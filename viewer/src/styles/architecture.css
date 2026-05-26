@@ -1,3 +1,15 @@
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
 .architecture-page {
   --panel: #fbfbf8;
   --panel-strong: #ffffff;
@@ -88,7 +100,7 @@
   min-height: 0;
   height: 100%;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
 }
 

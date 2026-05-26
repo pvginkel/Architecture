@@ -1,24 +1,24 @@
-// Placeholder — wired by Pieter against the homelab Jenkins + K8s stack.
-// Mirrors the shape of webathome.org's pipeline: build the image, push to
-// the internal registry, trigger the Ansible/K8s rollout.
+library('JenkinsPipelineUtils') _
 
-pipeline {
-  agent any
-  stages {
-    stage('build') {
-      steps {
-        echo 'TODO: docker build -t architecture .'
-      }
+podTemplate(inheritFrom: 'jenkins-agent kaniko') {
+    node(POD_LABEL) {
+        stage('Cloning repo') {
+            checkout scm
+        }
+
+        stage('Build architecture viewer') {
+            dir('Architecture') {
+                container('kaniko') {
+                    helmCharts.kaniko([
+                        "registry:5000/architecture_viewer:${currentBuild.number}",
+                        'registry:5000/architecture_viewer:latest'
+                    ])
+                }
+            }
+        }
+
+        stage('Redeploy home') {
+            build job: 'HelmCharts', wait: false
+        }
     }
-    stage('push') {
-      steps {
-        echo 'TODO: push to internal registry'
-      }
-    }
-    stage('deploy') {
-      steps {
-        echo 'TODO: trigger Ansible / K8s rollout'
-      }
-    }
-  }
 }
