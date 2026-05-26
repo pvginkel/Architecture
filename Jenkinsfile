@@ -7,13 +7,11 @@ podTemplate(inheritFrom: 'jenkins-agent kaniko') {
         }
 
         stage('Build architecture viewer') {
-            dir('Architecture') {
-                container('kaniko') {
-                    helmCharts.kaniko([
-                        "registry:5000/architecture_viewer:${currentBuild.number}",
-                        'registry:5000/architecture_viewer:latest'
-                    ])
-                }
+            container('kaniko') {
+                helmCharts.kaniko([
+                    "registry:5000/architecture_viewer:${currentBuild.number}",
+                    'registry:5000/architecture_viewer:latest'
+                ])
             }
         }
 
