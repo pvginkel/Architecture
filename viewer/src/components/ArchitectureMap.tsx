@@ -208,7 +208,7 @@ function ArchitectureNodeCard({ data }: NodeProps<Node<ArchitectureNodeData>>) {
         </span>
         <span className="arch-node__logo" aria-hidden="true">
           {data.logo ? (
-            <img src={`/logos/${data.logo}`} alt="" />
+            <img src={`${import.meta.env.BASE_URL}logos/${data.logo}`} alt="" />
           ) : null}
         </span>
       </div>
