@@ -248,8 +248,9 @@ These are catchable at single-artifact JSON Schema time:
 Caught only at collector time, listed for completeness:
 
 - Reference to an element id that doesn't exist in the merged dataset.
-- Two elements with the same id.
-- Producer declaring an element kind not permitted by its profile.
+- Two elements with the same id (a real ownership conflict between producers).
+- Cross-producer relation triples not permitted by ArchiMate 3.2 (in-artifact triples are already caught above; the same matrix is re-checked at merge time for relations whose source and target live in different artifacts).
+- alias-hint divergence (same UUID, different hints across producers — warning, not failure).
 
 ## Inclusion rule
 

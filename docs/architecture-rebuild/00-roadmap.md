@@ -54,10 +54,10 @@ Define how a repo becomes a producer of architecture data; build the Architectur
 
 Two pieces, one phase:
 
-- **Producer protocol** (this repo's contract with producer repos): Jenkins archives `architecture.yaml` as a build artifact per build; producers reference cross-producer elements by UUID (alias hints optional, label-divergence warned); each producer's CI runs `arch-validate` and fails the build on non-zero exit.
-- **Collector** (this repo's Jenkinsfile + a Python script in Docker): on each Architecture-repo build, pull every registered producer's latest-successful-build artifact, validate, merge, cross-check, and publish the consolidated `data/v0.1/architecture.yaml` as a static asset served by the v2 service.
+- **Producer protocol** (this repo's contract with producer repos): Jenkins archives `architecture.yaml` as a build artifact per build; producers reference cross-producer elements by UUID (alias hints optional, divergence warned); each producer's CI runs `arch-validate` and fails the build on non-zero exit; `«SoftwareProduct»` catalog entries are owner-emitted, not centrally curated.
+- **Collector** (this repo's Jenkinsfile + `tooling/collect.py` running as a Docker build stage): the Jenkinsfile uses native `copyArtifacts` to pull each registered producer's last-successful `architecture.yaml` into the build context; the collector validates, merges, cross-checks, and emits `dist/data/v0.1/*` which the final image stage copies in. Fail-fast at every step — no drop-and-continue, no machine-enforced profile constraints.
 
-Plans: [`04-producer-protocol.md`](./04-producer-protocol.md), [`05-collector-and-pipeline.md`](./05-collector-and-pipeline.md).
+Design docs: [`04-producer-protocol.md`](./04-producer-protocol.md), [`05-collector-and-pipeline.md`](./05-collector-and-pipeline.md). Work-item plan: [`../features/collector-and-pipeline.md`](../features/collector-and-pipeline.md).
 
 ### v4 — Bootstrap producer cycle
 
