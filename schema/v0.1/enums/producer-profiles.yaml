@@ -1,0 +1,31 @@
+# Producer profiles.
+#
+# Each artifact submitted to the validator declares which profile produced
+# it. The collector applies a per-profile authority matrix (which element
+# kinds the producer is allowed to emit) at merge time.
+#
+# A producer is realised concretely by a «Producer»-stereotyped Artifact
+# (a Repository). Multiple Artifact instances can share a profile (e.g.,
+# different app repos all declaring profile=application).
+
+$id: https://architecture.webathome.org/schema/v0.1/enums/producer-profiles.yaml
+entries:
+  - id: infra-physical
+    label: Physical infrastructure
+    summary: Ansible-owned hardware, VMs, OS-level installs.
+    lifecycle: active
+
+  - id: cluster-services
+    label: Cluster services
+    summary: HelmCharts-owned shared cluster services.
+    lifecycle: active
+
+  - id: images
+    label: Image identity
+    summary: DockerImages-owned image identity and build provenance. (Most fields v0.2.)
+    lifecycle: active
+
+  - id: application
+    label: Application
+    summary: Application repos (EI, IoT, Design Assistant, others) — own pods, queues, storage, ingress.
+    lifecycle: active

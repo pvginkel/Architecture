@@ -1,0 +1,184 @@
+# Curated capability enumeration for v0.1.
+#
+# Capabilities are business-architecture roles, not technical labels. The
+# bar for adding one: it answers a "what does this part of the system
+# offer" question at the level a non-implementer would phrase it.
+#
+# Adding a capability requires a PR to this file. Producers reference
+# entries by `id`; they cannot mint new capabilities ad-hoc.
+
+$id: https://architecture.webathome.org/schema/v0.1/enums/capabilities.yaml
+entries:
+  - id: cap:iam
+    label: Identity & Access Management
+    summary: Identity store, authentication, authorisation, SSO realisation.
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:secrets-management
+    label: Secrets management
+    summary: Secret storage, retrieval, rotation, lease management.
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:pki
+    label: Public Key Infrastructure
+    summary: Certificate issuance, renewal, trust chain management.
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:ingress
+    label: Ingress
+    summary: External-facing HTTP/TCP entry into the cluster.
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:dns
+    label: DNS
+    summary: Authoritative or recursive DNS resolution for a domain set.
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:dhcp
+    label: DHCP
+    summary: IP address allocation for a LAN segment.
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:relational-database
+    label: Relational database
+    summary: SQL-tabular persistence with transactions and joins.
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:document-store
+    label: Document store
+    summary: Schemaless or semi-structured document persistence.
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:vector-store
+    label: Vector store
+    summary: Embedding storage with similarity-search indexes.
+    lifecycle: active
+    introduced: 2026-05-27
+
+  - id: cap:full-text-search
+    label: Full-text search
+    summary: Inverted-index search over textual corpora.
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:cache
+    label: Cache
+    summary: In-memory key-value store with eviction.
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:message-queue
+    label: Message queue
+    summary: Point-to-point durable messaging (AMQP-style queues).
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:pub-sub-broker
+    label: Pub/sub broker
+    summary: Topic-based publish/subscribe (MQTT-style).
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:object-storage
+    label: Object storage
+    summary: S3-style bucket persistence.
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:shared-filesystem
+    label: Shared filesystem
+    summary: Network-mountable POSIX-ish filesystem (NFS, CephFS, SMB).
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:block-storage
+    label: Block storage
+    summary: Raw block devices (iSCSI, RBD).
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:metrics
+    label: Metrics
+    summary: Time-series numeric telemetry collection and storage.
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:logging
+    label: Logging
+    summary: Log shipping, aggregation, search.
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:observability
+    label: Observability
+    summary: Cross-cutting role that aggregates metrics + logging + tracing.
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:container-orchestration
+    label: Container orchestration
+    summary: Container scheduling and lifecycle management (Kubernetes).
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:hypervisor
+    label: Hypervisor
+    summary: VM scheduling and lifecycle management (Proxmox).
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:image-registry
+    label: Image registry
+    summary: OCI image storage and distribution.
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:source-control
+    label: Source control
+    summary: Git repository hosting and access control.
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:continuous-integration
+    label: Continuous integration
+    summary: Build and pipeline orchestration.
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:configuration-management
+    label: Configuration management
+    summary: Declarative or imperative system-state convergence (Ansible, TF).
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:remote-access
+    label: Remote access
+    summary: Browser/RDP/SSH gateway into managed environments.
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:vpn
+    label: VPN
+    summary: Encrypted network tunnel terminating at a remote endpoint.
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:media-streaming
+    label: Media streaming
+    summary: Audio/video catalogue, transcoding, client delivery.
+    lifecycle: active
+    introduced: 2024-07-12
+
+  - id: cap:home-automation
+    label: Home automation
+    summary: Sensor and actuator orchestration over Zigbee/MQTT.
+    lifecycle: active
+    introduced: 2024-07-12

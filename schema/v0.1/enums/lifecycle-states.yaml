@@ -1,0 +1,15 @@
+# Lifecycle states for every element kind.
+
+$id: https://architecture.webathome.org/schema/v0.1/enums/lifecycle-states.yaml
+entries:
+  - id: active
+    label: Active
+    summary: Live, referenceable.
+
+  - id: deprecated
+    label: Deprecated
+    summary: Being phased out. Requires replacedBy or retirementBy.
+
+  - id: removed
+    label: Removed
+    summary: No longer deployed. Producer still emits the entry until references are gone.

@@ -1,0 +1,23 @@
+# DTAP environment stages.
+#
+# Custom attribute; not ArchiMate's Plateau. The renderer filters on
+# environment=prd by default; other stages are accepted into the dataset
+# but not shown.
+
+$id: https://architecture.webathome.org/schema/v0.1/enums/environments.yaml
+entries:
+  - id: dev
+    label: Development
+    summary: Developer-shared environment. Lowest stability, fastest churn.
+
+  - id: tst
+    label: Test
+    summary: Functional and integration testing.
+
+  - id: uat
+    label: User Acceptance Test
+    summary: Stakeholder verification before production.
+
+  - id: prd
+    label: Production
+    summary: Live, serving real users. Default rendered environment.
