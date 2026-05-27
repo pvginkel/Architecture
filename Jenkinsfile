@@ -16,7 +16,6 @@
 //
 // Triggers wired below:
 //   - SCM push to this repo (the default poll-or-webhook).
-//   - Daily cron as a hedge against missed upstream triggers.
 //   - Upstream success of every registered producer's Jenkins job.
 //     In v3 pipeline-producers.yaml ships empty, so no upstream
 //     triggers are wired yet; v4 producer onboarding automatically
@@ -43,12 +42,14 @@ podTemplate(inheritFrom: 'jenkins-agent kaniko', containers: [
         def producers = producersDoc.producers ?: []
         def upstreamJobs = producers.collect { it.jenkinsJob }.join(', ')
 
-        def triggerList = [cron('@daily')]
         if (upstreamJobs) {
-            triggerList << upstream(threshold: hudson.model.Result.SUCCESS,
-                                    upstreamProjects: upstreamJobs)
+            properties([pipelineTriggers([
+                upstream(threshold: hudson.model.Result.SUCCESS,
+                         upstreamProjects: upstreamJobs)
+            ])])
+        } else {
+            properties([pipelineTriggers([])])
         }
-        properties([pipelineTriggers(triggerList)])
 
         stage('Copy producer artifacts') {
             sh 'mkdir -p producer-artifacts'

@@ -53,10 +53,11 @@ Schema-out-of-sync and schema-meta-invalid are caught early in the build (the ex
 
 ### Triggers
 
-- **On producer success**: each registered producer's Jenkins job, on successful build, triggers the Architecture repo's job downstream. Native Jenkins upstream-build trigger; no custom infra.
-- **Scheduled**: nightly rebuild as a hedge against missed triggers and to surface staleness warnings.
+- **On producer success**: each registered producer's Jenkins job, on successful build, triggers the Architecture repo's job downstream. Native Jenkins upstream-build trigger; no custom infra. The Jenkinsfile reads `pipeline-producers.yaml` and writes the `upstream()` trigger into the job's persisted properties — adding a producer to the registry auto-wires the dispatch path on the next run.
 - **On Architecture repo push**: any commit triggers a rebuild (schema change, collector change, viewer change, doc change — anything that changes container contents).
 - **Manual**: button in Jenkins for ad-hoc reruns (debugging, schema preview).
+
+No scheduled rebuild. The earlier draft proposed a nightly cron "as a hedge against missed triggers and to surface staleness warnings" — with the locked decisions (no staleness window, deterministic outputs) the cron caught nothing the other three triggers don't already cover, so it's gone.
 
 Concurrent producer completions are coalesced by Jenkins's pending-build merging on the Architecture job. Not a v3 concern.
 
