@@ -37,7 +37,7 @@ artifacts:
 devices:
   - id: device:proxmox-pve1,22222222-2222-4222-8222-222222222221
     label: pve1
-    summary: Proxmox node #1.
+    summary: "Proxmox node #1."
     introduced: 2024-07-12
     lifecycle: active
 

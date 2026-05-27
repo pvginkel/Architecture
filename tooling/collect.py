@@ -20,12 +20,14 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import sys
 import uuid
 from pathlib import Path
 from typing import Any
 
 import click
+import yaml
 
 from _arch import (
     PIPELINE_PRODUCERS_FILE,
@@ -601,6 +603,90 @@ def new_report() -> dict[str, Any]:
     return {"summary": {}, "warnings": [], "divergences": []}
 
 
+def assemble_merged_dataset(
+    producers: list[dict],
+    merged: dict[str, list],
+    rollups: dict[str, Any],
+) -> dict[str, Any]:
+    """The shape downstream consumers (validation service, viewer) read
+    from `/data/v0.1/architecture.yaml` and `architecture.json`.
+
+    Top-level shape:
+      schemaVersion: "0.1"
+      producers: [{id, profile}, ...]    # the registered producer list
+      <every element-kind array>
+      relations: [...]
+      derived: {groupings, capabilityRealizations}
+
+    No `generatedAt` — it would defeat the byte-identical-reruns guarantee
+    and isn't load-bearing. `producer:` top-level (single-producer
+    artifact-envelope convention) is absent because the merged set has
+    no single producer; the registered-producer list captures who
+    contributed.
+    """
+    doc: dict[str, Any] = {
+        "schemaVersion": "0.1",
+        "producers": [
+            {"id": p["id"], "profile": p["profile"]} for p in producers
+        ],
+    }
+    for kind in ELEMENT_KIND_ARRAYS:
+        doc[kind] = merged[kind]
+    doc["relations"] = merged["relations"]
+    doc["derived"] = rollups
+    return doc
+
+
+def finalize_report(
+    report: dict[str, Any],
+    docs: dict[str, Any],
+    merged: dict[str, list],
+) -> dict[str, Any]:
+    """Fill in `summary`. Phases already appended to warnings + divergences.
+    Errors never appear in the report — they failed the run before emit.
+    """
+    report["summary"] = {
+        "producers": len(docs),
+        "elements": sum(len(merged[k]) for k in ELEMENT_KIND_ARRAYS),
+        "relations": len(merged["relations"]),
+        "warnings": len(report["warnings"]),
+        "divergences": len(report["divergences"]),
+    }
+    return report
+
+
+def emit_outputs(
+    output_dir: Path,
+    merged_doc: dict[str, Any],
+    report: dict[str, Any],
+) -> list[Path]:
+    """Write architecture.yaml, architecture.json, validation-report.json
+    under `<output_dir>/data/v0.1/`. Returns the list of files written.
+
+    Byte-identical reruns guaranteed when input is identical: dict
+    insertion-order is preserved (Python 3.7+), all merged arrays are
+    built deterministically, and serialisation uses sort_keys=False so
+    the structure we built is what hits disk.
+    """
+    data_dir = output_dir / "data" / "v0.1"
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    yaml_path = data_dir / "architecture.yaml"
+    json_path = data_dir / "architecture.json"
+    report_path = data_dir / "validation-report.json"
+
+    yaml_path.write_text(
+        yaml.safe_dump(merged_doc, sort_keys=False, default_flow_style=False, width=120)
+    )
+    json_path.write_text(
+        json.dumps(merged_doc, indent=2, ensure_ascii=False, sort_keys=False) + "\n"
+    )
+    report_path.write_text(
+        json.dumps(report, indent=2, ensure_ascii=False, sort_keys=False) + "\n"
+    )
+    return [yaml_path, json_path, report_path]
+
+
 def _fail(err: CollectorError) -> None:
     click.echo(f"FAIL [{err.phase}] {len(err.messages)} error(s):", err=True)
     for m in err.messages:
@@ -723,8 +809,11 @@ def main(producers_path: Path, input_dir: Path, output_dir: Path) -> None:
         f"{len(rollups['capabilityRealizations'])} capability realisation map(s)."
     )
 
-    # Later work items extend this scaffold: emit.
-    _ = output_dir, merged, report, rollups
+    merged_doc = assemble_merged_dataset(producers, merged, rollups)
+    finalize_report(report, docs, merged)
+    written = emit_outputs(output_dir, merged_doc, report)
+    for p in written:
+        click.echo(f"Wrote {p}")
 
 
 if __name__ == "__main__":
