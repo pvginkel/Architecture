@@ -30,6 +30,7 @@ import click
 from _arch import (
     PIPELINE_PRODUCERS_FILE,
     PIPELINE_PRODUCERS_SCHEMA,
+    load_allowed_triples,
     load_capability_enum,
     load_pipeline_producers,
     load_yaml,
@@ -59,6 +60,24 @@ ELEMENT_KIND_ARRAYS: tuple[str, ...] = (
     "businessServices",
     "groupings",
 )
+
+# YAML envelope key → ArchiMate concept name. The triple matrix
+# (x-allowedTriples in generated/relations.schema.yaml) is keyed on
+# ArchiMate names; the ResolutionIndex returns the YAML envelope kind.
+ARRAY_TO_ARCHIMATE: dict[str, str] = {
+    "nodes": "Node",
+    "devices": "Device",
+    "systemSoftware": "SystemSoftware",
+    "applicationComponents": "ApplicationComponent",
+    "applicationServices": "ApplicationService",
+    "applicationInterfaces": "ApplicationInterface",
+    "technologyServices": "TechnologyService",
+    "technologyInterfaces": "TechnologyInterface",
+    "artifacts": "Artifact",
+    "capabilities": "Capability",
+    "businessServices": "BusinessService",
+    "groupings": "Grouping",
+}
 
 
 class CollectorError(Exception):
@@ -374,6 +393,50 @@ def resolve_cross_references(
         raise CollectorError("cross-reference", messages)
 
 
+def check_triple_matrix(
+    docs: dict[str, Any],
+    index: ResolutionIndex,
+) -> None:
+    """Every relation's `(source-kind, type, target-kind)` triple, in
+    ArchiMate concept-name terms, must appear in `x-allowedTriples` from
+    `schema/v0.1/generated/relations.schema.yaml`. The same check runs
+    over in-artifact and cross-artifact relations — JSON Schema doesn't
+    enforce triples on its own, so the collector is the enforcement
+    point for both.
+
+    Synthesised producer-Association edges land in the same relation
+    arrays as producer-emitted ones; they're checked here too. (Artifact,
+    Association, *) is permitted for every v0.1 element kind, which is
+    why Association is the synthesis type.
+    """
+    allowed = load_allowed_triples()
+    messages: list[str] = []
+
+    for pid in sorted(docs):
+        for i, rel in enumerate(docs[pid].get("relations") or []):
+            source_entry, _ = index.resolve(rel["source"], pid)
+            target_entry, _ = index.resolve(rel["target"], pid)
+            if source_entry is None or target_entry is None:
+                # cross-ref pass would have caught this; if we got here
+                # without cross-ref running first, skip rather than spam.
+                continue
+            source_kind_name, _, _ = source_entry
+            target_kind_name, _, _ = target_entry
+            source_concept = ARRAY_TO_ARCHIMATE[source_kind_name]
+            target_concept = ARRAY_TO_ARCHIMATE[target_kind_name]
+            triple = (source_concept, rel["type"], target_concept)
+            if triple not in allowed:
+                messages.append(
+                    f"{pid}: at /relations/{i}: triple "
+                    f"({source_concept}, {rel['type']}, {target_concept}) "
+                    f"not in x-allowedTriples — source {rel['source']!r}, "
+                    f"target {rel['target']!r}"
+                )
+
+    if messages:
+        raise CollectorError("triple-matrix", messages)
+
+
 def reconcile_alias_hints(
     docs: dict[str, Any],
     index: ResolutionIndex,
@@ -537,7 +600,14 @@ def main(producers_path: Path, input_dir: Path, output_dir: Path) -> None:
            f"{n_div} element(s) with hint divergence captured in the report.")
     )
 
-    # Later work items extend this scaffold: triple-matrix, grouping, emit.
+    try:
+        check_triple_matrix(docs, index)
+    except CollectorError as e:
+        _fail(e)
+
+    click.echo("Triple-matrix check: every relation triple permitted by ArchiMate 3.2.")
+
+    # Later work items extend this scaffold: grouping, emit.
     _ = output_dir, merged, report
 
 
