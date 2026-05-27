@@ -34,6 +34,7 @@ from _arch import (
     load_pipeline_producers,
     load_yaml,
     normalize,
+    parse_id,
     validate_doc,
 )
 
@@ -266,47 +267,88 @@ def merge_artifacts(docs: dict[str, Any]) -> dict[str, list]:
     return merged
 
 
-def build_id_index(merged: dict[str, list]) -> dict[str, tuple[str, dict]]:
-    """Map every merged element id → (kind, element-dict). The merge step
-    already guarantees ids are unique across the merged set, so this is a
-    one-pass dict construction with no collision handling needed.
+class ResolutionIndex:
+    """Three lookup tables built from the per-producer `docs` walk:
+
+    * `by_full_id` — exact-string match. The merged set's element id keys
+      everything (composite, bare kebab, anything the schema accepts).
+    * `by_uuid` — for declarations that minted a UUID (instance kinds).
+      Keyed on the UUID portion of the composite declaration.
+    * `by_internal_hint` — (producer, kind, hint) → element. Lets a producer
+      write hint-only references to its own elements. Cross-producer
+      hint-only references deliberately do not resolve through this table.
+
+    Each value is a (kind, elem, owner_pid) tuple, so callers can ask for
+    the kind and owner without re-parsing.
     """
-    index: dict[str, tuple[str, dict]] = {}
-    for kind in ELEMENT_KIND_ARRAYS:
-        for elem in merged[kind]:
-            index[elem["id"]] = (kind, elem)
-    return index
+
+    def __init__(self, docs: dict[str, Any]) -> None:
+        self.by_full_id: dict[str, tuple[str, dict, str]] = {}
+        self.by_uuid: dict[str, tuple[str, dict, str]] = {}
+        # Internal-hint key is the id-prefix (e.g. "ss", "node") not the
+        # YAML array name (e.g. "systemSoftware"), so it lines up with
+        # what `parse_id` returns on a reference.
+        self.by_internal_hint: dict[tuple[str, str, str], tuple[str, dict, str]] = {}
+        for pid in sorted(docs):
+            doc = docs[pid]
+            for kind_name in ELEMENT_KIND_ARRAYS:
+                for elem in doc.get(kind_name) or []:
+                    eid = elem["id"]
+                    entry = (kind_name, elem, pid)
+                    self.by_full_id[eid] = entry
+                    prefix_kind, hint, uuid_str = parse_id(eid)
+                    if uuid_str is not None:
+                        self.by_uuid[uuid_str] = entry
+                    if hint is not None and uuid_str is not None:
+                        self.by_internal_hint[(pid, prefix_kind, hint)] = entry
+
+    def resolve(
+        self, ref: str, relation_pid: str
+    ) -> tuple[tuple[str, dict, str] | None, str | None]:
+        """Return (entry-or-None, ref-supplied-hint-for-divergence-check).
+
+        Lookup order:
+            1. UUID portion present → by_uuid (any-producer, by design).
+            2. No UUID, full-string match → by_full_id (catalogue / curated).
+            3. No UUID, hint-only → by_internal_hint for the relation's
+               own producer. Cross-producer hint-only refs do not resolve
+               and surface as dangling — they need the UUID.
+        """
+        kind, hint, uuid_str = parse_id(ref)
+        if uuid_str is not None:
+            return self.by_uuid.get(uuid_str), hint
+        if ref in self.by_full_id:
+            return self.by_full_id[ref], None
+        if hint is not None:
+            return self.by_internal_hint.get((relation_pid, kind, hint)), None
+        return None, None
 
 
 def resolve_cross_references(
     docs: dict[str, Any],
-    merged: dict[str, list],
+    index: ResolutionIndex,
     report: dict[str, Any],
 ) -> None:
-    """For every relation `source`/`target`, check the id resolves to a
-    merged element. Dangling = fail. Reference to a `removed` element =
-    fail. Reference to a `deprecated` element = warning in the report;
-    the run still succeeds. The same lookup handles UUID and kebab-case
-    SoftwareProduct ids — no special-casing.
-
-    Relations don't carry a `producer` field in v0.1, so this pass walks
-    `docs` (the per-producer parsed inputs) for provenance in error
-    messages.
+    """For every relation source/target, check the id resolves. Dangling =
+    fail. Reference to a `removed` element = fail. Reference to a
+    `deprecated` element = warning in the report; the run still succeeds.
+    Composite + uuid-only + hint-only forms all flow through `index`.
     """
-    index = build_id_index(merged)
     messages: list[str] = []
 
     for pid in sorted(docs):
         for i, rel in enumerate(docs[pid].get("relations") or []):
             for field in ("source", "target"):
                 ref = rel[field]
-                if ref not in index:
+                entry, _ = index.resolve(ref, pid)
+                if entry is None:
                     messages.append(
                         f"{pid}: at /relations/{i}/{field}: dangling reference to "
-                        f"{ref!r} (no element with that id in the merged dataset)"
+                        f"{ref!r} (no element resolves; cross-producer references "
+                        f"must include the UUID)"
                     )
                     continue
-                _, elem = index[ref]
+                _, elem, _ = entry
                 lifecycle = elem.get("lifecycle")
                 if lifecycle == "removed":
                     messages.append(
@@ -330,6 +372,58 @@ def resolve_cross_references(
 
     if messages:
         raise CollectorError("cross-reference", messages)
+
+
+def reconcile_alias_hints(
+    docs: dict[str, Any],
+    index: ResolutionIndex,
+    report: dict[str, Any],
+) -> None:
+    """Compare the hint portion of every composite reference against the
+    owner's declared hint. If a referring producer writes a hint that
+    differs from the owner's, that's a divergence — captured in the
+    report, not a build failure. Convergent hints (same as owner) and
+    hint-less references (UUID-only) produce no entry.
+
+    Each divergent observation is grouped per element so the report names
+    every referring producer that drifted, and the owner's authoritative
+    spelling.
+    """
+    # uuid -> {"owner_pid": ..., "owner_hint": ..., "observed": [(pid, pointer, hint), ...]}
+    divergences: dict[str, dict[str, Any]] = {}
+
+    for pid in sorted(docs):
+        for i, rel in enumerate(docs[pid].get("relations") or []):
+            for field in ("source", "target"):
+                ref = rel[field]
+                entry, ref_hint = index.resolve(ref, pid)
+                if entry is None or ref_hint is None:
+                    continue
+                kind, elem, owner_pid = entry
+                _, owner_hint, _ = parse_id(elem["id"])
+                if owner_hint is None or ref_hint == owner_hint:
+                    continue
+                uuid_key = parse_id(elem["id"])[2]
+                bucket = divergences.setdefault(
+                    uuid_key,
+                    {
+                        "id": elem["id"],
+                        "kind": kind,
+                        "owner_producer": owner_pid,
+                        "owner_hint": owner_hint,
+                        "observed": [],
+                    },
+                )
+                bucket["observed"].append(
+                    {
+                        "producer": pid,
+                        "pointer": f"/relations/{i}/{field}",
+                        "hint": ref_hint,
+                    }
+                )
+
+    for entry in divergences.values():
+        report["divergences"].append(entry)
 
 
 def new_report() -> dict[str, Any]:
@@ -420,9 +514,10 @@ def main(producers_path: Path, input_dir: Path, output_dir: Path) -> None:
     )
 
     report = new_report()
+    index = ResolutionIndex(docs)
 
     try:
-        resolve_cross_references(docs, merged, report)
+        resolve_cross_references(docs, index, report)
     except CollectorError as e:
         _fail(e)
 
@@ -434,8 +529,15 @@ def main(producers_path: Path, input_dir: Path, output_dir: Path) -> None:
         + (f" ({deprecated_warnings} deprecated-target warning(s))." if deprecated_warnings else ".")
     )
 
-    # Later work items extend this scaffold: alias-hint, triple-matrix,
-    # grouping, emit.
+    reconcile_alias_hints(docs, index, report)
+    n_div = len(report["divergences"])
+    click.echo(
+        f"Alias-hint reconciliation: "
+        + ("hints agree across all observations." if n_div == 0 else
+           f"{n_div} element(s) with hint divergence captured in the report.")
+    )
+
+    # Later work items extend this scaffold: triple-matrix, grouping, emit.
     _ = output_dir, merged, report
 
 
