@@ -1,0 +1,117 @@
+# Architecture artifact starter skeleton.
+#
+# Replace placeholders. Drop the sections you don't need; everything
+# except `schemaVersion`, `producer`, and the matching «Producer»
+# Artifact entry is optional at the envelope level. Per-element
+# required fields are enforced by the validator — run
+#   ./scripts/arch-validate architecture.yaml
+# after each edit until it's clean.
+#
+# IDs:
+#   - Instance kinds → composite form: <kind>:<hint>,<uuid4>
+#     Mint UUIDs with: python -c 'import uuid; print(uuid.uuid4())'
+#     Once minted, NEVER re-mint. Commit them next to this file so
+#     they're stable across builds.
+#   - Curated / catalog / Repository / Producer kinds → bare kebab.
+#
+# Relations: the collector synthesises one Association relation per
+# declared element from the «Producer» Artifact below to the element,
+# automatically. Do NOT emit those relations yourself.
+#
+# See MANUAL.md for the full vocabulary, allowed relation triples,
+# stereotype rules, and inclusion criteria.
+
+schemaVersion: "0.1"
+producer: art:<PRODUCER-ID>     # bare kebab; must match the «Producer» Artifact id below
+
+artifacts:
+  - id: art:<PRODUCER-ID>
+    label: <repo display name>
+    summary: <one or two sentences describing what this repo produces>
+    introduced: 2026-05-27       # ISO date when this repo became a producer
+    lifecycle: active
+    stereotype: Producer
+    url: https://github.com/<owner>/<repo>
+    role: source
+    owner: <human or team>
+
+# ─── Replace / remove sections below as appropriate ─────────────────
+
+# devices:
+#   - id: device:<hint>,<uuid4>
+#     label: ...
+#     summary: ...
+#     introduced: 2026-05-27
+#     lifecycle: active
+
+# nodes:
+#   - id: node:<hint>,<uuid4>
+#     label: ...
+#     summary: ...
+#     introduced: 2026-05-27
+#     lifecycle: active
+#     cluster: prd                  # optional, free-form cluster id
+#     environment: prd              # optional: dev | tst | uat | prd
+
+# systemSoftware:
+#   - id: ss:<hint>,<uuid4>          # composite for running instances
+#     label: ...
+#     summary: ...
+#     introduced: 2026-05-27
+#     lifecycle: active
+#     environment: prd
+#     cluster: prd
+#
+#   - id: ss:<product-name>          # bare kebab for SoftwareProduct catalog entries
+#     label: ...
+#     summary: ...
+#     introduced: 2026-05-27
+#     lifecycle: active
+#     stereotype: SoftwareProduct
+#     homepage: https://...
+#     logo: <name>.svg
+
+# applicationComponents:
+#   - id: app:<hint>,<uuid4>
+#     ...
+
+# applicationServices:
+#   - id: svc:<hint>,<uuid4>
+#     ...
+
+# applicationInterfaces:
+#   - id: if:<hint>,<uuid4>
+#     ...
+
+# technologyServices:
+#   - id: svc:<hint>,<uuid4>
+#     ...
+
+# technologyInterfaces:
+#   - id: if:<hint>,<uuid4>
+#     ...
+
+# capabilities:
+#   # Reference any capabilities you realise. The id MUST exist in the
+#   # central enum (see MANUAL.md § Capability enum). Producers cannot
+#   # mint new capabilities; a PR against the Architecture repo's enum
+#   # is needed first.
+#   - id: cap:secrets-management
+#     label: Secrets management
+#     summary: Secrets storage / rotation / lease management.
+#     introduced: 2024-07-12
+#     lifecycle: active
+
+# businessServices:
+#   - id: bsvc:<kebab>
+#     ...
+
+# groupings:
+#   - id: grp:<hint>,<uuid4>
+#     ...
+
+# relations:
+#   - id: rel:<kebab-or-uuid>
+#     source: <element-id>
+#     target: <element-id>
+#     type: <ArchiMate type — see MANUAL.md § Relations>
