@@ -1,0 +1,29 @@
+schemaVersion: "0.1"
+producer: art:ansible
+artifacts:
+  - id: art:ansible
+    label: Ansible
+    summary: Producer.
+    introduced: 2024-07-12
+    lifecycle: active
+    stereotype: Producer
+    url: https://example.invalid/ansible
+    role: source
+    owner: nobody
+nodes:
+  - id: node:prd-cluster,33333333-3333-4333-8333-333333333331
+    label: Cluster
+    summary: Cluster.
+    introduced: 2024-07-12
+    lifecycle: active
+systemSoftware:
+  - id: ss:keycloak-prd,44444444-4444-4444-8444-444444444441
+    label: Keycloak
+    summary: Keycloak.
+    introduced: 2024-07-12
+    lifecycle: active
+relations:
+  - id: rel:cluster-runs-ghost
+    source: node:prd-cluster,33333333-3333-4333-8333-333333333331
+    target: ss:does-not-exist,99999999-9999-4999-8999-999999999999
+    type: Assignment

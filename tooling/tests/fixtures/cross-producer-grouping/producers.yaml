@@ -1,0 +1,7 @@
+producers:
+  - id: ansible
+    profile: infra-physical
+    jenkinsJob: ansible/master
+  - id: helm
+    profile: cluster-services
+    jenkinsJob: HelmCharts/master

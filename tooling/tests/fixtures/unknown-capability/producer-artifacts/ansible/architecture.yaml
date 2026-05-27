@@ -1,0 +1,23 @@
+schemaVersion: "0.1"
+producer: art:ansible
+artifacts:
+  - id: art:ansible
+    label: Ansible
+    summary: Producer.
+    introduced: 2024-07-12
+    lifecycle: active
+    stereotype: Producer
+    url: https://example.invalid/ansible
+    role: source
+    owner: nobody
+nodes:
+  - id: node:prd-cluster,33333333-3333-4333-8333-333333333331
+    label: Cluster
+    summary: Cluster.
+    introduced: 2024-07-12
+    lifecycle: active
+relations:
+  - id: rel:cluster-realises-bogus
+    source: node:prd-cluster,33333333-3333-4333-8333-333333333331
+    target: cap:does-not-exist
+    type: Realization

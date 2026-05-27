@@ -1,0 +1,19 @@
+schemaVersion: "0.1"
+producer: art:ansible
+artifacts:
+  - id: art:ansible
+    label: Ansible repo
+    summary: Ansible producer.
+    introduced: 2024-07-12
+    lifecycle: active
+    stereotype: Producer
+    url: https://example.invalid/ansible
+    role: source
+    owner: nobody
+nodes:
+  - id: node:prd-cluster,33333333-3333-4333-8333-333333333331
+    label: Production cluster
+    summary: Production Kubernetes cluster.
+    introduced: 2024-07-12
+    lifecycle: active
+    cluster: prd
