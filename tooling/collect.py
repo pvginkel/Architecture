@@ -37,6 +37,22 @@ from _arch import (
 )
 
 
+ELEMENT_KIND_ARRAYS: tuple[str, ...] = (
+    "nodes",
+    "devices",
+    "systemSoftware",
+    "applicationComponents",
+    "applicationServices",
+    "applicationInterfaces",
+    "technologyServices",
+    "technologyInterfaces",
+    "artifacts",
+    "capabilities",
+    "businessServices",
+    "groupings",
+)
+
+
 class CollectorError(Exception):
     """Phase-level failure carrying one-or-more concrete error messages.
     The CLI surfaces each message and exits non-zero. Raised whenever a
@@ -162,6 +178,39 @@ def reconcile_capability_enum(docs: dict[str, Any]) -> None:
         raise CollectorError("capability-enum", messages)
 
 
+def merge_artifacts(docs: dict[str, Any]) -> dict[str, list]:
+    """Union every element-kind array (and relations) across producers.
+    Fails the run if any id appears in more than one place, reporting
+    both the original producer + kind and the conflicting producer + kind.
+
+    Element `producer` back-pointers are preserved verbatim — the merge
+    does not rewrite them. Producer iteration is in sorted order so the
+    merged array order is deterministic for the same input set.
+    """
+    merged: dict[str, list] = {name: [] for name in (*ELEMENT_KIND_ARRAYS, "relations")}
+    seen: dict[str, tuple[str, str]] = {}  # id -> (kind, producer)
+    messages: list[str] = []
+
+    for pid in sorted(docs):
+        doc = docs[pid]
+        for kind in (*ELEMENT_KIND_ARRAYS, "relations"):
+            for elem in doc.get(kind) or []:
+                eid = elem["id"]
+                if eid in seen:
+                    prev_kind, prev_pid = seen[eid]
+                    messages.append(
+                        f"duplicate id {eid!r}: declared by {prev_pid!r} as "
+                        f"{prev_kind} and by {pid!r} as {kind}"
+                    )
+                    continue
+                seen[eid] = (kind, pid)
+                merged[kind].append(elem)
+
+    if messages:
+        raise CollectorError("merge", messages)
+    return merged
+
+
 def _fail(err: CollectorError) -> None:
     click.echo(f"FAIL [{err.phase}] {len(err.messages)} error(s):", err=True)
     for m in err.messages:
@@ -224,9 +273,20 @@ def main(producers_path: Path, input_dir: Path, output_dir: Path) -> None:
 
     click.echo("Capability-enum reconciliation: every cap: reference resolved.")
 
-    # Later work items extend this scaffold: merge, cross-ref, alias-hint,
+    try:
+        merged = merge_artifacts(docs)
+    except CollectorError as e:
+        _fail(e)
+
+    total_elements = sum(len(merged[k]) for k in ELEMENT_KIND_ARRAYS)
+    click.echo(
+        f"Merge: {total_elements} element(s) + {len(merged['relations'])} relation(s) "
+        f"unioned across {len(docs)} producer(s)."
+    )
+
+    # Later work items extend this scaffold: cross-ref, alias-hint,
     # triple-matrix, grouping, emit.
-    _ = output_dir
+    _ = output_dir, merged
 
 
 if __name__ == "__main__":
