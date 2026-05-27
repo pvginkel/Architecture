@@ -2,11 +2,14 @@ import express, { type Router } from "express";
 import yaml from "js-yaml";
 import type { SchemaBundle } from "./schema-loader.js";
 import { translateErrors, type TranslatedError } from "./error-translate.js";
+import type { Metrics, ValidateOutcome } from "./metrics.js";
 
 export interface ValidateOptions {
   bundle: SchemaBundle;
   /** Max body size in bytes. Defaults to 5 MiB per the spec. */
   bodyLimit?: number;
+  /** Optional metrics sink. If absent, instrumentation is a no-op. */
+  metrics?: Metrics;
 }
 
 const DEFAULT_LIMIT = 5 * 1024 * 1024;
@@ -44,49 +47,65 @@ export function mountValidate(opts: ValidateOptions): Router {
   return router;
 
   function handle(req: express.Request, res: express.Response): void {
-    const ctype = (req.headers["content-type"] ?? "").split(";")[0]!.trim().toLowerCase();
-    const raw = (req.body as Buffer | undefined) ?? Buffer.alloc(0);
-
-    let artifact: unknown;
+    const started = process.hrtime.bigint();
+    let outcome: ValidateOutcome = "error";
     try {
-      artifact = parseBody(raw, ctype);
-    } catch (e) {
-      if (e instanceof UnsupportedMediaTypeError) {
-        res.status(415).json({ error: e.message });
-        return;
-      }
-      if (e instanceof BadRequestError) {
-        res.status(400).json({ error: e.message });
-        return;
-      }
-      throw e;
-    }
+      const ctype = (req.headers["content-type"] ?? "").split(";")[0]!.trim().toLowerCase();
+      const raw = (req.body as Buffer | undefined) ?? Buffer.alloc(0);
+      opts.metrics?.validateBodyBytes.observe(raw.length);
 
-    const version = (artifact as { schemaVersion?: unknown })?.schemaVersion;
-    if (typeof version !== "string") {
-      res.status(400).json({ error: "artifact is missing required field 'schemaVersion'" });
-      return;
-    }
-    if (!SUPPORTED_VERSIONS.has(version)) {
-      res.status(400).json({
-        error: `schemaVersion '${version}' is not supported by this service`,
-        supported: [...SUPPORTED_VERSIONS],
+      let artifact: unknown;
+      try {
+        artifact = parseBody(raw, ctype);
+      } catch (e) {
+        if (e instanceof UnsupportedMediaTypeError) {
+          outcome = "bad_request";
+          res.status(415).json({ error: e.message });
+          return;
+        }
+        if (e instanceof BadRequestError) {
+          outcome = "bad_request";
+          res.status(400).json({ error: e.message });
+          return;
+        }
+        throw e;
+      }
+
+      const version = (artifact as { schemaVersion?: unknown })?.schemaVersion;
+      if (typeof version !== "string") {
+        outcome = "bad_request";
+        res.status(400).json({ error: "artifact is missing required field 'schemaVersion'" });
+        return;
+      }
+      if (!SUPPORTED_VERSIONS.has(version)) {
+        outcome = "bad_request";
+        res.status(400).json({
+          error: `schemaVersion '${version}' is not supported by this service`,
+          supported: [...SUPPORTED_VERSIONS],
+        });
+        return;
+      }
+
+      const ok = opts.bundle.artifactValidator(artifact);
+      const schemaErrors = ok
+        ? []
+        : translateErrors(opts.bundle.artifactValidator.errors ?? [], artifact);
+      const tripleErrors = checkRelationsTriples(artifact, opts.bundle);
+      const all = [...schemaErrors, ...tripleErrors];
+
+      outcome = all.length === 0 ? "valid" : "invalid";
+      res.status(200).json({
+        valid: all.length === 0,
+        schemaVersion: version,
+        ...(all.length > 0 ? { errors: all } : {}),
       });
-      return;
+    } finally {
+      if (opts.metrics) {
+        const elapsed = Number(process.hrtime.bigint() - started) / 1e9;
+        opts.metrics.validateRequests.inc({ outcome });
+        opts.metrics.validateDuration.observe({ outcome }, elapsed);
+      }
     }
-
-    const ok = opts.bundle.artifactValidator(artifact);
-    const schemaErrors = ok
-      ? []
-      : translateErrors(opts.bundle.artifactValidator.errors ?? [], artifact);
-    const tripleErrors = checkRelationsTriples(artifact, opts.bundle);
-    const all = [...schemaErrors, ...tripleErrors];
-
-    res.status(200).json({
-      valid: all.length === 0,
-      schemaVersion: version,
-      ...(all.length > 0 ? { errors: all } : {}),
-    });
   }
 }
 
