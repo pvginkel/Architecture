@@ -8,7 +8,7 @@ entries:
 
   - id: deprecated
     label: Deprecated
-    summary: Being phased out. Requires replacedBy or retirementBy.
+    summary: Being phased out. `retirementBy` may be set as an informational target date.
 
   - id: removed
     label: Removed

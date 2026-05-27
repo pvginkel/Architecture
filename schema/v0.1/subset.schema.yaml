@@ -14,7 +14,6 @@ required:
   - xsdReservedAttributeNames
   - attributeMapping
   - commonAttributes
-  - lifecycleRules
   - stereotypes
   - kinds
 
@@ -50,15 +49,6 @@ properties:
     additionalProperties:
       $ref: "#/$defs/attributeSpec"
 
-  lifecycleRules:
-    type: array
-    items:
-      type: object
-      required: [if, then]
-      properties:
-        if: { type: object }
-        then: { type: object }
-
   stereotypes:
     type: object
     additionalProperties:
@@ -78,7 +68,7 @@ $defs:
     properties:
       type:
         type: string
-        enum: [string, date, uri, enum, idRef, idRefSameKind, stringMap]
+        enum: [string, date, uri, enum, idRef, stringMap]
       required: { type: boolean }
       description: { type: string }
       enumRef: { type: string }
@@ -130,4 +120,3 @@ $defs:
         additionalProperties:
           $ref: "#/$defs/attributeSpec"
       enumRef: { type: string }
-      producerOptional: { type: boolean }

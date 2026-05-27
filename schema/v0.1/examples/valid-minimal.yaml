@@ -11,7 +11,6 @@ artifacts:
     summary: Pieter's HelmCharts repository; produces architecture data for cluster services.
     introduced: 2024-07-12
     lifecycle: active
-    producer: art:helmcharts
     stereotype: Producer
     url: https://github.com/pvginkel/HelmCharts
     role: source
@@ -23,7 +22,6 @@ nodes:
     summary: Three-node microk8s cluster on srvk8s1/2/3.
     introduced: 2024-07-12
     lifecycle: active
-    producer: art:helmcharts
     cluster: prd
 
 systemSoftware:
@@ -32,7 +30,6 @@ systemSoftware:
     summary: Production Keycloak instance providing IAM.
     introduced: 2024-09-04
     lifecycle: active
-    producer: art:helmcharts
     environment: prd
     cluster: prd
 
@@ -42,4 +39,3 @@ technologyServices:
     summary: auth.webathome.org OpenID Connect issuer.
     introduced: 2024-09-04
     lifecycle: active
-    producer: art:helmcharts

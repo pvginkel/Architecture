@@ -215,15 +215,12 @@ def attribute_to_json_schema(
             out["enum"] = resolve_enum_ref(spec["enumRef"])
     elif t == "idRef":
         out["type"] = "string"
-        # We don't enforce the exact target regex on a ref — the validation
-        # service does cross-element existence checks. We do enforce prefix
-        # via a simple pattern.
+        # We don't enforce the exact target regex on a ref — the collector
+        # does cross-element existence checks at merge time. We do enforce
+        # prefix via a simple pattern.
         kind = spec["refKind"]
         prefix = kind_prefix(kind)
         out["pattern"] = f"^{re.escape(prefix)}"
-    elif t == "idRefSameKind":
-        out["type"] = "string"
-        out["pattern"] = kind_id_regex
     elif t == "stringMap":
         out["type"] = "object"
         out["additionalProperties"] = {"type": "string"}
@@ -285,13 +282,7 @@ def emit_per_kind_schema(
         if attr_name == "id":
             continue
         properties[attr_name] = attribute_to_json_schema(attr_name, spec, id_regex)
-        if spec.get("required") and attr_name not in (
-            "replacedBy",
-            "retirementBy",
-            "producer",
-        ):
-            required.append(attr_name)
-        elif attr_name == "producer" and not kind.get("producerOptional", False):
+        if spec.get("required"):
             required.append(attr_name)
 
     # 3. Kind-specific additional attributes.
@@ -326,33 +317,7 @@ def emit_per_kind_schema(
     # 5. Conditional rules.
     all_of: list[dict[str, Any]] = []
 
-    # 5a. Lifecycle: deprecated → exactly one of replacedBy/retirementBy.
-    all_of.append(
-        {
-            "if": {"properties": {"lifecycle": {"const": "deprecated"}}, "required": ["lifecycle"]},
-            "then": {
-                "oneOf": [
-                    {"required": ["replacedBy"]},
-                    {"required": ["retirementBy"]},
-                ]
-            },
-        }
-    )
-
-    # 5b. Lifecycle: removed → neither replacedBy nor retirementBy.
-    all_of.append(
-        {
-            "if": {"properties": {"lifecycle": {"const": "removed"}}, "required": ["lifecycle"]},
-            "then": {
-                "allOf": [
-                    {"not": {"required": ["replacedBy"]}},
-                    {"not": {"required": ["retirementBy"]}},
-                ]
-            },
-        }
-    )
-
-    # 5c. Per stereotype: when stereotype is set, required stereotype-attrs
+    # 5a. Per stereotype: when stereotype is set, required stereotype-attrs
     #     must be present. When unset, none of the stereotype-attrs may
     #     appear (they're additionalProperties otherwise).
     for stereo_name, _attrs in stereotype_specific_attrs.items():
@@ -371,7 +336,7 @@ def emit_per_kind_schema(
                 }
             )
 
-    # 5d. When stereotype is unset, no stereotype-specific attrs may appear.
+    # 5b. When stereotype is unset, no stereotype-specific attrs may appear.
     if stereotype_specific_attrs:
         all_attr_names_across_stereos = sorted(
             {a for attrs in stereotype_specific_attrs.values() for a in attrs}

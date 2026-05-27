@@ -45,6 +45,14 @@ attributeMapping:
 # Custom attributes applied to every included element kind.
 # Per-kind blocks below may add further attributes; they may not redeclare
 # these.
+#
+# Provenance (which producer declared an element) is NOT a field on the
+# element. The collector synthesises an Association relation per declared
+# element from the producer's «Producer» Artifact to the element, using the
+# artifact's top-level `producer:` envelope key — producers don't have to
+# emit those relations explicitly. See tooling/collect.py.
+#
+# Lifecycle successor (`replacedBy`) is intentionally absent in v0.1.
 commonAttributes:
   id:
     type: string
@@ -67,43 +75,15 @@ commonAttributes:
     enumRef: ./enums/lifecycle-states.yaml
     required: true
     description: Lifecycle state.
-  replacedBy:
-    type: idRefSameKind
-    required: false
-    description: Required iff lifecycle == deprecated and a replacement exists.
   retirementBy:
     type: date
     required: false
-    description: Required iff lifecycle == deprecated and no replacement.
-                 Forbidden iff lifecycle == removed.
-  producer:
-    type: idRef
-    refKind: Artifact
-    refStereotype: Producer
-    required: true
-    description: The «Producer» Artifact (repo) that declared this element.
+    description: ISO-8601 date when the element is planned for retirement. Optional, informational.
   stats:
     type: stringMap
     required: false
     description: Non-load-bearing facts (versions, URLs, image tags).
                  Render hints. Free-form string→string.
-
-# Conditional rules applied uniformly across kinds.
-lifecycleRules:
-  - if:
-      properties:
-        lifecycle: { const: deprecated }
-    then:
-      oneOf:
-        - required: [replacedBy]
-        - required: [retirementBy]
-  - if:
-      properties:
-        lifecycle: { const: removed }
-    then:
-      allOf:
-        - not: { required: [replacedBy] }
-        - not: { required: [retirementBy] }
 
 # Stereotype definitions.
 # A kind that lists a stereotype in `applicableStereotypes` allows artifact
@@ -269,11 +249,9 @@ kinds:
     idRegex: '^cap:[a-z][a-z0-9-]*$'
     description: Business-architecture role. IAM, observability, secrets-management.
     enumRef: ./enums/capabilities.yaml
-    producerOptional: true
     # Capabilities are curated in enums/capabilities.yaml. A producer artifact
     # may reference a capability by id, but the canonical declaration lives
-    # in the enum file. The `producer` attribute is optional on Capability
-    # for this reason.
+    # in the enum file.
 
   BusinessService:
     layer: business

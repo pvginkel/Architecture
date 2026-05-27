@@ -10,7 +10,6 @@ required:
 - summary
 - introduced
 - lifecycle
-- producer
 properties:
   id:
     type: string
@@ -35,18 +34,10 @@ properties:
     - active
     - deprecated
     - removed
-  replacedBy:
-    description: Required iff lifecycle == deprecated and a replacement exists.
-    type: string
-    pattern: ^node:[a-z][a-z0-9-]*$
   retirementBy:
-    description: Required iff lifecycle == deprecated and no replacement. Forbidden iff lifecycle == removed.
+    description: ISO-8601 date when the element is planned for retirement. Optional, informational.
     type: string
     format: date
-  producer:
-    description: "The \xABProducer\xBB Artifact (repo) that declared this element."
-    type: string
-    pattern: '^art:'
   stats:
     description: "Non-load-bearing facts (versions, URLs, image tags). Render hints. Free-form string\u2192string."
     type: object
@@ -64,30 +55,3 @@ properties:
     description: Cluster identifier when the node lives inside one.
     type: string
     minLength: 1
-allOf:
-- if:
-    properties:
-      lifecycle:
-        const: deprecated
-    required:
-    - lifecycle
-  then:
-    oneOf:
-    - required:
-      - replacedBy
-    - required:
-      - retirementBy
-- if:
-    properties:
-      lifecycle:
-        const: removed
-    required:
-    - lifecycle
-  then:
-    allOf:
-    - not:
-        required:
-        - replacedBy
-    - not:
-        required:
-        - retirementBy

@@ -10,7 +10,6 @@ required:
 - summary
 - introduced
 - lifecycle
-- producer
 properties:
   id:
     type: string
@@ -35,18 +34,10 @@ properties:
     - active
     - deprecated
     - removed
-  replacedBy:
-    description: Required iff lifecycle == deprecated and a replacement exists.
-    type: string
-    pattern: ^art:([a-z][a-z0-9-]*|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$
   retirementBy:
-    description: Required iff lifecycle == deprecated and no replacement. Forbidden iff lifecycle == removed.
+    description: ISO-8601 date when the element is planned for retirement. Optional, informational.
     type: string
     format: date
-  producer:
-    description: "The \xABProducer\xBB Artifact (repo) that declared this element."
-    type: string
-    pattern: '^art:'
   stats:
     description: "Non-load-bearing facts (versions, URLs, image tags). Render hints. Free-form string\u2192string."
     type: object
@@ -87,32 +78,6 @@ properties:
     type: string
     minLength: 1
 allOf:
-- if:
-    properties:
-      lifecycle:
-        const: deprecated
-    required:
-    - lifecycle
-  then:
-    oneOf:
-    - required:
-      - replacedBy
-    - required:
-      - retirementBy
-- if:
-    properties:
-      lifecycle:
-        const: removed
-    required:
-    - lifecycle
-  then:
-    allOf:
-    - not:
-        required:
-        - replacedBy
-    - not:
-        required:
-        - retirementBy
 - if:
     properties:
       stereotype:

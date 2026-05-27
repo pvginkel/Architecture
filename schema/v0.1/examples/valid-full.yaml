@@ -14,7 +14,6 @@ artifacts:
     summary: Pieter's HelmCharts repository; produces architecture for cluster services.
     introduced: 2024-07-12
     lifecycle: active
-    producer: art:helmcharts
     environment: prd
     stereotype: Producer
     url: https://github.com/pvginkel/HelmCharts
@@ -26,7 +25,6 @@ artifacts:
     summary: Helm chart deploying EI to prd.
     introduced: 2025-08-27
     lifecycle: active
-    producer: art:helmcharts
     environment: prd
 
   - id: art:keycloak-prd-chart
@@ -34,7 +32,6 @@ artifacts:
     summary: Helm chart deploying Keycloak to prd.
     introduced: 2024-09-04
     lifecycle: active
-    producer: art:helmcharts
     environment: prd
 
 devices:
@@ -43,7 +40,6 @@ devices:
     summary: Proxmox node #1.
     introduced: 2024-07-12
     lifecycle: active
-    producer: art:helmcharts
 
 nodes:
   - id: node:prd-cluster
@@ -51,7 +47,6 @@ nodes:
     summary: Three-node microk8s cluster on srvk8s1/2/3.
     introduced: 2024-07-12
     lifecycle: active
-    producer: art:helmcharts
     cluster: prd
 
 systemSoftware:
@@ -60,7 +55,6 @@ systemSoftware:
     summary: Software product identity for Postgres.
     introduced: 2024-07-12
     lifecycle: active
-    producer: art:helmcharts
     stereotype: SoftwareProduct
     homepage: https://www.postgresql.org/
     logo: postgresql.svg
@@ -70,7 +64,6 @@ systemSoftware:
     summary: Software product identity for Keycloak.
     introduced: 2024-09-04
     lifecycle: active
-    producer: art:helmcharts
     stereotype: SoftwareProduct
     homepage: https://www.keycloak.org/
     logo: keycloak.svg
@@ -80,7 +73,6 @@ systemSoftware:
     summary: Running Keycloak instance backing all internal apps.
     introduced: 2024-09-04
     lifecycle: active
-    producer: art:helmcharts
     environment: prd
     cluster: prd
 
@@ -89,7 +81,6 @@ systemSoftware:
     summary: Cluster-shared Postgres providing relational storage to applications.
     introduced: 2026-05-01
     lifecycle: active
-    producer: art:helmcharts
     environment: prd
     cluster: prd
 
@@ -99,7 +90,6 @@ applicationComponents:
     summary: Electronics Inventory web UI.
     introduced: 2025-08-27
     lifecycle: active
-    producer: art:helmcharts
     environment: prd
     cluster: prd
 
@@ -108,7 +98,6 @@ applicationComponents:
     summary: Electronics Inventory REST API.
     introduced: 2025-08-27
     lifecycle: active
-    producer: art:helmcharts
     environment: prd
     cluster: prd
 
@@ -118,7 +107,6 @@ applicationServices:
     summary: Internal HTTP API consumed by the EI frontend.
     introduced: 2025-08-27
     lifecycle: active
-    producer: art:helmcharts
 
 applicationInterfaces:
   - id: if:ei-backend-rest
@@ -126,7 +114,6 @@ applicationInterfaces:
     summary: /api/v1 paths exposed by the EI backend.
     introduced: 2025-08-27
     lifecycle: active
-    producer: art:helmcharts
 
 technologyServices:
   - id: svc:oidc-issuer
@@ -134,21 +121,18 @@ technologyServices:
     summary: auth.webathome.org OpenID Connect issuer realising IAM.
     introduced: 2024-09-04
     lifecycle: active
-    producer: art:helmcharts
 
   - id: svc:postgres-shared
     label: Shared Postgres
     summary: Cluster-shared Postgres at pg.cluster.svc:5432.
     introduced: 2026-05-01
     lifecycle: active
-    producer: art:helmcharts
 
   - id: svc:github-api
     label: GitHub API
     summary: External GitHub REST API.
     introduced: 2024-07-12
     lifecycle: active
-    producer: art:helmcharts
 
 technologyInterfaces:
   - id: if:postgres-5432
@@ -156,7 +140,6 @@ technologyInterfaces:
     summary: Default Postgres protocol port.
     introduced: 2026-05-01
     lifecycle: active
-    producer: art:helmcharts
 
 capabilities:
   - id: cap:iam
@@ -177,7 +160,6 @@ businessServices:
     summary: Users authenticate once and access multiple internal apps.
     introduced: 2024-09-04
     lifecycle: active
-    producer: art:helmcharts
 
 groupings:
   - id: grp:ei-prd
@@ -185,7 +167,6 @@ groupings:
     summary: All EI prd components grouped for the renderer.
     introduced: 2025-08-27
     lifecycle: active
-    producer: art:helmcharts
 
 relations:
   # ArchiMate 3.2 puts active technology elements on the *source* side of
