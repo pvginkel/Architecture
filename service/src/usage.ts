@@ -8,15 +8,26 @@ export interface UsageOptions {
   usagePath?: string;
 }
 
-const DEFAULT_USAGE_PATH = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname),
-  "../../USAGE.md",
-);
+/** Find USAGE.md. Container Dockerfile COPYs it to /app/USAGE.md (WORKDIR-
+ *  relative); dev source lives two directories up from service/dist/usage.js. */
+function defaultUsagePath(): string {
+  if (process.env.USAGE_PATH) return process.env.USAGE_PATH;
+  const here = path.dirname(new URL(import.meta.url).pathname);
+  const candidates = [
+    path.join(process.cwd(), "USAGE.md"),
+    path.resolve(here, "../USAGE.md"),
+    path.resolve(here, "../../USAGE.md"),
+  ];
+  for (const c of candidates) {
+    if (existsSync(c)) return c;
+  }
+  return candidates[0]!;
+}
 
 /** Build the router that serves the rendered USAGE.md at /. */
 export function mountUsage(opts: UsageOptions = {}): Router {
   const router = express.Router();
-  const usagePath = opts.usagePath ?? DEFAULT_USAGE_PATH;
+  const usagePath = opts.usagePath ?? defaultUsagePath();
   const html = renderUsage(usagePath);
   router.get("/", (_req, res) => {
     res.status(200).type("text/html").send(html);
