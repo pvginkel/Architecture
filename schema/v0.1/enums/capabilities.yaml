@@ -33,6 +33,12 @@ entries:
     lifecycle: active
     introduced: 2024-07-12
 
+  - id: cap:load-balancing
+    label: Load balancing
+    summary: L2/L4 traffic distribution across multiple targets (MetalLB, keepalived, HAProxy).
+    lifecycle: active
+    introduced: 2026-05-27
+
   - id: cap:dns
     label: DNS
     summary: Authoritative or recursive DNS resolution for a domain set.
