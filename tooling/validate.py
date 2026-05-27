@@ -19,93 +19,31 @@ Exit codes: 0 on success, 1 on validation failure.
 
 from __future__ import annotations
 
-import datetime as dt
 import sys
 from pathlib import Path
-from typing import Any
 
 import click
-import jsonschema
-import yaml
-from jsonschema import Draft202012Validator
-from referencing import Registry, Resource
-from referencing.jsonschema import DRAFT202012
 
-
-def _normalize(obj: Any) -> Any:
-    """Convert YAML-parsed date/datetime into ISO strings so JSON Schema
-    `format: date` / `format: date-time` validates them as strings.
-    """
-    if isinstance(obj, dt.datetime):
-        return obj.isoformat()
-    if isinstance(obj, dt.date):
-        return obj.isoformat()
-    if isinstance(obj, dict):
-        return {k: _normalize(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [_normalize(v) for v in obj]
-    return obj
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
-SCHEMA_DIR = REPO_ROOT / "schema" / "v0.1"
-GENERATED_DIR = SCHEMA_DIR / "generated"
-ENUMS_DIR = SCHEMA_DIR / "enums"
-
-
-def load_yaml(path: Path) -> Any:
-    with path.open() as fh:
-        return yaml.safe_load(fh)
-
-
-def collect_schema_files() -> list[Path]:
-    """Every YAML schema we expect to be a JSON Schema 2020-12 document."""
-    files: list[Path] = []
-    files.append(SCHEMA_DIR / "architecture.schema.yaml")
-    files.append(SCHEMA_DIR / "subset.schema.yaml")
-    files.extend(sorted(GENERATED_DIR.glob("*.yaml")))
-    return [p for p in files if p.exists()]
+from _arch import (
+    REPO_ROOT,
+    load_yaml,
+    meta_validate_schemas,
+    normalize,
+    validate_doc,
+)
 
 
 def meta_validate() -> int:
     """Meta-validate every schema. Returns process exit code."""
     failures = 0
-    for path in collect_schema_files():
-        doc = load_yaml(path)
+    for path, error in meta_validate_schemas():
         rel = path.relative_to(REPO_ROOT)
-        try:
-            Draft202012Validator.check_schema(doc)
+        if error is None:
             click.echo(f"OK   {rel}")
-        except jsonschema.SchemaError as e:
-            click.echo(f"FAIL {rel}: {e.message}", err=True)
+        else:
+            click.echo(f"FAIL {rel}: {error}", err=True)
             failures += 1
     return 1 if failures else 0
-
-
-def build_registry() -> Registry:
-    """Resolve $ref pointers in architecture.schema.yaml against the local
-    generated/ tree. Each generated file is registered under both an
-    absolute URI (its $id) and a relative file URI (./generated/x.yaml)
-    so that whichever form architecture.schema.yaml uses in $ref resolves.
-    """
-    registry: Registry = Registry()
-    arch_path = SCHEMA_DIR / "architecture.schema.yaml"
-    arch_uri = arch_path.as_uri()
-
-    for path in sorted(GENERATED_DIR.glob("*.yaml")):
-        doc = load_yaml(path)
-        resource = Resource(contents=doc, specification=DRAFT202012)
-        # Register under the absolute $id from the schema document
-        registry = registry.with_resource(uri=doc["$id"], resource=resource)
-        # Also register under the file URI (resolved relative to architecture.schema.yaml)
-        rel_target = path.as_uri()
-        registry = registry.with_resource(uri=rel_target, resource=resource)
-        # And under the relative form architecture.schema.yaml uses
-        # (./generated/<filename>) — resolve against arch_uri as base.
-        from urllib.parse import urljoin
-
-        relative_resolved = urljoin(arch_uri, f"./generated/{path.name}")
-        registry = registry.with_resource(uri=relative_resolved, resource=resource)
-    return registry
 
 
 def parse_expected_pointer(artifact_path: Path) -> str | None:
@@ -124,12 +62,8 @@ def parse_expected_pointer(artifact_path: Path) -> str | None:
 
 def validate_artifact(artifact_path: Path) -> int:
     """Validate a single artifact. Returns process exit code."""
-    schema_doc = load_yaml(SCHEMA_DIR / "architecture.schema.yaml")
-    registry = build_registry()
-    artifact = _normalize(load_yaml(artifact_path))
-
-    validator = Draft202012Validator(schema=schema_doc, registry=registry)
-    errors = sorted(validator.iter_errors(artifact), key=lambda e: list(e.absolute_path))
+    artifact = normalize(load_yaml(artifact_path))
+    errors = validate_doc(artifact)
 
     expected = parse_expected_pointer(artifact_path)
     abs_path = artifact_path.resolve()
