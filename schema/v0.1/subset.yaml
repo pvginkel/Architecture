@@ -1,0 +1,284 @@
+# schema/v0.1/subset.yaml
+#
+# Declares the ArchiMate 3.x subset used by v0.1 of the architecture
+# metaschema, plus the custom profile (stereotypes and attributes) layered
+# on top.
+#
+# tooling/generate.py reads this file together with the vendored ArchiMate
+# XSDs and Archi relationship matrix to emit:
+#   - one JSON Schema per element kind under schema/v0.1/generated/
+#   - relations.schema.yaml encoding the allowed (source, relation, target)
+#     triple matrix, narrowed to the kinds we include here.
+#
+# Authoritative source for element-type names, relationship-type names, and
+# the triple matrix: schema/v0.1/archimate/. This file does not redeclare
+# any of that — it only declares which subset we include and what we layer
+# on top.
+
+$schema: ./subset.schema.yaml
+
+# Pointer to the canonical ArchiMate sources.
+archimate:
+  xsd: ./archimate/archimate3_Model.xsd
+  relationshipsMatrix: ./archimate/relationships.xml
+  relationshipsKeys: ./archimate/relationships-keys.xml
+  specVersion: "3.2"
+
+# Names reserved by the XSD's base types that no custom attribute may use.
+# The generator enforces this.
+xsdReservedAttributeNames:
+  - identifier
+  - name
+  - documentation
+  - properties
+  - source
+  - target
+
+# Mapping from our top-level attribute names to ArchiMate XSD constructs.
+# Used by the generator when emitting per-kind schemas (so artifact authors
+# write `label` while serialization-time we know it's the XSD's `name`).
+attributeMapping:
+  id: identifier
+  label: name
+  summary: documentation
+
+# Custom attributes applied to every included element kind.
+# Per-kind blocks below may add further attributes; they may not redeclare
+# these.
+commonAttributes:
+  id:
+    type: string
+    required: true
+    description: Stable identifier. Prefix + format per element kind.
+  label:
+    type: string
+    required: true
+    description: Display string. May change without ID change.
+  summary:
+    type: string
+    required: true
+    description: One or two sentences. Maps to ArchiMate documentation.
+  introduced:
+    type: date
+    required: true
+    description: ISO-8601 date when the element was first declared.
+  lifecycle:
+    type: enum
+    enumRef: ./enums/lifecycle-states.yaml
+    required: true
+    description: Lifecycle state.
+  replacedBy:
+    type: idRefSameKind
+    required: false
+    description: Required iff lifecycle == deprecated and a replacement exists.
+  retirementBy:
+    type: date
+    required: false
+    description: Required iff lifecycle == deprecated and no replacement.
+                 Forbidden iff lifecycle == removed.
+  producer:
+    type: idRef
+    refKind: Artifact
+    refStereotype: Producer
+    required: true
+    description: The «Producer» Artifact (repo) that declared this element.
+  stats:
+    type: stringMap
+    required: false
+    description: Non-load-bearing facts (versions, URLs, image tags).
+                 Render hints. Free-form string→string.
+
+# Conditional rules applied uniformly across kinds.
+lifecycleRules:
+  - if:
+      properties:
+        lifecycle: { const: deprecated }
+    then:
+      oneOf:
+        - required: [replacedBy]
+        - required: [retirementBy]
+  - if:
+      properties:
+        lifecycle: { const: removed }
+    then:
+      allOf:
+        - not: { required: [replacedBy] }
+        - not: { required: [retirementBy] }
+
+# Stereotype definitions.
+# A kind that lists a stereotype in `applicableStereotypes` allows artifact
+# authors to set `stereotype: <Name>` on an element; the additional
+# attributes from the stereotype block become available when the stereotype
+# is applied (the generator emits a conditional schema for it).
+stereotypes:
+  SoftwareProduct:
+    appliesTo: [ApplicationComponent, SystemSoftware]
+    addedAttributes:
+      homepage:
+        type: uri
+        required: false
+        description: Upstream product homepage, if applicable.
+      logo:
+        type: string
+        required: false
+        description: Filename under viewer/public/logos/.
+      sourceRepository:
+        type: idRef
+        refKind: Artifact
+        refStereotype: Repository
+        required: false
+        description: Source repository for in-house products.
+
+  Repository:
+    appliesTo: [Artifact]
+    addedAttributes:
+      url:
+        type: uri
+        required: true
+        description: Repository URL (e.g. GitHub HTTPS URL).
+      role:
+        type: enum
+        enumValues: [source, spec, config]
+        required: true
+        description: What this repository holds.
+      languageMix:
+        type: stringMap
+        required: false
+        description: Language → percentage. Informational.
+      owner:
+        type: string
+        required: true
+        description: Human or team responsible.
+
+  Producer:
+    appliesTo: [Artifact]
+    requires: [Repository]
+    addedAttributes: {}
+
+# Element kinds included in the v0.1 subset. Each archimateType must match
+# an ElementType enumeration value in archimate3_Model.xsd. The generator
+# verifies this at run time.
+kinds:
+
+  Node:
+    layer: technology
+    archimateType: Node
+    idPrefix: "node:"
+    idRegex: '^node:[a-z][a-z0-9-]*$'
+    description: Execution host. VMs, K8s clusters, Proxmox cluster, ESP32 devices.
+    attributesAddition:
+      environment:
+        type: enum
+        enumRef: ./enums/environments.yaml
+        required: false
+      cluster:
+        type: string
+        required: false
+        description: Cluster identifier when the node lives inside one.
+
+  Device:
+    layer: technology
+    archimateType: Device
+    idPrefix: "device:"
+    idRegex: '^device:[a-z][a-z0-9-]*$'
+    description: Physical hardware. Switches, APs, server hardware, IoT devices.
+
+  SystemSoftware:
+    layer: technology
+    archimateType: SystemSoftware
+    idPrefix: "ss:"
+    idRegex: '^ss:([a-z][a-z0-9-]*|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$'
+    description: Infra/middleware runtime. Running Keycloak, Postgres, nginx, OpenBao, dnsmasq.
+    applicableStereotypes: [SoftwareProduct]
+    attributesAddition:
+      environment:
+        type: enum
+        enumRef: ./enums/environments.yaml
+        required: false
+      cluster:
+        type: string
+        required: false
+
+  ApplicationComponent:
+    layer: application
+    archimateType: ApplicationComponent
+    idPrefix: "app:"
+    idRegex: '^app:([a-z][a-z0-9-]*|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$'
+    description: User-facing app workload. EI backend, EI frontend, DA portal, DA worker.
+    applicableStereotypes: [SoftwareProduct]
+    attributesAddition:
+      environment:
+        type: enum
+        enumRef: ./enums/environments.yaml
+        required: false
+      cluster:
+        type: string
+        required: false
+
+  ApplicationService:
+    layer: application
+    archimateType: ApplicationService
+    idPrefix: "svc:"
+    idRegex: '^svc:[a-z][a-z0-9-]*$'
+    description: App-layer consumption surface (an internal HTTP API).
+
+  ApplicationInterface:
+    layer: application
+    archimateType: ApplicationInterface
+    idPrefix: "if:"
+    idRegex: '^if:[a-z][a-z0-9-]*$'
+    description: Addressable point on an ApplicationService.
+
+  TechnologyService:
+    layer: technology
+    archimateType: TechnologyService
+    idPrefix: "svc:"
+    idRegex: '^svc:[a-z][a-z0-9-]*$'
+    description: Infra consumption surface. Postgres-on-5432, OIDC issuer, ZFS volume API, GitHub API.
+
+  TechnologyInterface:
+    layer: technology
+    archimateType: TechnologyInterface
+    idPrefix: "if:"
+    idRegex: '^if:[a-z][a-z0-9-]*$'
+    description: Addressable point on a TechnologyService. Queue, topic, OpenBao path, DB name, subvolume.
+
+  Artifact:
+    layer: technology
+    archimateType: Artifact
+    idPrefix: "art:"
+    idRegex: '^art:([a-z][a-z0-9-]*|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$'
+    description: Deployable bundle or repository content. Helm chart, Ansible role, TF module, source repo, Jenkinsfile.
+    applicableStereotypes: [Repository, Producer]
+    attributesAddition:
+      environment:
+        type: enum
+        enumRef: ./enums/environments.yaml
+        required: false
+
+  Capability:
+    layer: strategy
+    archimateType: Capability
+    idPrefix: "cap:"
+    idRegex: '^cap:[a-z][a-z0-9-]*$'
+    description: Business-architecture role. IAM, observability, secrets-management.
+    enumRef: ./enums/capabilities.yaml
+    producerOptional: true
+    # Capabilities are curated in enums/capabilities.yaml. A producer artifact
+    # may reference a capability by id, but the canonical declaration lives
+    # in the enum file. The `producer` attribute is optional on Capability
+    # for this reason.
+
+  BusinessService:
+    layer: business
+    archimateType: BusinessService
+    idPrefix: "bsvc:"
+    idRegex: '^bsvc:[a-z][a-z0-9-]*$'
+    description: What the system delivers to humans. SSO realised by IAM.
+
+  Grouping:
+    layer: cross-cutting
+    archimateType: Grouping
+    idPrefix: "grp:"
+    idRegex: '^grp:([a-z][a-z0-9-]*|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$'
+    description: Cosmetic clustering. No semantics.

@@ -1,0 +1,133 @@
+# Schema for schema/v0.1/subset.yaml — structural sanity check.
+#
+# Generator does deeper validation (XSD-existence of archimateType values,
+# attribute-name collisions with reserved XSD names, stereotype reference
+# integrity, etc.) on top of what this schema enforces.
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://architecture.webathome.org/schema/v0.1/subset.schema.yaml
+title: ArchiMate subset declaration (v0.1)
+type: object
+additionalProperties: false
+required:
+  - archimate
+  - xsdReservedAttributeNames
+  - attributeMapping
+  - commonAttributes
+  - lifecycleRules
+  - stereotypes
+  - kinds
+
+properties:
+  $schema:
+    type: string
+    description: Self-reference pointer. Optional; informational.
+
+  archimate:
+    type: object
+    additionalProperties: false
+    required: [xsd, relationshipsMatrix, relationshipsKeys, specVersion]
+    properties:
+      xsd: { type: string }
+      relationshipsMatrix: { type: string }
+      relationshipsKeys: { type: string }
+      specVersion: { type: string }
+
+  xsdReservedAttributeNames:
+    type: array
+    items: { type: string }
+    minItems: 1
+    uniqueItems: true
+
+  attributeMapping:
+    type: object
+    additionalProperties: { type: string }
+    minProperties: 1
+
+  commonAttributes:
+    type: object
+    minProperties: 1
+    additionalProperties:
+      $ref: "#/$defs/attributeSpec"
+
+  lifecycleRules:
+    type: array
+    items:
+      type: object
+      required: [if, then]
+      properties:
+        if: { type: object }
+        then: { type: object }
+
+  stereotypes:
+    type: object
+    additionalProperties:
+      $ref: "#/$defs/stereotypeSpec"
+
+  kinds:
+    type: object
+    minProperties: 1
+    additionalProperties:
+      $ref: "#/$defs/kindSpec"
+
+$defs:
+  attributeSpec:
+    type: object
+    additionalProperties: false
+    required: [type, required, description]
+    properties:
+      type:
+        type: string
+        enum: [string, date, uri, enum, idRef, idRefSameKind, stringMap]
+      required: { type: boolean }
+      description: { type: string }
+      enumRef: { type: string }
+      enumValues:
+        type: array
+        items: { type: string }
+        minItems: 1
+        uniqueItems: true
+      refKind: { type: string }
+      refStereotype: { type: string }
+
+  stereotypeSpec:
+    type: object
+    additionalProperties: false
+    required: [appliesTo, addedAttributes]
+    properties:
+      appliesTo:
+        type: array
+        items: { type: string }
+        minItems: 1
+        uniqueItems: true
+      requires:
+        type: array
+        items: { type: string }
+        uniqueItems: true
+      addedAttributes:
+        type: object
+        additionalProperties:
+          $ref: "#/$defs/attributeSpec"
+
+  kindSpec:
+    type: object
+    additionalProperties: false
+    required: [layer, archimateType, idPrefix, idRegex, description]
+    properties:
+      layer:
+        type: string
+        enum: [technology, application, strategy, business, cross-cutting, motivation, implementation]
+      archimateType: { type: string }
+      idPrefix: { type: string }
+      idRegex: { type: string }
+      description: { type: string }
+      applicableStereotypes:
+        type: array
+        items: { type: string }
+        uniqueItems: true
+      attributesAddition:
+        type: object
+        additionalProperties:
+          $ref: "#/$defs/attributeSpec"
+      enumRef: { type: string }
+      producerOptional: { type: boolean }
