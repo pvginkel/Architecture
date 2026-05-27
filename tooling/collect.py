@@ -211,6 +211,80 @@ def merge_artifacts(docs: dict[str, Any]) -> dict[str, list]:
     return merged
 
 
+def build_id_index(merged: dict[str, list]) -> dict[str, tuple[str, dict]]:
+    """Map every merged element id → (kind, element-dict). The merge step
+    already guarantees ids are unique across the merged set, so this is a
+    one-pass dict construction with no collision handling needed.
+    """
+    index: dict[str, tuple[str, dict]] = {}
+    for kind in ELEMENT_KIND_ARRAYS:
+        for elem in merged[kind]:
+            index[elem["id"]] = (kind, elem)
+    return index
+
+
+def resolve_cross_references(
+    docs: dict[str, Any],
+    merged: dict[str, list],
+    report: dict[str, Any],
+) -> None:
+    """For every relation `source`/`target`, check the id resolves to a
+    merged element. Dangling = fail. Reference to a `removed` element =
+    fail. Reference to a `deprecated` element = warning in the report;
+    the run still succeeds. The same lookup handles UUID and kebab-case
+    SoftwareProduct ids — no special-casing.
+
+    Relations don't carry a `producer` field in v0.1, so this pass walks
+    `docs` (the per-producer parsed inputs) for provenance in error
+    messages.
+    """
+    index = build_id_index(merged)
+    messages: list[str] = []
+
+    for pid in sorted(docs):
+        for i, rel in enumerate(docs[pid].get("relations") or []):
+            for field in ("source", "target"):
+                ref = rel[field]
+                if ref not in index:
+                    messages.append(
+                        f"{pid}: at /relations/{i}/{field}: dangling reference to "
+                        f"{ref!r} (no element with that id in the merged dataset)"
+                    )
+                    continue
+                _, elem = index[ref]
+                lifecycle = elem.get("lifecycle")
+                if lifecycle == "removed":
+                    messages.append(
+                        f"{pid}: at /relations/{i}/{field}: relation references "
+                        f"{ref!r} which is lifecycle=removed "
+                        f"(remove the relation or restore the target)"
+                    )
+                elif lifecycle == "deprecated":
+                    report["warnings"].append(
+                        {
+                            "kind": "deprecated-target",
+                            "producer": pid,
+                            "pointer": f"/relations/{i}/{field}",
+                            "reference": ref,
+                            "message": (
+                                f"relation references {ref!r} which is "
+                                f"lifecycle=deprecated"
+                            ),
+                        }
+                    )
+
+    if messages:
+        raise CollectorError("cross-reference", messages)
+
+
+def new_report() -> dict[str, Any]:
+    """Empty validation-report scaffold. Phases append to `warnings` and
+    `divergences`; the emit step (item 10) finalises `summary` and writes
+    `validation-report.json`.
+    """
+    return {"summary": {}, "warnings": [], "divergences": []}
+
+
 def _fail(err: CollectorError) -> None:
     click.echo(f"FAIL [{err.phase}] {len(err.messages)} error(s):", err=True)
     for m in err.messages:
@@ -284,9 +358,24 @@ def main(producers_path: Path, input_dir: Path, output_dir: Path) -> None:
         f"unioned across {len(docs)} producer(s)."
     )
 
-    # Later work items extend this scaffold: cross-ref, alias-hint,
-    # triple-matrix, grouping, emit.
-    _ = output_dir, merged
+    report = new_report()
+
+    try:
+        resolve_cross_references(docs, merged, report)
+    except CollectorError as e:
+        _fail(e)
+
+    deprecated_warnings = sum(
+        1 for w in report["warnings"] if w["kind"] == "deprecated-target"
+    )
+    click.echo(
+        "Cross-reference resolution: all references resolved"
+        + (f" ({deprecated_warnings} deprecated-target warning(s))." if deprecated_warnings else ".")
+    )
+
+    # Later work items extend this scaffold: alias-hint, triple-matrix,
+    # grouping, emit.
+    _ = output_dir, merged, report
 
 
 if __name__ == "__main__":
