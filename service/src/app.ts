@@ -3,6 +3,7 @@ import { loadSchemas, SchemaLoadError, type SchemaBundle } from "./schema-loader
 import { mountStatic, resolveViewerRoot } from "./static.js";
 import { mountValidate } from "./validate.js";
 import { createMetrics, mountMetrics, type Metrics } from "./metrics.js";
+import { mountUsage } from "./usage.js";
 
 export interface AppOptions {
   /** Schema bundle. Defaults to loading from the repo's schema/v0.1/. */
@@ -11,6 +12,8 @@ export interface AppOptions {
   viewerRoot?: string;
   /** Metrics sink. Defaults to a fresh registry. */
   metrics?: Metrics;
+  /** Filesystem path to USAGE.md. Defaults to the repo root copy. */
+  usagePath?: string;
 }
 
 export function createApp(opts: AppOptions = {}): Express {
@@ -23,6 +26,7 @@ export function createApp(opts: AppOptions = {}): Express {
     res.status(200).type("text/plain").send("ok");
   });
 
+  app.use(mountUsage({ usagePath: opts.usagePath }));
   app.use(mountStatic({ viewerRoot, bundle }));
   app.use(mountValidate({ bundle, metrics }));
   app.use(mountMetrics(metrics));

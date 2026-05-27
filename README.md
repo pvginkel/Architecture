@@ -45,6 +45,13 @@ The viewer is designed to live inside an iframe on webathome.org. It speaks a sm
 
 Origin is locked to `https://webathome.org`. No consumers yet.
 
+## Validation service
+
+Producer-facing integration documentation lives in [`USAGE.md`](./USAGE.md): the
+`POST /api/validate` contract, schema URLs, the `arch-validate` CLI, and how to
+file schema-change requests. It is also rendered at the deployed container root
+(`architecture.webathome.org/`).
+
 ## Plan
 
 See [`docs/architecture-rebuild/`](docs/architecture-rebuild/) — the multi-phase rebuild plan. v0 ("01-repo-extraction") is the current state. Later phases add a metaschema, federated producers, a collector, and a richer data model.
