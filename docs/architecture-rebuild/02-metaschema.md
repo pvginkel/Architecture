@@ -1,4 +1,16 @@
-# 02 — Metaschema (v1, input)
+# 02 — Metaschema (v1, brainstorm — superseded)
+
+> **Status: original brainstorm, superseded 2026-05-26.**
+>
+> The metaschema discussion converged on adopting **ArchiMate 3.x** as the reference model, with a small custom profile (three stereotypes, one set of custom attributes) layered on top. The kinds, IDs, edge vocabulary, validator-CLI shape, and several decisions in this doc are **not** what landed.
+>
+> The executed spec is [`../features/metaschema-design.md`](../features/metaschema-design.md). The schema package, generated per-kind JSON Schemas, enums, examples, and tooling all live under `schema/v0.1/` and `tooling/`. The validator is a hosted service, not a standalone binary — see [`../features/validation-service.md`](../features/validation-service.md).
+>
+> What in this doc *is* still load-bearing (carried verbatim into the executed spec): the lifecycle three-state model (`active`/`deprecated`/`removed`), the inclusion rule, the rationale for splitting capability / implementation / product, and the producer-profile distinction.
+>
+> Read this doc as historical context for *why* the decisions in the executed spec are what they are. Where this doc conflicts with `metaschema-design.md`, the latter wins.
+
+---
 
 Lock the schema before any data migration or federation work. This document defines the model; `03-data-migration.md` applies it to the current 145 nodes; `04-producer-protocol.md` defines what each producer is allowed to emit against it.
 

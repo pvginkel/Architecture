@@ -1,6 +1,8 @@
 # Validation service + developer integration
 
-The runtime side of the metaschema phase. Delivers the container that hosts the schema files, exposes `POST /api/validate`, renders developer docs at the container root, and ships the `arch-validate` dev CLI.
+The runtime side of the metaschema phase. Delivers the container that hosts the schema files, exposes `POST /api/validate`, renders developer docs at the container root, ships the `arch-validate` dev CLI, **and serves the merged architecture artifact** produced by the Architecture pipeline.
+
+The service does **not** collect, merge, or assemble producer artifacts. That happens in this repo's Jenkinsfile (a Python-in-Docker step; see [`../architecture-rebuild/05-collector-and-pipeline.md`](../architecture-rebuild/05-collector-and-pipeline.md)). The merged dataset arrives in the container image at build time as files under `dist/data/v0.1/`; the service serves them as static HTTP.
 
 Depends on [`metaschema-design.md`](./metaschema-design.md) — the schema files this service serves and validates against must exist first.
 
@@ -49,6 +51,9 @@ Routes:
 | `/viewer/*` | GET | static viewer build, SPA fallback to `/viewer/index.html` |
 | `/schema/v0.1/*.json` | GET | canonical JSON form of each schema/enum file |
 | `/schema/v0.1/*.yaml` | GET | YAML source of each schema/enum file |
+| `/data/v0.1/architecture.yaml` | GET | merged dataset (built by the Architecture pipeline) |
+| `/data/v0.1/architecture.json` | GET | canonical JSON form of the merged dataset |
+| `/data/v0.1/validation-report.json` | GET | warnings/dangling refs/alias divergences from the last merge |
 | `/api/validate` | POST | validate artifact |
 | `/healthz` | GET | liveness/readiness, returns `200 OK` |
 | `/metrics` | GET | Prometheus exposition |
@@ -293,6 +298,7 @@ COPY --from=build-service /app/dist ./dist
 COPY --from=build-service /app/node_modules ./node_modules
 COPY --from=build-viewer /app/dist ./viewer-dist
 COPY --from=check-schemas /work/schema ./schema
+COPY dist/data ./data
 COPY USAGE.md ./USAGE.md
 ENV NODE_ENV=production
 EXPOSE 8080
@@ -300,6 +306,8 @@ ENTRYPOINT ["node", "dist/index.js"]
 ```
 
 The `check-schemas` stage runs `generate.py --check` against the committed `schema/v0.1/generated/` tree; the build fails if the generator would produce different output (i.e. if `subset.yaml` was changed without re-running the generator). The image then copies `schema/` from that stage, guaranteeing the in-container schemas match the checked-in form.
+
+`dist/data/` is the output of an earlier pipeline step that ran the collector (`tooling/collect.py`, see [`../architecture-rebuild/05-collector-and-pipeline.md`](../architecture-rebuild/05-collector-and-pipeline.md)). The Dockerfile shown above assumes the collector has already produced the merged dataset on disk; the Jenkinsfile orchestrates ordering. The service treats `data/` as immutable static content.
 
 The service's `static.ts` resolves `./viewer-dist`, `./schema`, `./USAGE.md` relative to the working directory.
 

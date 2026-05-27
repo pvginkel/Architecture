@@ -1,86 +1,106 @@
-# 05 — Collector and pipeline (v2/v3)
+# 05 — Collector and pipeline
 
-The collector is the piece of software in the architecture repo that pulls every producer's artifact, validates and merges them, resolves cross-producer references, and emits the final dataset the viewer consumes. The Jenkins pipeline is the orchestration around it.
+The collector is a Python script in Docker, invoked from the Architecture repo's Jenkinsfile. It pulls every registered producer's latest-successful-build `architecture.yaml` from Jenkins, validates each against the v0.1 schema, merges them, runs cross-producer checks, and writes the consolidated dataset that the validation service serves at a static URL.
 
-These are bundled in one plan because the collector's behavior dictates the pipeline shape: what triggers rebuilds, what fails the build, what the output artifact looks like.
+The collector is **not** part of the validation service. The service validates (POST /api/validate) and publishes (static HTTP). Assembly happens in the build, where rebuild semantics, retry policy, and failure handling are easy to reason about.
 
-## Collector responsibilities
+The producer-side counterpart is [`04-producer-protocol.md`](./04-producer-protocol.md). The schema is [`../features/metaschema-design.md`](../features/metaschema-design.md). The service that serves the merged artifact is [`../features/validation-service.md`](../features/validation-service.md).
 
-In order of execution:
+## Where the collector lives
 
-1. **Fetch** the latest successful build's `architecture.json` from each registered producer.
-2. **Validate** each artifact independently against the schema for its profile (re-running what the producer already ran, as a defense-in-depth check).
-3. **Reconcile enums.** Every `cap:*` and `prod:*` reference must exist in the architecture repo's enum YAML files. Unknown enum values are a failure.
-4. **Merge.** Combine all components, edges, and groups across artifacts into a single dataset. Detect GUID collisions.
-5. **Resolve cross-references.** Every edge endpoint must be either a GUID present in the merged components list or a known capability/product. Dangling = failure (per user requirement). Reference to a `deprecated` component = warning. Reference to a `removed` component = failure.
-6. **Rollup.** Compute group memberships, capability-realization maps, and any derived structures the viewer uses for filtering. Render-only — does not change the canonical data.
-7. **Emit.** Produce `dist/architecture.json` (the canonical merged dataset), `dist/index/<profile>.json` (one per producer, listing every component's GUID + label for cross-producer GUID discovery), and `dist/validation-report.json` (warnings, dangling refs, deprecated refs).
-8. **Build the viewer.** Vite build consumes `dist/architecture.json` and produces static HTML/JS/CSS.
-9. **Package the container.** nginx serving the viewer + the JSON datasets + the schema versions at stable URLs.
+`tooling/collect.py` in this repo. Python (Poetry), runs under the same `tooling/pyproject.toml` as `generate.py` and `validate.py`. Single-file Click CLI. Same image (`registry:5000/architecture-tooling:<tag>`) used by other Architecture-pipeline Python steps.
 
-## Failure modes
+The Architecture repo's Jenkinsfile runs the collector inside the Docker image. No collector logic lives in the validation service container; the service consumes the collector's output.
+
+## Inputs
+
+- `pipeline-producers.yaml` in this repo: the registered producer list. Each entry: `id`, `profile`, `jenkins-job-url`. Adding a producer is a PR.
+- For each producer, the latest-successful-build's `architecture.yaml` artifact (HTTP fetch via the Jenkins API, anonymous read where possible; token-auth otherwise).
+- The vendored ArchiMate XSD + Archi matrix + `subset.yaml` + generated schemas (already present in this repo) — for re-validation.
+
+## Outputs
+
+- `dist/data/v0.1/architecture.yaml` — the merged dataset (YAML).
+- `dist/data/v0.1/architecture.json` — canonical JSON form of the same dataset.
+- `dist/data/v0.1/validation-report.json` — structured report of warnings, dangling references, alias-hint divergences, deprecated references, profile violations, and any cached-fallback notes.
+
+These are baked into the validation-service container image at build time (the v2 service serves `/data/v0.1/architecture.yaml` and `/data/v0.1/validation-report.json` directly from disk). When the merged dataset changes, the container image is rebuilt and redeployed via the existing Jenkins → Kaniko → Helm flow.
+
+## Pipeline (this repo's Jenkinsfile)
+
+```
+1. Checkout architecture repo.
+2. Build / pull tooling Docker image.
+3. poetry run python tooling/generate.py --check      # schemas up to date
+4. poetry run python tooling/validate.py meta          # schemas valid
+5. poetry run python tooling/collect.py                # fetches, validates, merges
+6. Build validation service (Node).
+7. Build viewer (Vite).
+8. Build container image with service + viewer + dist/data/.
+9. Push to registry; trigger Helm-side deploy.
+10. Archive dist/data/validation-report.json as a Jenkins artifact.
+```
+
+Steps 3 and 4 fail the build immediately if the schema package is out of sync or invalid (a defense against generated-files drift). Step 5 is the substantive work.
+
+### Triggers
+
+- **On producer success**: each registered producer's Jenkins job, on successful build, triggers the Architecture repo's job downstream. Native Jenkins; no custom infra.
+- **Scheduled**: nightly rebuild as a hedge against missed triggers and to surface staleness warnings.
+- **On Architecture repo push**: any commit triggers a rebuild (schema change, collector change, viewer change, doc change — anything that changes container contents).
+- **Manual**: button in Jenkins for ad-hoc reruns (debugging, schema preview).
+
+Concurrent producer completions are coalesced by Jenkins's pending-build merging on the Architecture job. Not a v3 concern.
+
+## Collector responsibilities (in order)
+
+1. **Fetch** the latest-successful-build `architecture.yaml` from each registered producer. Concurrent fetches with a 60s per-fetch timeout. A failed fetch falls back to the cached artifact (see "Caching" below) and records a warning.
+2. **Per-artifact validate** against `schema/v0.1/architecture.schema.yaml` (using the existing `validate.py` machinery). Schema-invalid producer artifacts are reported but **do not fail** the build — the report lists them and the merge proceeds without that producer's data. (Rationale: a single misbehaving producer shouldn't blackhole the entire merged dataset. If schema-invalid persists for a producer, that producer's own CI should already be failing — fix is upstream.)
+3. **Reconcile enums.** Every `Capability` id and `«SoftwareProduct»` id referenced from any artifact must exist in the curated enum / catalog. Unknown references fail the build (a producer needs to PR the enum first).
+4. **Profile enforcement.** Each producer's artifact may only contain element kinds permitted by its profile (per `04-producer-protocol.md` § Profile constraints). Profile violations fail the build.
+5. **Merge.** Combine all element-kind arrays across artifacts. Detect duplicate UUIDs (a real conflict between producers; fail the build).
+6. **Cross-reference resolution.** Every relation's `source` and `target` UUID must resolve to an element in the merged dataset. Dangling = build failure. Reference to a `deprecated` element = warning. Reference to a `removed` element = build failure.
+7. **Alias-hint reconciliation.** Same UUID with different `aliasHint` strings across producers = warning, captured in the report. Owner's hint (matched by element's `producer` back-pointer to its owning artifact) is the one retained in the merged dataset.
+8. **Triple-matrix check.** Every relation's `(source-kind, type, target-kind)` triple must be in the allowed-triples enumeration (already encoded as `x-allowedTriples` in `generated/relations.schema.yaml`). Violations fail the build.
+9. **Rollup.** Compute Grouping memberships, Capability-realisation maps, and any derived view structures.
+10. **Emit.** Write `dist/data/v0.1/architecture.yaml`, `.json`, and `validation-report.json`.
+
+## Failure modes summary
 
 | Condition | Behavior |
 |---|---|
-| Producer artifact missing (build never produced one, or producer repo is offline) | Warning; build continues with last-known artifact for that producer (cached). After 7 days of staleness, escalate to failure. |
-| Producer artifact present but schema-invalid | Build fails. Should have been caught upstream; if we're seeing it here, the upstream validator is misconfigured. |
-| Capability or product reference not in enum | Build fails. Producer must PR the enum first. |
-| Dangling cross-producer GUID reference | Build fails. User-required. |
-| Reference to `removed` component | Build fails. Producers must remove references before marking a component `removed`. |
-| Reference to `deprecated` component | Warning, counted in report. Render with deprecated styling. |
-| GUID collision between producers | Build fails. Indicates a serious bug — GUIDs are unique by construction. |
-| Group references a non-existent group | Build fails. |
-| Component declares a group from another producer | Build fails (groups don't cross producers; `02-metaschema.md`). |
+| Producer fetch failed | Warning; fall back to cached artifact. After 7 days of staleness, escalate to failure. |
+| Per-artifact schema-invalid | Warning; that producer's data is dropped from the merge. Build continues. |
+| Capability or `«SoftwareProduct»` reference not in catalog | Build fails. |
+| Profile violation (kind not permitted for profile) | Build fails. |
+| Duplicate UUID across producers | Build fails. |
+| Dangling cross-producer UUID reference | Build fails. |
+| Reference to a `removed` element | Build fails. |
+| Reference to a `deprecated` element | Warning. |
+| Alias-hint divergence (same UUID, different hints) | Warning. |
+| Triple-matrix violation | Build fails. |
+| Grouping references missing member | Build fails. |
+| Grouping spans producers | Build fails (groupings are producer-local). |
 
-The validation report is a first-class artifact of the build. Surface it in the viewer (a small "system health" badge that opens a panel listing warnings and deprecated references). Recruiters reading the diagram seeing this is a positive signal.
+The validation report is a first-class artifact of the build. The viewer exposes a "data quality" link surfacing it in the UI.
 
-## Cached / fallback behavior
+## Caching / fallback
 
-The collector keeps a `cache/` directory of the last-known-good artifact per producer, indexed by producer name + schema version + git commit. If fetching fresh fails, the cached version is used and a warning is recorded.
+`dist/cache/<producer-id>/<schema-version>/<commit>.yaml` is the last-known-good artifact per producer. If a fetch fails, the cache entry is used and a staleness warning is recorded. A successful fetch + validate refreshes the cache entry. Entries older than 30 days are pruned.
 
-Cache invalidation: a successful fetch + validate pass updates the cache entry for that producer. Old entries are pruned after 30 days.
+The cache makes the system robust to individual producer downtime. The merged dataset doesn't disappear because Ansible's Jenkins is rebooting.
 
-This is what makes the system robust to individual producer downtime. The diagram doesn't disappear because Ansible's Jenkins is rebooting.
+## Implementation notes
 
-## Merge logic specifics
-
-### Capabilities and products
-
-Definitions come from the architecture repo's enum YAML. Producers reference; they don't define. The collector verifies references and is otherwise a passthrough.
-
-### Components
-
-Each producer contributes some. Union them. GUID collisions are an error. If two producers both want to claim the same logical component — for instance, an app declares "the Postgres I use" with a different GUID than HelmCharts assigned — that's the producer profile bug: apps reference, they don't redeclare.
-
-### Edges
-
-Union, with deduplication on `(source, target, type)`. Two producers describing the same edge with the same type is allowed (no-op); with different attributes is a collision (the collector picks the higher-criticality one and records a warning).
-
-### Groups
-
-Each group lives entirely within one producer. Union with no merging needed.
-
-## Cross-reference resolution and the published index
-
-Apps reference Keycloak by its GUID. They get that GUID from somewhere. Two options:
-
-- **Option A: published index.** The collector publishes per-profile indexes at stable URLs. App authors look up the GUID once, paste it into their artifact source.
-- **Option B: registry API.** A small API that resolves slugs (`cluster-services:keycloak-prd`) to GUIDs at producer build time.
-
-Option B is overengineering for this scale. Option A is fine:
-
-```
-https://architecture.webathome.org/index/cluster-services.json
-https://architecture.webathome.org/index/infra-physical.json
-```
-
-Each entry has `id` (GUID), `slug` (producer-assigned, may not be unique long-term), `label`, `lifecycle`, `summary`. App authors hand-pick GUIDs from this index. The architecture repo's README documents the workflow.
-
-To make this slightly less error-prone, the validator can accept a `--resolve-index <url>` flag and validate that referenced GUIDs exist in the published index at build time. Optional; warns rather than fails locally.
+- Python 3.13, Poetry, same dependency set as `generate.py` / `validate.py` plus `requests` (or `httpx`) for fetches.
+- The collector's per-artifact validation reuses `validate.py`'s machinery rather than reinventing.
+- `x-allowedTriples` is already embedded in `generated/relations.schema.yaml` — the collector reads it directly.
+- Concurrent fetches use a small `ThreadPoolExecutor`; nothing fancy.
+- All file paths in `dist/` are deterministic so the container image build is reproducible.
 
 ## Named views
 
-Saved filter / zoom configurations, committed to the architecture repo as YAML:
+Saved filter / zoom configurations, committed to this repo as YAML under `views/`:
 
 ```
 views/
@@ -90,54 +110,19 @@ views/
 └── delivery.yaml
 ```
 
-Each defines:
-- Initial zoom / pan / center.
-- Active filters (capabilities shown, edge types shown, lifecycle states shown).
-- Optional pinned components (always shown, override filters).
-- Title and one-line description displayed in a view picker.
+Each defines initial zoom/pan/centre, active filters (kinds shown, layers shown, lifecycle states shown), pinned UUIDs, and a one-line description for the view picker.
 
-URL state: `architecture.webathome.org/?view=portfolio` loads the named view. Filter changes update a transient URL hash; users can copy and share custom states.
+URL state: `architecture.webathome.org/?view=portfolio` loads a named view. Filter changes update a transient URL hash; users can copy and share custom states.
 
 The viewer ships with a view picker UI. The portfolio view is the default route.
 
-## Jenkins pipeline shape
+Named-view authoring is v5 work (after the viewer is repointed at the merged dataset).
 
-Architecture repo's `Jenkinsfile` runs:
+## Performance considerations
 
-1. **Checkout** architecture repo.
-2. **Build the validator and collector** (if their source has changed).
-3. **Fetch all producer artifacts** via Jenkins API. Concurrent.
-4. **Run the collector.** Outputs `dist/` and `dist/validation-report.json`.
-5. **Fail the build** on collector exit != 0.
-6. **Build the viewer** (Vite).
-7. **Build the container image** (nginx + dist).
-8. **Push to registry** (existing flow).
-9. **Trigger downstream deploy** (existing Ansible / K8s flow).
-10. **Archive `dist/validation-report.json`** as a Jenkins artifact for postmortem on warnings.
-
-### Triggers
-
-- **On producer success**: each producer's Jenkins job, on successful build, triggers the architecture repo's job downstream. Jenkins-native, no custom infra.
-- **Scheduled**: nightly rebuild, as a hedge against missed triggers and to surface cache staleness warnings.
-- **Manual**: button in Jenkins, for trying schema changes.
-- **On architecture repo push**: any commit to the architecture repo (schema change, view edit, viewer code change) triggers a rebuild.
-
-### Concurrent producer triggers
-
-If three producers finish within a minute of each other, they trigger three sequential collector runs. Jenkins's coalescing of pending builds on the same job handles this fine; if the queue depth becomes a problem, configure the architecture job as non-concurrent with a coalescing wait. Not a v2 concern.
-
-## Performance considerations (not v2-critical, noted for later)
-
-At full federation the collector handles maybe a thousand components. JSON parsing, GUID-keyed maps, edge resolution — all sub-second on modest hardware. The viewer is the only piece where performance is non-trivial: ReactFlow with 1000+ nodes wants auto-layout caching and aggressive filtering at the data layer.
-
-Caching strategy if needed:
-- Pre-computed layouts per named view, written to disk by the collector and shipped with the container.
-- The viewer loads the layout for the active view rather than computing it client-side.
-
-Worth implementing once the diagram is actually at scale, not before.
+At full federation, the merged dataset is maybe a few thousand elements. Python merge + cross-checks are sub-second on modest hardware. The viewer is the only piece where performance is non-trivial (ReactFlow with 1000+ nodes), and that's auto-layout + aggressive filtering at the data layer — separate from collector work.
 
 ## Open questions
 
-- **Named views: committed YAML vs URL state only?** Committed YAML is concrete decision above. Transient URL state for ad-hoc filtering. Both coexist. If maintenance friction emerges, lean on URL state.
-- **Should the validation report surface in the embedded iframe on webathome.org?** Probably yes, behind a small "data quality" link in the viewer chrome. Visible from the iframe, helpful for credibility, not in the recruiter's face.
-- **postMessage events for filter changes?** Wired up in `01-repo-extraction.md` already; no consumer in v0. Possible v3 use: site can deep-link to filter states with `set-view` messages. Worth nothing more than reserving the message names now.
+- **Should named-view authoring be lifted earlier than v5?** If the merged dataset is large enough mid-bootstrap that filter presets help, yes. Defer the decision until we have real Ansible + Helm data flowing.
+- **Should the collector publish a producer-readable index** (`/data/v0.1/index.yaml` enumerating every UUID with its owning producer and aliasHint)? Useful for producer authors looking up UUIDs without scanning the full merged dataset. Low-cost. Likely yes; finalise when the second producer comes online.

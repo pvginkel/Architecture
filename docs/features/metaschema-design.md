@@ -40,6 +40,22 @@ The matrix is, however, machine-readable from another source: the Archi modellin
 - **Importability:** v0.1 artifacts are structurally compatible with ArchiMate Exchange XML by construction. A formal YAML↔XML exporter is v0.2; the path is open.
 - **Deferred to v0.2:** image identity, build provenance, variant matrices, certificate / rotation tracking, multi-environment rendering.
 
+## Pending v0.1 tightening (next session)
+
+Two changes to land before the first real producer (Ansible) starts emitting. Both came out of the producer-protocol discussion on 2026-05-27.
+
+1. **UUIDs canonical for instance kinds.** Tighten the ID regexes on `Node`, `Device`, `SystemSoftware` (instance), `ApplicationComponent` (instance), `Artifact`, `ApplicationService`, `TechnologyService`, `ApplicationInterface`, `TechnologyInterface`, and `Grouping` to **require UUIDv4** (drop the kebab-case alternative). Curated kinds (`Capability`, `BusinessService`) and `«SoftwareProduct»`-stereotyped catalog entries keep kebab-case enumeration IDs — those are catalogue identities, not instance identities.
+
+2. **`aliasHint` field on instance kinds.** A new optional attribute carrying the producer's human-readable kebab-case nickname for an element. The hint exists for diagnostics (so log lines and validation errors say `node:prd-cluster` rather than `node:7f3a2b1c-…`). The collector warns on alias-hint divergence across artifacts referencing the same UUID; same UUID, different hints = warning in the validation report (not a build failure). See [`../architecture-rebuild/04-producer-protocol.md`](../architecture-rebuild/04-producer-protocol.md) § Cross-producer references for the full rule.
+
+Mechanical changes implied:
+
+- Update the appropriate `idRegex` entries in `schema/v0.1/subset.yaml`.
+- Add `aliasHint` to `commonAttributes` (or as a per-kind addition on the instance kinds only).
+- Re-run `tooling/generate.py`; commit the regenerated `generated/*.yaml`.
+- Update `schema/v0.1/examples/valid-*.yaml` and `valid-full.yaml` to use UUIDv4s with `aliasHint` annotations.
+- Update the corresponding tables and ID-format section in this doc.
+
 ## ArchiMate subset for v0.1
 
 Eleven element kinds across four ArchiMate layers. Renderer colors follow ArchiMate convention (green / blue / pink / yellow).
