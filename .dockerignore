@@ -1,0 +1,26 @@
+# Build-context exclusions. The Jenkinsfile (v3 #13) opts the pipeline in
+# by removing this file (or overriding the producer-artifacts/ entry)
+# before kaniko reads the context.
+
+# Producer artifacts are pipeline-injected. A developer running `docker
+# build .` locally must not silently bundle whatever happens to be in
+# producer-artifacts/ — usually nothing, occasionally fixtures.
+producer-artifacts/
+
+# Standard noise.
+node_modules/
+.git/
+.gitignore
+**/dist
+**/__pycache__/
+*.pyc
+.vite/
+viewer/dist/
+service/dist/
+service/node_modules/
+viewer/node_modules/
+
+# Editor / OS.
+.DS_Store
+.vscode/
+.idea/
