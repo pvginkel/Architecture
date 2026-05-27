@@ -437,6 +437,110 @@ def check_triple_matrix(
         raise CollectorError("triple-matrix", messages)
 
 
+def check_groupings(
+    docs: dict[str, Any],
+    index: ResolutionIndex,
+) -> None:
+    """Groupings are producer-local. For every Grouping element, find the
+    Aggregation relations sourced from it (each target is a member).
+    Two rules:
+
+    - Each member's owning producer must equal the Grouping's owning
+      producer. A Grouping that aggregates someone else's element is a
+      cross-producer Grouping — refused.
+    - A Grouping with zero Aggregation members is refused. The construct
+      is a render-time clustering hint; an empty one is dead data.
+    """
+    messages: list[str] = []
+
+    # Index Groupings → owner_pid
+    grouping_owner: dict[str, str] = {}
+    for pid in sorted(docs):
+        for elem in docs[pid].get("groupings") or []:
+            grouping_owner[elem["id"]] = pid
+
+    # Aggregations sourced from a Grouping: {grouping_id: [(pid, i, target_id)]}
+    aggregations: dict[str, list[tuple[str, int, str]]] = {
+        gid: [] for gid in grouping_owner
+    }
+    for pid in sorted(docs):
+        for i, rel in enumerate(docs[pid].get("relations") or []):
+            if rel["type"] != "Aggregation":
+                continue
+            src_entry, _ = index.resolve(rel["source"], pid)
+            if src_entry is None:
+                continue
+            src_kind_name, _, _ = src_entry
+            if src_kind_name != "groupings":
+                continue
+            src_eid = src_entry[1]["id"]
+            aggregations.setdefault(src_eid, []).append((pid, i, rel["target"]))
+
+    for gid, owner_pid in sorted(grouping_owner.items()):
+        members = aggregations.get(gid, [])
+        if not members:
+            messages.append(
+                f"{owner_pid}: Grouping {gid!r} declared but no Aggregation "
+                f"relation aggregates any member from it"
+            )
+            continue
+        for rel_pid, i, target_ref in members:
+            tgt_entry, _ = index.resolve(target_ref, rel_pid)
+            if tgt_entry is None:
+                # Already caught by cross-ref pass; defensive skip.
+                continue
+            _, _, target_owner = tgt_entry
+            if target_owner != owner_pid:
+                messages.append(
+                    f"{rel_pid}: at /relations/{i}: cross-producer Grouping — "
+                    f"Grouping {gid!r} (owner {owner_pid!r}) aggregates "
+                    f"{target_ref!r} owned by {target_owner!r}; "
+                    f"Groupings must be producer-local"
+                )
+
+    if messages:
+        raise CollectorError("groupings", messages)
+
+
+def compute_rollups(
+    docs: dict[str, Any],
+    index: ResolutionIndex,
+) -> dict[str, Any]:
+    """Derive structures consumers expect to find pre-rolled in the merged
+    dataset:
+
+    - `groupings`: {grouping-id: [member-id, ...]} — every Aggregation
+      sourced from a Grouping element.
+    - `capabilityRealizations`: {capability-id: [realising-element-id, ...]} —
+      every Realization relation whose target is a Capability.
+
+    Iteration is in producer-sorted order and member lists are sorted so
+    reruns produce byte-identical output.
+    """
+    groupings: dict[str, list[str]] = {}
+    realizations: dict[str, list[str]] = {}
+
+    for pid in sorted(docs):
+        for rel in docs[pid].get("relations") or []:
+            src_entry, _ = index.resolve(rel["source"], pid)
+            tgt_entry, _ = index.resolve(rel["target"], pid)
+            if src_entry is None or tgt_entry is None:
+                continue
+            src_kind_name, src_elem, _ = src_entry
+            tgt_kind_name, tgt_elem, _ = tgt_entry
+            if rel["type"] == "Aggregation" and src_kind_name == "groupings":
+                groupings.setdefault(src_elem["id"], []).append(tgt_elem["id"])
+            if rel["type"] == "Realization" and tgt_kind_name == "capabilities":
+                realizations.setdefault(tgt_elem["id"], []).append(src_elem["id"])
+
+    return {
+        "groupings": {k: sorted(set(v)) for k, v in sorted(groupings.items())},
+        "capabilityRealizations": {
+            k: sorted(set(v)) for k, v in sorted(realizations.items())
+        },
+    }
+
+
 def reconcile_alias_hints(
     docs: dict[str, Any],
     index: ResolutionIndex,
@@ -607,8 +711,20 @@ def main(producers_path: Path, input_dir: Path, output_dir: Path) -> None:
 
     click.echo("Triple-matrix check: every relation triple permitted by ArchiMate 3.2.")
 
-    # Later work items extend this scaffold: grouping, emit.
-    _ = output_dir, merged, report
+    try:
+        check_groupings(docs, index)
+    except CollectorError as e:
+        _fail(e)
+
+    rollups = compute_rollups(docs, index)
+    click.echo(
+        f"Grouping checks + rollup: "
+        f"{len(rollups['groupings'])} grouping(s), "
+        f"{len(rollups['capabilityRealizations'])} capability realisation map(s)."
+    )
+
+    # Later work items extend this scaffold: emit.
+    _ = output_dir, merged, report, rollups
 
 
 if __name__ == "__main__":
