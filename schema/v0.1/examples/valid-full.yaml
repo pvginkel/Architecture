@@ -1,0 +1,264 @@
+# Full-coverage artifact: exercises every subset element kind plus one
+# representative relation of several ArchiMate relationship types. Mirrors
+# (a simplified slice of) what HelmCharts would emit for the prd cluster:
+# Keycloak realising IAM, EI as an in-house application stack, Postgres as
+# a shared platform service, plus an external API endpoint.
+
+schemaVersion: "0.1"
+producer: art:helmcharts
+generatedAt: 2026-05-27T12:00:00Z
+
+artifacts:
+  - id: art:helmcharts
+    label: HelmCharts repo
+    summary: Pieter's HelmCharts repository; produces architecture for cluster services.
+    introduced: 2024-07-12
+    lifecycle: active
+    producer: art:helmcharts
+    environment: prd
+    stereotype: Producer
+    url: https://github.com/pvginkel/HelmCharts
+    role: source
+    owner: Pieter van Ginkel
+
+  - id: art:ei-prd-chart
+    label: EI chart (prd)
+    summary: Helm chart deploying EI to prd.
+    introduced: 2025-08-27
+    lifecycle: active
+    producer: art:helmcharts
+    environment: prd
+
+  - id: art:keycloak-prd-chart
+    label: Keycloak chart (prd)
+    summary: Helm chart deploying Keycloak to prd.
+    introduced: 2024-09-04
+    lifecycle: active
+    producer: art:helmcharts
+    environment: prd
+
+devices:
+  - id: device:proxmox-pve1
+    label: pve1
+    summary: Proxmox node #1.
+    introduced: 2024-07-12
+    lifecycle: active
+    producer: art:helmcharts
+
+nodes:
+  - id: node:prd-cluster
+    label: Production Kubernetes cluster
+    summary: Three-node microk8s cluster on srvk8s1/2/3.
+    introduced: 2024-07-12
+    lifecycle: active
+    producer: art:helmcharts
+    cluster: prd
+
+systemSoftware:
+  - id: ss:postgresql
+    label: PostgreSQL
+    summary: Software product identity for Postgres.
+    introduced: 2024-07-12
+    lifecycle: active
+    producer: art:helmcharts
+    stereotype: SoftwareProduct
+    homepage: https://www.postgresql.org/
+    logo: postgresql.svg
+
+  - id: ss:keycloak
+    label: Keycloak
+    summary: Software product identity for Keycloak.
+    introduced: 2024-09-04
+    lifecycle: active
+    producer: art:helmcharts
+    stereotype: SoftwareProduct
+    homepage: https://www.keycloak.org/
+    logo: keycloak.svg
+
+  - id: ss:keycloak-prd
+    label: Keycloak (prd)
+    summary: Running Keycloak instance backing all internal apps.
+    introduced: 2024-09-04
+    lifecycle: active
+    producer: art:helmcharts
+    environment: prd
+    cluster: prd
+
+  - id: ss:postgres-shared-prd
+    label: Shared Postgres (prd)
+    summary: Cluster-shared Postgres providing relational storage to applications.
+    introduced: 2026-05-01
+    lifecycle: active
+    producer: art:helmcharts
+    environment: prd
+    cluster: prd
+
+applicationComponents:
+  - id: app:ei-frontend-prd
+    label: EI frontend (prd)
+    summary: Electronics Inventory web UI.
+    introduced: 2025-08-27
+    lifecycle: active
+    producer: art:helmcharts
+    environment: prd
+    cluster: prd
+
+  - id: app:ei-backend-prd
+    label: EI backend (prd)
+    summary: Electronics Inventory REST API.
+    introduced: 2025-08-27
+    lifecycle: active
+    producer: art:helmcharts
+    environment: prd
+    cluster: prd
+
+applicationServices:
+  - id: svc:ei-backend-api
+    label: EI backend API
+    summary: Internal HTTP API consumed by the EI frontend.
+    introduced: 2025-08-27
+    lifecycle: active
+    producer: art:helmcharts
+
+applicationInterfaces:
+  - id: if:ei-backend-rest
+    label: EI backend REST endpoint
+    summary: /api/v1 paths exposed by the EI backend.
+    introduced: 2025-08-27
+    lifecycle: active
+    producer: art:helmcharts
+
+technologyServices:
+  - id: svc:oidc-issuer
+    label: OIDC issuer
+    summary: auth.webathome.org OpenID Connect issuer realising IAM.
+    introduced: 2024-09-04
+    lifecycle: active
+    producer: art:helmcharts
+
+  - id: svc:postgres-shared
+    label: Shared Postgres
+    summary: Cluster-shared Postgres at pg.cluster.svc:5432.
+    introduced: 2026-05-01
+    lifecycle: active
+    producer: art:helmcharts
+
+  - id: svc:github-api
+    label: GitHub API
+    summary: External GitHub REST API.
+    introduced: 2024-07-12
+    lifecycle: active
+    producer: art:helmcharts
+
+technologyInterfaces:
+  - id: if:postgres-5432
+    label: Postgres TCP 5432
+    summary: Default Postgres protocol port.
+    introduced: 2026-05-01
+    lifecycle: active
+    producer: art:helmcharts
+
+capabilities:
+  - id: cap:iam
+    label: Identity & Access Management
+    summary: Identity store, authentication, authorisation, SSO realisation.
+    introduced: 2024-07-12
+    lifecycle: active
+
+  - id: cap:relational-database
+    label: Relational database
+    summary: SQL-tabular persistence with transactions and joins.
+    introduced: 2024-07-12
+    lifecycle: active
+
+businessServices:
+  - id: bsvc:single-sign-on
+    label: Single Sign-On
+    summary: Users authenticate once and access multiple internal apps.
+    introduced: 2024-09-04
+    lifecycle: active
+    producer: art:helmcharts
+
+groupings:
+  - id: grp:ei-prd
+    label: EI prd
+    summary: All EI prd components grouped for the renderer.
+    introduced: 2025-08-27
+    lifecycle: active
+    producer: art:helmcharts
+
+relations:
+  - id: rel:ei-frontend-runs-on-cluster
+    source: app:ei-frontend-prd
+    target: node:prd-cluster
+    type: Assignment
+
+  - id: rel:ei-backend-runs-on-cluster
+    source: app:ei-backend-prd
+    target: node:prd-cluster
+    type: Assignment
+
+  - id: rel:keycloak-runs-on-cluster
+    source: ss:keycloak-prd
+    target: node:prd-cluster
+    type: Assignment
+
+  - id: rel:ei-frontend-uses-backend
+    source: app:ei-frontend-prd
+    target: svc:ei-backend-api
+    type: Serving
+
+  - id: rel:ei-backend-accesses-shared-pg
+    source: app:ei-backend-prd
+    target: svc:postgres-shared
+    type: Access
+
+  - id: rel:oidc-realises-iam
+    source: svc:oidc-issuer
+    target: cap:iam
+    type: Realization
+
+  - id: rel:keycloak-realises-iam
+    source: ss:keycloak-prd
+    target: cap:iam
+    type: Realization
+
+  - id: rel:keycloak-instance-of-product
+    source: ss:keycloak-prd
+    target: ss:keycloak
+    type: Specialization
+
+  - id: rel:shared-pg-realises-rel-db
+    source: ss:postgres-shared-prd
+    target: cap:relational-database
+    type: Realization
+
+  - id: rel:postgres-interface-on-service
+    source: if:postgres-5432
+    target: svc:postgres-shared
+    type: Composition
+
+  - id: rel:iam-realises-sso
+    source: cap:iam
+    target: bsvc:single-sign-on
+    type: Realization
+
+  - id: rel:grouping-aggregates-frontend
+    source: grp:ei-prd
+    target: app:ei-frontend-prd
+    type: Aggregation
+
+  - id: rel:grouping-aggregates-backend
+    source: grp:ei-prd
+    target: app:ei-backend-prd
+    type: Aggregation
+
+  - id: rel:chart-deploys-frontend
+    source: art:ei-prd-chart
+    target: app:ei-frontend-prd
+    type: Realization
+
+  - id: rel:chart-deploys-backend
+    source: art:ei-prd-chart
+    target: app:ei-backend-prd
+    type: Realization

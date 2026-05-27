@@ -1,0 +1,26 @@
+# expect: /nodes/0/id
+#
+# Node id violates the kebab-case regex (uppercase + underscore not allowed).
+
+schemaVersion: "0.1"
+producer: art:helmcharts
+
+artifacts:
+  - id: art:helmcharts
+    label: HelmCharts repo
+    summary: Producer artifact.
+    introduced: 2024-07-12
+    lifecycle: active
+    producer: art:helmcharts
+    stereotype: Producer
+    url: https://github.com/pvginkel/HelmCharts
+    role: source
+    owner: Pieter van Ginkel
+
+nodes:
+  - id: node:Bad_ID
+    label: Bad node
+    summary: ID uses uppercase and underscore — both rejected by the regex.
+    introduced: 2024-07-12
+    lifecycle: active
+    producer: art:helmcharts

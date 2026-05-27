@@ -1,0 +1,33 @@
+# expect: /relations/0/type
+#
+# Relations.type is constrained to the ArchiMate XSD enumeration. A type
+# not in that list is rejected.
+
+schemaVersion: "0.1"
+producer: art:helmcharts
+
+artifacts:
+  - id: art:helmcharts
+    label: HelmCharts repo
+    summary: Producer artifact.
+    introduced: 2024-07-12
+    lifecycle: active
+    producer: art:helmcharts
+    stereotype: Producer
+    url: https://github.com/pvginkel/HelmCharts
+    role: source
+    owner: Pieter van Ginkel
+
+nodes:
+  - id: node:prd-cluster
+    label: Production cluster
+    summary: K8s cluster.
+    introduced: 2024-07-12
+    lifecycle: active
+    producer: art:helmcharts
+
+relations:
+  - id: rel:imaginary
+    source: node:prd-cluster
+    target: node:prd-cluster
+    type: HypotheticalRelationship

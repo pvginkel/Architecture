@@ -1,0 +1,29 @@
+# expect: /nodes/0
+#
+# A Node carries a render-only `position` field. v0.1 schemas declare
+# additionalProperties:false on every element, so the unknown key is
+# rejected at the element's path.
+
+schemaVersion: "0.1"
+producer: art:helmcharts
+
+artifacts:
+  - id: art:helmcharts
+    label: HelmCharts repo
+    summary: Producer artifact.
+    introduced: 2024-07-12
+    lifecycle: active
+    producer: art:helmcharts
+    stereotype: Producer
+    url: https://github.com/pvginkel/HelmCharts
+    role: source
+    owner: Pieter van Ginkel
+
+nodes:
+  - id: node:prd-cluster
+    label: Production cluster
+    summary: K8s cluster with a render-only field that should be rejected.
+    introduced: 2024-07-12
+    lifecycle: active
+    producer: art:helmcharts
+    position: { x: 100, y: 200 }

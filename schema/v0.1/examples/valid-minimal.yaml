@@ -1,0 +1,45 @@
+# Minimal artifact: one Node, one SystemSoftware, one TechnologyService,
+# one «Producer» Repository Artifact. No relations. Demonstrates the
+# smallest dataset the validator accepts.
+
+schemaVersion: "0.1"
+producer: art:helmcharts
+
+artifacts:
+  - id: art:helmcharts
+    label: HelmCharts repo
+    summary: Pieter's HelmCharts repository; produces architecture data for cluster services.
+    introduced: 2024-07-12
+    lifecycle: active
+    producer: art:helmcharts
+    stereotype: Producer
+    url: https://github.com/pvginkel/HelmCharts
+    role: source
+    owner: Pieter van Ginkel
+
+nodes:
+  - id: node:prd-cluster
+    label: Production Kubernetes cluster
+    summary: Three-node microk8s cluster on srvk8s1/2/3.
+    introduced: 2024-07-12
+    lifecycle: active
+    producer: art:helmcharts
+    cluster: prd
+
+systemSoftware:
+  - id: ss:keycloak-prd
+    label: Keycloak (prd)
+    summary: Production Keycloak instance providing IAM.
+    introduced: 2024-09-04
+    lifecycle: active
+    producer: art:helmcharts
+    environment: prd
+    cluster: prd
+
+technologyServices:
+  - id: svc:oidc-issuer
+    label: OIDC issuer
+    summary: auth.webathome.org OpenID Connect issuer.
+    introduced: 2024-09-04
+    lifecycle: active
+    producer: art:helmcharts
