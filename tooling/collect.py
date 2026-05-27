@@ -21,6 +21,7 @@ Usage:
 from __future__ import annotations
 
 import sys
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +36,12 @@ from _arch import (
     normalize,
     validate_doc,
 )
+
+
+# Stable namespace for uuid5-derived synthesised producer-relation ids.
+# Same (producer-id, element-id) input always yields the same uuid, which
+# keeps the merged dataset byte-identical across reruns.
+PRODUCER_RELATION_NAMESPACE = uuid.UUID("41a96d77-cf3a-4f53-9e75-2ad5e8d3e7c4")
 
 
 ELEMENT_KIND_ARRAYS: tuple[str, ...] = (
@@ -176,6 +183,54 @@ def reconcile_capability_enum(docs: dict[str, Any]) -> None:
 
     if messages:
         raise CollectorError("capability-enum", messages)
+
+
+def synthesize_producer_relations(docs: dict[str, Any]) -> int:
+    """Append one Association relation per declared element from the
+    artifact's top-level «Producer» Artifact to that element. Mutates each
+    doc's `relations` array in place. Producers don't have to emit these
+    by hand — provenance falls out of the merged dataset structurally,
+    expressed as real ArchiMate edges rather than an attribute on every
+    element.
+
+    Relation type is Association (matches every v0.1 element kind in the
+    triple matrix from Artifact-as-source; Aggregation/Composition would
+    only permit Artifact and Grouping targets).
+
+    Relation ids are uuid5(NAMESPACE, "<producer-id>|<element-id>") so the
+    output is deterministic across reruns. The producer's own «Producer»
+    Artifact entry is skipped (no self-Association).
+
+    Pre-merge: synthesised relations join their owning artifact's relations
+    array, which means they pass through dup-id detection and cross-ref
+    resolution like producer-emitted relations.
+
+    Returns the total number of relations synthesised across all artifacts.
+    """
+    synthesised = 0
+    for pid in sorted(docs):
+        doc = docs[pid]
+        producer_id = doc["producer"]
+        relations = doc.setdefault("relations", []) or []
+        doc["relations"] = relations
+        for kind in ELEMENT_KIND_ARRAYS:
+            for elem in doc.get(kind) or []:
+                if elem["id"] == producer_id:
+                    continue
+                rel_uuid = uuid.uuid5(
+                    PRODUCER_RELATION_NAMESPACE,
+                    f"{producer_id}|{elem['id']}",
+                )
+                relations.append(
+                    {
+                        "id": f"rel:{rel_uuid}",
+                        "source": producer_id,
+                        "target": elem["id"],
+                        "type": "Association",
+                    }
+                )
+                synthesised += 1
+    return synthesised
 
 
 def merge_artifacts(docs: dict[str, Any]) -> dict[str, list]:
@@ -346,6 +401,12 @@ def main(producers_path: Path, input_dir: Path, output_dir: Path) -> None:
         _fail(e)
 
     click.echo("Capability-enum reconciliation: every cap: reference resolved.")
+
+    synth_total = synthesize_producer_relations(docs)
+    click.echo(
+        f"Producer-relation synthesis: appended {synth_total} Association edge(s) "
+        f"across {len(docs)} artifact(s)."
+    )
 
     try:
         merged = merge_artifacts(docs)
