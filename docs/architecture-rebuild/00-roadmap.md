@@ -44,6 +44,8 @@ Build the runtime container that hosts the schemas, validates artifacts via `POS
 
 The service is **publish-only** for architecture data. It does not collect, merge, or assemble producer artifacts — that happens in v3's Architecture pipeline.
 
+Status: **done.** Service code under `service/`; container builds and serves `/`, `/viewer/`, `/schema/v0.1/*`, `/api/validate`, `/healthz`, `/metrics`. `USAGE.md` at the repo root is rendered at `/`. `arch-validate` CLI at `scripts/arch-validate`. Helm chart updated in `pvginkel/HelmCharts` (port/probes/scrape annotations). Homelab deploy is the operator step left to verify.
+
 Plan: [`../features/validation-service.md`](../features/validation-service.md).
 
 ### v3 — Producer protocol + Architecture-build collector

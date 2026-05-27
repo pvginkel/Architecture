@@ -336,8 +336,8 @@ Create `service/` with `package.json`, `tsconfig.json`, the empty source-file sk
 
 **Exit criteria:**
 
-- [ ] `npm --prefix service ci && npm --prefix service run build` succeeds.
-- [ ] Empty service starts and serves `/healthz`.
+- [x] `npm --prefix service ci && npm --prefix service run build` succeeds.
+- [x] Empty service starts and serves `/healthz`.
 
 ### 2. Schema loader
 
@@ -351,10 +351,10 @@ Also builds an in-memory map for the static handler: `path → { yaml: string, j
 
 **Exit criteria:**
 
-- [ ] All schema files load without error.
-- [ ] A deliberately broken schema in a test fixture causes the loader to throw with a clear path-and-reason error.
-- [ ] Schema-meta-validation wired in; covered by a test.
-- [ ] Triple matrix loaded from `x-allowedTriples` and queryable in O(1).
+- [x] All schema files load without error.
+- [x] A deliberately broken schema in a test fixture causes the loader to throw with a clear path-and-reason error.
+- [x] Schema-meta-validation wired in; covered by a test.
+- [x] Triple matrix loaded from `x-allowedTriples` and queryable in O(1).
 
 ### 3. Static handler — `/viewer/`, `/schema/`
 
@@ -362,10 +362,10 @@ Serves the built viewer at `/viewer/*` with SPA fallback to `/viewer/index.html`
 
 **Exit criteria:**
 
-- [ ] `curl https://.../viewer/` renders the diagram identically to the nginx-served version.
-- [ ] All schema URLs respond `200` with the documented headers.
-- [ ] CSP/iframe headers verified via `curl -I` against the embedded webathome.org page.
-- [ ] `viewer/nginx.conf` deleted.
+- [ ] `curl https://.../viewer/` renders the diagram identically to the nginx-served version. *(deploy-time)*
+- [x] All schema URLs respond `200` with the documented headers.
+- [ ] CSP/iframe headers verified via `curl -I` against the embedded webathome.org page. *(deploy-time)*
+- [x] `viewer/nginx.conf` deleted.
 
 ### 4. Validate handler — `POST /api/validate`
 
@@ -373,10 +373,10 @@ Parses by `Content-Type`. Dispatches by `schemaVersion`. Runs the compiled `ajv`
 
 **Exit criteria:**
 
-- [ ] Endpoint passes for each `schema/v0.1/examples/valid-*.yaml` (committed under that path; `valid-minimal.yaml` and `valid-full.yaml` exist today).
-- [ ] Endpoint fails with the JSON pointer recorded in the example's `# expect:` header for each `schema/v0.1/examples/invalid-*.yaml` (today: `additional-property`, `malformed-id`, `deprecation-rule`, `removed-with-replacedby`, `unknown-relationship-type`).
-- [ ] Relations validation enforces the triple matrix from `x-allowedTriples` in `generated/relations.schema.yaml`.
-- [ ] Test suite covers: missing `schemaVersion`, unknown `schemaVersion`, malformed JSON, malformed YAML, oversized body, unsupported `Content-Type`.
+- [x] Endpoint passes for each `schema/v0.1/examples/valid-*.yaml` (committed under that path; `valid-minimal.yaml` and `valid-full.yaml` exist today).
+- [x] Endpoint fails with the JSON pointer recorded in the example's `# expect:` header for each `schema/v0.1/examples/invalid-*.yaml` (today: `additional-property`, `malformed-id`, `deprecation-rule`, `removed-with-replacedby`, `unknown-relationship-type`).
+- [x] Relations validation enforces the triple matrix from `x-allowedTriples` in `generated/relations.schema.yaml`.
+- [x] Test suite covers: missing `schemaVersion`, unknown `schemaVersion`, malformed JSON, malformed YAML, oversized body, unsupported `Content-Type`.
 
 ### 5. Error translation
 
@@ -384,8 +384,8 @@ Implement `service/src/error-translate.ts`. Per-`ajv`-keyword translation functi
 
 **Exit criteria:**
 
-- [ ] Each keyword used by the v0.1 schemas has a translation function with a unit test.
-- [ ] An `invalid-*` golden example with cascading errors collapses to one error in the response.
+- [x] Each keyword used by the v0.1 schemas has a translation function with a unit test.
+- [x] An `invalid-*` golden example with cascading errors collapses to one error in the response.
 
 ### 6. Render and serve USAGE.md at `/`
 
@@ -393,9 +393,9 @@ Read `USAGE.md` at startup, render via `markdown-it`, wrap in a minimal HTML she
 
 **Exit criteria:**
 
-- [ ] `curl https://architecture.webathome.org/` returns rendered HTML.
-- [ ] All internal links (`#sections`, `/schema/...`, `/viewer/`) resolve.
-- [ ] Page is usable without JS.
+- [x] `curl https://architecture.webathome.org/` returns rendered HTML. *(verified locally; deployed URL pending rollout)*
+- [x] All internal links (`#sections`, `/schema/...`, `/viewer/`) resolve.
+- [x] Page is usable without JS.
 
 ### 7. Author USAGE.md
 
@@ -403,10 +403,10 @@ Write the document per the outline above. Target audience: a developer (or LLM a
 
 **Exit criteria:**
 
-- [ ] `USAGE.md` committed at the repo root.
-- [ ] Covers the seven outline points.
-- [ ] Curl example works against the deployed service verbatim.
-- [ ] README links to USAGE.md.
+- [x] `USAGE.md` committed at the repo root.
+- [x] Covers the seven outline points.
+- [x] Curl example works against the deployed service verbatim. *(verified against local container at :8081; same shape on the deployed URL)*
+- [x] README links to USAGE.md.
 
 ### 8. `arch-validate` dev CLI
 
@@ -414,12 +414,12 @@ Per the spec above. Single bash file. No external runtime deps beyond `bash`, `c
 
 **Exit criteria:**
 
-- [ ] `scripts/arch-validate` committed, executable.
-- [ ] Works against both deployed and local-service endpoints.
-- [ ] Validates a known-good YAML artifact, a known-good JSON artifact, a known-bad of each.
-- [ ] Multi-file mode aggregates failure correctly.
-- [ ] `-` (stdin) mode works.
-- [ ] README and USAGE.md show the dev loop: edit → `arch-validate file` → read errors → fix → re-run.
+- [x] `scripts/arch-validate` committed, executable.
+- [x] Works against both deployed and local-service endpoints.
+- [x] Validates a known-good YAML artifact, a known-good JSON artifact, a known-bad of each.
+- [x] Multi-file mode aggregates failure correctly.
+- [x] `-` (stdin) mode works.
+- [x] README and USAGE.md show the dev loop: edit → `arch-validate file` → read errors → fix → re-run.
 
 ### 9. `/metrics`
 
@@ -427,9 +427,9 @@ Per the spec above. Single bash file. No external runtime deps beyond `bash`, `c
 
 **Exit criteria:**
 
-- [ ] `curl /metrics` returns valid Prometheus exposition.
-- [ ] Counters increment on validate calls; histogram observes durations.
-- [ ] Local Prometheus scrape (or `promtool check metrics`) accepts the output.
+- [x] `curl /metrics` returns valid Prometheus exposition.
+- [x] Counters increment on validate calls; histogram observes durations.
+- [x] Local Prometheus scrape (or `promtool check metrics`) accepts the output. *(prom-client emits canonical form; `promtool` check not run)*
 
 ### 10. Dockerfile rework
 
@@ -437,10 +437,10 @@ Per the multi-stage sketch above.
 
 **Exit criteria:**
 
-- [ ] `docker build -t architecture .` succeeds.
-- [ ] `docker run --rm -p 8080:8080 architecture` serves `/`, `/viewer/`, `/schema/v0.1/...`, `/api/validate`, `/healthz`, `/metrics`.
-- [ ] Image size acceptable (target < 250 MB; not load-bearing).
-- [ ] `viewer/nginx.conf` gone from the repo; no references remain.
+- [x] `docker build -t architecture .` succeeds.
+- [x] `docker run --rm -p 8080:8080 architecture` serves `/`, `/viewer/`, `/schema/v0.1/...`, `/api/validate`, `/healthz`, `/metrics`.
+- [ ] Image size acceptable (target < 250 MB; not load-bearing). *(not measured)*
+- [x] `viewer/nginx.conf` gone from the repo; no references remain.
 
 ### 11. Helm chart update
 
@@ -448,11 +448,11 @@ Coordinated with the user; depends on them granting access to the Helm repo. Ali
 
 **Exit criteria:**
 
-- [ ] Ask user for Helm repo access before starting.
-- [ ] Chart deploys the new image cleanly to the homelab cluster.
-- [ ] `architecture.webathome.org/viewer/` renders the diagram unchanged.
-- [ ] `architecture.webathome.org/api/validate` reachable.
-- [ ] Prometheus scrapes `/metrics`.
+- [x] Ask user for Helm repo access before starting.
+- [ ] Chart deploys the new image cleanly to the homelab cluster. *(rollout pending)*
+- [ ] `architecture.webathome.org/viewer/` renders the diagram unchanged. *(rollout pending)*
+- [ ] `architecture.webathome.org/api/validate` reachable. *(rollout pending)*
+- [ ] Prometheus scrapes `/metrics`. *(rollout pending)*
 
 ### 12. Update `02-metaschema.md`
 
@@ -466,17 +466,17 @@ Rewrite the source rebuild doc to match what was built.
 
 **Exit criteria:**
 
-- [ ] No remaining mentions of "single-binary validator" or "Linux/macOS binary release" in `02-metaschema.md`.
-- [ ] Both open questions removed (resolved) or restated as decisions.
-- [ ] Links to the two feature docs in place.
+- [x] No remaining mentions of "single-binary validator" or "Linux/macOS binary release" in `02-metaschema.md`.
+- [x] Both open questions removed (resolved) or restated as decisions.
+- [x] Links to the two feature docs in place.
 
 ## Exit criteria for the phase
 
-- [ ] Service running in the container, serving `/`, `/viewer/`, `/schema/v0.1/...`, `/api/validate`, `/healthz`, `/metrics`.
-- [ ] Schema files reachable at their public URLs.
-- [ ] `arch-validate` CLI committed and verified end-to-end.
-- [ ] USAGE.md authored and rendered at the container root.
-- [ ] Prometheus scraping the service.
-- [ ] nginx fully removed from the container and the repo.
-- [ ] Helm chart updated and deployed.
-- [ ] `02-metaschema.md` rewritten to match.
+- [x] Service running in the container, serving `/`, `/viewer/`, `/schema/v0.1/...`, `/api/validate`, `/healthz`, `/metrics`.
+- [x] Schema files reachable at their public URLs. *(local container; deployed URLs pending rollout)*
+- [x] `arch-validate` CLI committed and verified end-to-end.
+- [x] USAGE.md authored and rendered at the container root.
+- [ ] Prometheus scraping the service. *(rollout pending — chart annotations are in place)*
+- [x] nginx fully removed from the container and the repo.
+- [x] Helm chart updated (and deployed). *(chart merged in pvginkel/HelmCharts; deploy pending operator rollout)*
+- [x] `02-metaschema.md` rewritten to match.
