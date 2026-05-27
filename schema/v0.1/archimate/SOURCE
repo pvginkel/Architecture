@@ -1,0 +1,24 @@
+ArchiMate Model Exchange File Format — vendored XSDs
+=====================================================
+
+Source: The Open Group, ArchiMate Model Exchange File Format
+Index page: https://www.opengroup.org/xsd/archimate/
+
+Files vendored verbatim:
+  archimate3_Model.xsd     https://www.opengroup.org/xsd/archimate/3.1/archimate3_Model.xsd
+  archimate3_View.xsd      https://www.opengroup.org/xsd/archimate/3.1/archimate3_View.xsd
+  archimate3_Diagram.xsd   https://www.opengroup.org/xsd/archimate/3.1/archimate3_Diagram.xsd
+
+Schema version: 3.1
+Specification: covers ArchiMate 3.1 and ArchiMate 3.2 (no breaking changes to the
+               exchange format between 3.1 and 3.2; The Open Group publishes one
+               XSD set under the 3.1 path that serves both).
+Retrieval date: 2026-05-27
+
+Companion publication (the Guide): https://pubs.opengroup.org/architecture/archimate31-exchange-file-format-guide/
+
+These files are vendored unmodified. Do not edit. To update, replace verbatim
+from the source URLs and bump the retrieval date.
+
+The XSDs themselves do not embed a redistribution license. The Open Group hosts
+them publicly under the URL above for use by ArchiMate tooling implementers.
