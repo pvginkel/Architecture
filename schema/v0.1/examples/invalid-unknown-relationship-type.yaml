@@ -12,7 +12,6 @@ artifacts:
     summary: Producer artifact.
     introduced: 2024-07-12
     lifecycle: active
-    producer: art:helmcharts
     stereotype: Producer
     url: https://github.com/pvginkel/HelmCharts
     role: source
@@ -24,7 +23,6 @@ nodes:
     summary: K8s cluster.
     introduced: 2024-07-12
     lifecycle: active
-    producer: art:helmcharts
 
 relations:
   - id: rel:imaginary

@@ -57,20 +57,10 @@ describe("translateErrors against the v0.1 golden invalid fixtures", () => {
     );
   });
 
-  it("deprecation-rule: cascade collapses to one error at /nodes/0", () => {
-    const errs = validateAndTranslate("invalid-deprecation-rule.yaml");
-    const atNode = errs.filter((x) => x.path === "/nodes/0");
-    // Cascade dedup: a single representative for the conditional violation.
-    expect(atNode.length).toBe(1);
-    expect(["oneOf", "if", "allOf", "then"]).toContain(atNode[0]!.keyword);
-  });
-
-  it("removed-with-replacedby: cascade collapses to one error at /nodes/0", () => {
-    const errs = validateAndTranslate("invalid-removed-with-replacedby.yaml");
-    const atNode = errs.filter((x) => x.path === "/nodes/0");
-    expect(atNode.length).toBe(1);
-    expect(["not", "allOf", "if", "then"]).toContain(atNode[0]!.keyword);
-  });
+  // v3 removed the lifecycle conditional rules and `replacedBy` attribute,
+  // so the cascade-dedup tests that targeted those error shapes are gone.
+  // Cascade-dedup is still exercised through the per-keyword translators
+  // below.
 });
 
 describe("per-keyword translators", () => {

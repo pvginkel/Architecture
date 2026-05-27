@@ -4,3 +4,5 @@ dist
 *.log
 .vite
 /tmp
+__pycache__/
+*.pyc

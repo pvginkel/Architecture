@@ -41,7 +41,6 @@ from _arch import (
     validate_doc,
 )
 
-
 # Stable namespace for uuid5-derived synthesised producer-relation ids.
 # Same (producer-id, element-id) input always yields the same uuid, which
 # keeps the merged dataset byte-identical across reruns.
@@ -777,15 +776,17 @@ def main(producers_path: Path, input_dir: Path, output_dir: Path) -> None:
     deprecated_warnings = sum(
         1 for w in report["warnings"] if w["kind"] == "deprecated-target"
     )
-    click.echo(
-        "Cross-reference resolution: all references resolved"
-        + (f" ({deprecated_warnings} deprecated-target warning(s))." if deprecated_warnings else ".")
+    suffix = (
+        f" ({deprecated_warnings} deprecated-target warning(s))."
+        if deprecated_warnings
+        else "."
     )
+    click.echo(f"Cross-reference resolution: all references resolved{suffix}")
 
     reconcile_alias_hints(docs, index, report)
     n_div = len(report["divergences"])
     click.echo(
-        f"Alias-hint reconciliation: "
+        "Alias-hint reconciliation: "
         + ("hints agree across all observations." if n_div == 0 else
            f"{n_div} element(s) with hint divergence captured in the report.")
     )

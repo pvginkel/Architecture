@@ -263,13 +263,13 @@ const translators: Record<string, Translator> = {
     return {
       message:
         "value satisfies a forbidden constraint (a `not` schema matched when it should not have)",
-      hint: "likely a lifecycle rule — e.g. removed elements may not carry replacedBy",
+      hint: "likely a stereotype rule — e.g. stereotype-specific attributes present without the stereotype",
     };
   },
   if(_e, _value): PartialTranslation {
     return {
       message: "conditional rule did not match the 'then' branch",
-      hint: "this is usually a lifecycle-deprecation/removal rule",
+      hint: "usually a stereotype-conditional rule (stereotype-specific required attributes)",
     };
   },
   then(_e, _value): PartialTranslation {

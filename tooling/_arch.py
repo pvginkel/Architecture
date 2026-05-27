@@ -178,7 +178,11 @@ def load_pipeline_producers(
     seen: dict[str, int] = {}
     for i, p in enumerate(producers):
         if p["id"] in seen:
-            rel = yaml_path.relative_to(REPO_ROOT) if yaml_path.is_relative_to(REPO_ROOT) else yaml_path
+            rel = (
+                yaml_path.relative_to(REPO_ROOT)
+                if yaml_path.is_relative_to(REPO_ROOT)
+                else yaml_path
+            )
             raise ValueError(
                 f"{rel}: duplicate producer id "
                 f"{p['id']!r} at indexes {seen[p['id']]} and {i}"

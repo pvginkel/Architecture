@@ -57,9 +57,7 @@ describe("POST /api/validate — golden YAML fixtures", () => {
 
   const invalidFixtures = [
     "invalid-additional-property.yaml",
-    "invalid-deprecation-rule.yaml",
     "invalid-malformed-id.yaml",
-    "invalid-removed-with-replacedby.yaml",
     "invalid-unknown-relationship-type.yaml",
   ];
 

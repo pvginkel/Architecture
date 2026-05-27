@@ -11,7 +11,6 @@ artifacts:
     summary: Producer artifact.
     introduced: 2024-07-12
     lifecycle: active
-    producer: art:helmcharts
     stereotype: Producer
     url: https://github.com/pvginkel/HelmCharts
     role: source
@@ -23,4 +22,3 @@ nodes:
     summary: ID uses uppercase and underscore — both rejected by the regex.
     introduced: 2024-07-12
     lifecycle: active
-    producer: art:helmcharts

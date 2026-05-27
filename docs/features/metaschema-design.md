@@ -229,8 +229,8 @@ relations: []                            # {id, source, target, type}
    - `description` on every field
    - `id`/`label`/`summary`/`introduced` (mapped from ArchiMate identifier/name/documentation)
    - All custom attributes from `subset.yaml`
-   - Lifecycle conditional rules (`if`/`then`/`else` on `replacedBy` / `retirementBy`)
-   - The ID regex for the kind
+   - Stereotype conditional rules (required stereotype-specific attributes when a stereotype is set; forbidden stereotype-specific attributes when no stereotype is set)
+   - The ID regex for the kind (composite `<kind>:<hint>,<uuid4>` for instance kinds; bare kebab for curated / catalog kinds)
 5. The generator parses the vendored `relationships.xml` and `relationships-keys.xml`, expands the key-letter dictionary into full relationship type names, restricts the resulting triple matrix to source/target kinds in our subset, and emits `relations.schema.yaml` encoding the allowed `(source-kind, relation-type, target-kind)` triples.
 6. Generated files are committed. CI re-runs the generator and gates on a clean diff.
 
@@ -239,19 +239,20 @@ relations: []                            # {id, source, target, type}
 These are catchable at single-artifact JSON Schema time:
 
 - Any document with a render-only field (`additionalProperties: false`).
-- ID that fails its kind's regex.
-- Reference to a `capability` not declared in `enums/capabilities.yaml`.
-- Element with `lifecycle: deprecated` and neither `replacedBy` nor `retirementBy`.
-- Element with `lifecycle: removed` and a `replacedBy` or `retirementBy` present.
+- ID that fails its kind's regex (composite form mandatory at instance-kind declarations).
+- A stereotype-bearing element missing its stereotype-specific required attributes (e.g., a «Repository» Artifact without `url`/`role`/`owner`).
+- An element carrying stereotype-specific attributes without setting the stereotype.
 - A `relation` entry whose `type` is not a known ArchiMate relationship type.
-- A `relation` entry whose `(source-kind, type, target-kind)` triple is not permitted by ArchiMate 3.2.
 
 Caught only at collector time, listed for completeness:
 
-- Reference to an element id that doesn't exist in the merged dataset.
-- Two elements with the same id (a real ownership conflict between producers).
-- Cross-producer relation triples not permitted by ArchiMate 3.2 (in-artifact triples are already caught above; the same matrix is re-checked at merge time for relations whose source and target live in different artifacts).
-- alias-hint divergence (same UUID, different hints across producers — warning, not failure).
+- Reference to an element id that doesn't exist in the merged dataset (any of the three forms; cross-producer hint-only refs fail here too).
+- Reference to a `removed`-lifecycle element (fail) or `deprecated` (warning).
+- Capability reference not in `enums/capabilities.yaml`.
+- Two elements with the same id across producers (real ownership conflict).
+- Relation `(source-kind, type, target-kind)` triple not permitted by ArchiMate 3.2 (the collector enforces the matrix for every relation, in-artifact and cross-artifact).
+- Hint divergence on composite references (same UUID, differing hint portion — warning, not failure).
+- A Grouping declared without any Aggregation member, or that aggregates an element owned by a different producer.
 
 ## Inclusion rule
 
