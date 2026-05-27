@@ -1,0 +1,124 @@
+# schema/v0.1/architecture.schema.yaml
+#
+# Top-level envelope for a single architecture artifact submitted to the
+# validation service. Every producer emits one of these. The collector
+# merges artifacts at ingest time.
+#
+# Hand-authored; the per-kind schemas this references are generated from
+# subset.yaml + the vendored ArchiMate sources (see tooling/generate.py).
+
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://architecture.webathome.org/schema/v0.1/architecture.schema.yaml
+title: Architecture artifact (v0.1)
+description: >
+  One artifact submitted to the validation service. Contains zero or more
+  element documents per ArchiMate kind plus a relations list. Producers
+  emit one of these per build; the collector merges them.
+
+type: object
+additionalProperties: false
+required:
+  - schemaVersion
+  - producer
+
+properties:
+  schemaVersion:
+    type: string
+    const: "0.1"
+    description: Metaschema version. v0.1 accepts only "0.1".
+
+  producer:
+    type: string
+    pattern: '^art:'
+    description: >
+      The «Producer» Artifact (Repository) id that produced this artifact.
+      Must exist in the merged dataset as a Repository Artifact with the
+      «Producer» stereotype.
+
+  generatedAt:
+    type: string
+    format: date-time
+    description: ISO-8601 timestamp; informational.
+
+  nodes:
+    type: array
+    description: Node elements (execution hosts).
+    items:
+      $ref: ./generated/node.schema.yaml
+
+  devices:
+    type: array
+    description: Device elements (physical hardware).
+    items:
+      $ref: ./generated/device.schema.yaml
+
+  systemSoftware:
+    type: array
+    description: SystemSoftware elements.
+    items:
+      $ref: ./generated/systemsoftware.schema.yaml
+
+  applicationComponents:
+    type: array
+    description: ApplicationComponent elements.
+    items:
+      $ref: ./generated/applicationcomponent.schema.yaml
+
+  applicationServices:
+    type: array
+    description: ApplicationService elements.
+    items:
+      $ref: ./generated/applicationservice.schema.yaml
+
+  applicationInterfaces:
+    type: array
+    description: ApplicationInterface elements.
+    items:
+      $ref: ./generated/applicationinterface.schema.yaml
+
+  technologyServices:
+    type: array
+    description: TechnologyService elements.
+    items:
+      $ref: ./generated/technologyservice.schema.yaml
+
+  technologyInterfaces:
+    type: array
+    description: TechnologyInterface elements.
+    items:
+      $ref: ./generated/technologyinterface.schema.yaml
+
+  artifacts:
+    type: array
+    description: Artifact elements (repos, charts, modules, scripts).
+    items:
+      $ref: ./generated/artifact.schema.yaml
+
+  capabilities:
+    type: array
+    description: Capability elements. Normally curated in enums/capabilities.yaml; producers rarely emit these directly.
+    items:
+      $ref: ./generated/capability.schema.yaml
+
+  businessServices:
+    type: array
+    description: BusinessService elements (SSO realisation, self-service tooling).
+    items:
+      $ref: ./generated/businessservice.schema.yaml
+
+  groupings:
+    type: array
+    description: Grouping elements (cosmetic clustering).
+    items:
+      $ref: ./generated/grouping.schema.yaml
+
+  relations:
+    type: array
+    description: >
+      Relations between elements. Each entry is validated against
+      generated/relations.schema.yaml, which constrains type to the
+      ArchiMate 3.2 enumeration and embeds the (source-kind, type,
+      target-kind) allowed-triples matrix in x-allowedTriples for the
+      collector to enforce.
+    items:
+      $ref: ./generated/relations.schema.yaml
