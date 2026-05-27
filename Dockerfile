@@ -16,7 +16,7 @@ FROM python:3.13-slim AS check-schemas
 WORKDIR /work
 RUN pip install --no-cache-dir poetry==1.8.5
 COPY tooling/pyproject.toml tooling/poetry.lock ./tooling/
-RUN cd tooling && poetry install --no-root --only main
+RUN cd tooling && poetry install --no-root --without dev
 COPY schema/ ./schema/
 COPY tooling/ ./tooling/
 RUN cd tooling && poetry run python generate.py --check
