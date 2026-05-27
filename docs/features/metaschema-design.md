@@ -108,22 +108,25 @@ Stereotype-specific attributes are carried only when the stereotype applies. The
 
 ## ID formats
 
-| Element kind | ID prefix | Format | Notes |
-|---|---|---|---|
-| `Node` | `node:` | kebab-case | `node:pve1`, `node:prd-cluster` |
-| `Device` | `device:` | kebab-case | `device:switch-rack1` |
-| `SystemSoftware` (instance) | `ss:` | UUIDv4 | Producer-minted |
-| `SystemSoftware` («SoftwareProduct») | `ss:` | kebab-case | `ss:keycloak`, `ss:postgresql` |
-| `ApplicationComponent` (instance) | `app:` | UUIDv4 | Producer-minted |
-| `ApplicationComponent` («SoftwareProduct») | `app:` | kebab-case | `app:electronics-inventory` |
-| `ApplicationService` / `TechnologyService` | `svc:` | kebab-case | `svc:oidc-issuer`, `svc:postgres-shared` |
-| `ApplicationInterface` / `TechnologyInterface` | `if:` | kebab-case | `if:postgres-5432`, `if:iotsupport-events-queue` |
-| `Artifact` | `art:` | kebab-case or UUIDv4 | `art:ei-prd-chart`, `art:helmcharts-repo` |
-| `Capability` | `cap:` | kebab-case | `cap:iam`, `cap:observability` |
-| `BusinessService` | `bsvc:` | kebab-case | `bsvc:single-sign-on` |
-| `Grouping` | `grp:` | UUIDv4 or kebab-case | Producer-declared |
+Three id forms exist in v0.1; per-kind regex selects the one(s) acceptable at the declaration site.
 
-UUIDv4 is used where stable cross-repo reference is needed (instance identities minted by producers). Kebab-case is used for curated enumerated entries (products, capabilities, named hosts).
+| Element kind | ID prefix | Declaration format | Notes |
+|---|---|---|---|
+| `Node` | `node:` | composite | `node:prd-cluster,7f3a2b1c-9d4a-4e8c-b2f1-1a2b3c4d5e6f` |
+| `Device` | `device:` | composite | `device:switch-rack1,…` |
+| `SystemSoftware` (instance) | `ss:` | composite | `ss:keycloak-prd,…` |
+| `SystemSoftware` («SoftwareProduct») | `ss:` | bare kebab | `ss:keycloak`, `ss:postgresql` |
+| `ApplicationComponent` (instance) | `app:` | composite | `app:ei-backend-prd,…` |
+| `ApplicationComponent` («SoftwareProduct») | `app:` | bare kebab | `app:electronics-inventory` |
+| `ApplicationService` / `TechnologyService` | `svc:` | composite | `svc:oidc-issuer,…` |
+| `ApplicationInterface` / `TechnologyInterface` | `if:` | composite | `if:postgres-5432,…` |
+| `Artifact` (non-stereotyped) | `art:` | composite | `art:ei-prd-chart,…` |
+| `Artifact` («Repository» / «Producer») | `art:` | bare kebab | `art:helmcharts` |
+| `Capability` | `cap:` | bare kebab | `cap:iam`, `cap:observability` |
+| `BusinessService` | `bsvc:` | bare kebab | `bsvc:single-sign-on` |
+| `Grouping` | `grp:` | composite | `grp:identity,…` |
+
+Composite is `<kind>:<hint>,<uuid4>`. On *references* (relation source/target), three forms are accepted: composite, uuid-only (`<kind>:<uuid4>`), or hint-only (`<kind>:<hint>` — internal-only; cross-producer hint-only refs fail at merge time). Bare kebab is used for curated and catalog identities — capabilities, business services, SoftwareProduct/Repository/Producer entries — where the id IS the canonical name.
 
 ## Relationships
 
