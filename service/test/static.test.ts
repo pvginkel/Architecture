@@ -24,7 +24,11 @@ afterAll(() => {
 });
 
 function makeApp() {
-  return createApp({ bundle: loadSchemas({ schemaRoot: REPO_SCHEMA_ROOT }), viewerRoot });
+  return createApp({
+    bundle: loadSchemas({ schemaRoot: REPO_SCHEMA_ROOT }),
+    viewerRoot,
+    dataRoot: "/nonexistent",
+  });
 }
 
 describe("viewer static handler", () => {
@@ -110,6 +114,37 @@ describe("schema static handler", () => {
 
   it("returns 404 for an unknown schema path", async () => {
     const res = await request(makeApp()).get("/schema/v0.1/nope.yaml");
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("data static handler", () => {
+  it("serves a populated dataRoot at /data/v0.1/architecture.yaml", async () => {
+    const dataRoot = path.resolve(__dirname, "../../tmp-test-data-static");
+    const fs = await import("node:fs");
+    fs.mkdirSync(path.join(dataRoot, "v0.1"), { recursive: true });
+    fs.writeFileSync(
+      path.join(dataRoot, "v0.1", "architecture.yaml"),
+      "schemaVersion: '0.1'\n",
+    );
+    try {
+      const app = createApp({
+        bundle: loadSchemas({ schemaRoot: REPO_SCHEMA_ROOT }),
+        viewerRoot,
+        dataRoot,
+      });
+      const res = await request(app).get("/data/v0.1/architecture.yaml");
+      expect(res.status).toBe(200);
+      expect(res.headers["content-type"]).toContain("application/yaml");
+      expect(res.headers["access-control-allow-origin"]).toBe("*");
+      expect(res.text).toContain("schemaVersion");
+    } finally {
+      fs.rmSync(dataRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("returns 404 when the merged dataset is not yet bundled (v2 stub)", async () => {
+    const res = await request(makeApp()).get("/data/v0.1/architecture.yaml");
     expect(res.status).toBe(404);
   });
 });

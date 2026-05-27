@@ -10,14 +10,20 @@ Served as a standalone container at [`architecture.webathome.org/viewer`](https:
 viewer/      # React + ReactFlow SPA (Vite)
   src/         components, layout, data, postMessage bridge
   public/      logos served at /viewer/logos/
-  nginx.conf   serves the build with /viewer/ base + CSP for the iframe parents
+service/     # Node + Express validation service (TypeScript)
+  src/         routes (validate, static, usage, metrics, csp), schema loader, error translation
+  test/        vitest suite
+schema/v0.1/ # JSON Schema metaschema + vendored ArchiMate sources
+tooling/     # Python (Poetry): generate.py, validate.py, [collect.py — v3]
 scripts/
-  dev.sh       wrapper for `npm run dev` from the repo root
+  arch-validate  bash CLI producer repos copy into their own scripts/
+  dev.sh         wrapper for `npm run dev` from the repo root
 docs/
-  architecture-rebuild/  multi-phase rebuild plan (v0 = this repo)
-  todo.md                deferred decisions
-Dockerfile     multi-stage: node build → nginx
-Jenkinsfile    homelab Jenkins + Kaniko pipeline
+  architecture-rebuild/  multi-phase rebuild plan
+  features/              feature specs (metaschema-design, validation-service)
+USAGE.md     # producer integration docs; rendered at the container root
+Dockerfile   # multi-stage: schema-check → viewer build → service build → node runtime
+Jenkinsfile  # homelab Jenkins + Kaniko pipeline
 ```
 
 ## Develop
@@ -32,8 +38,10 @@ Vite dev server on `http://localhost:5173/viewer/`. Configured for remote access
 
 ```
 docker build -t architecture .
-docker run --rm -p 8080:80 architecture
-# open http://localhost:8080/viewer/
+docker run --rm -p 8080:8080 architecture
+# open http://localhost:8080/         — rendered USAGE.md
+# open http://localhost:8080/viewer/  — diagram
+# curl http://localhost:8080/healthz  /metrics  /schema/v0.1/architecture.schema.yaml
 ```
 
 ## Iframe contract

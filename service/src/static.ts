@@ -9,12 +9,15 @@ export interface StaticOptions {
   viewerRoot: string;
   /** Schema bundle from loadSchemas(). */
   bundle: SchemaBundle;
+  /** Filesystem path to the collector's merged dataset directory. */
+  dataRoot: string;
 }
 
 const CACHE_ASSETS = "public, max-age=31536000, immutable";
 const CACHE_LOGOS = "public, max-age=86400";
 const CACHE_HTML = "no-cache";
 const CACHE_SCHEMA = "public, max-age=300";
+const CACHE_DATA = "public, max-age=60";
 
 /**
  * Mounts /viewer/* and /schema/v0.1/* on the given router. Returns it so the
@@ -24,7 +27,35 @@ export function mountStatic(opts: StaticOptions): Router {
   const router = express.Router();
   mountViewer(router, opts.viewerRoot);
   mountSchema(router, opts.bundle);
+  mountData(router, opts.dataRoot);
   return router;
+}
+
+function mountData(router: Router, dataRoot: string): void {
+  // The collector (v3, see docs/architecture-rebuild/05-collector-and-pipeline.md)
+  // populates dataRoot/v0.1/{architecture.yaml,architecture.json,
+  // validation-report.json} at image-build time. Until then, the directory
+  // is empty and every request 404s — by design.
+  router.use(
+    "/data",
+    (_req, res, next) => {
+      res.setHeader("Cache-Control", CACHE_DATA);
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      next();
+    },
+    express.static(dataRoot, {
+      fallthrough: true,
+      index: false,
+      etag: true,
+      setHeaders(res, filePath) {
+        if (filePath.endsWith(".yaml") || filePath.endsWith(".yml")) {
+          res.setHeader("Content-Type", "application/yaml; charset=utf-8");
+        } else if (filePath.endsWith(".json")) {
+          res.setHeader("Content-Type", "application/json; charset=utf-8");
+        }
+      },
+    }),
+  );
 }
 
 function mountViewer(router: Router, viewerRoot: string): void {
@@ -141,6 +172,22 @@ export function resolveViewerRoot(cwd: string = process.cwd()): string {
   const candidates = [
     path.join(cwd, "viewer-dist"),
     path.join(cwd, "..", "viewer", "dist"),
+  ];
+  for (const c of candidates) {
+    if (existsSync(c) && statSync(c).isDirectory()) return c;
+  }
+  return candidates[0]!;
+}
+
+/**
+ * Resolve the merged-dataset directory. Honors DATA_ROOT for tests; otherwise
+ * looks for ./data (Docker layout), then ../dist/data (dev/CI layout).
+ */
+export function resolveDataRoot(cwd: string = process.cwd()): string {
+  if (process.env.DATA_ROOT) return process.env.DATA_ROOT;
+  const candidates = [
+    path.join(cwd, "data"),
+    path.join(cwd, "..", "dist", "data"),
   ];
   for (const c of candidates) {
     if (existsSync(c) && statSync(c).isDirectory()) return c;

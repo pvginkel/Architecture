@@ -1,6 +1,6 @@
 import express, { type Express } from "express";
 import { loadSchemas, SchemaLoadError, type SchemaBundle } from "./schema-loader.js";
-import { mountStatic, resolveViewerRoot } from "./static.js";
+import { mountStatic, resolveViewerRoot, resolveDataRoot } from "./static.js";
 import { mountValidate } from "./validate.js";
 import { createMetrics, mountMetrics, type Metrics } from "./metrics.js";
 import { mountUsage } from "./usage.js";
@@ -10,6 +10,8 @@ export interface AppOptions {
   bundle?: SchemaBundle;
   /** Filesystem path to the built viewer. Defaults to resolveViewerRoot(). */
   viewerRoot?: string;
+  /** Filesystem path to the merged-dataset directory. Defaults to resolveDataRoot(). */
+  dataRoot?: string;
   /** Metrics sink. Defaults to a fresh registry. */
   metrics?: Metrics;
   /** Filesystem path to USAGE.md. Defaults to the repo root copy. */
@@ -21,13 +23,14 @@ export function createApp(opts: AppOptions = {}): Express {
   const metrics = opts.metrics ?? createMetrics();
   const bundle = opts.bundle ?? loadBundleOrCount(metrics);
   const viewerRoot = opts.viewerRoot ?? resolveViewerRoot();
+  const dataRoot = opts.dataRoot ?? resolveDataRoot();
 
   app.get("/healthz", (_req, res) => {
     res.status(200).type("text/plain").send("ok");
   });
 
   app.use(mountUsage({ usagePath: opts.usagePath }));
-  app.use(mountStatic({ viewerRoot, bundle }));
+  app.use(mountStatic({ viewerRoot, bundle, dataRoot }));
   app.use(mountValidate({ bundle, metrics }));
   app.use(mountMetrics(metrics));
 
