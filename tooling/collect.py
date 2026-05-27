@@ -29,6 +29,7 @@ import click
 from _arch import (
     PIPELINE_PRODUCERS_FILE,
     PIPELINE_PRODUCERS_SCHEMA,
+    load_capability_enum,
     load_pipeline_producers,
     load_yaml,
     normalize,
@@ -122,6 +123,45 @@ def load_and_validate_artifacts(artifact_paths: dict[str, Path]) -> dict[str, An
     return docs
 
 
+def reconcile_capability_enum(docs: dict[str, Any]) -> None:
+    """Every `cap:`-prefixed id appearing anywhere in the merged set must
+    exist in `schema/v0.1/enums/capabilities.yaml`. Producers cannot mint
+    capabilities — additions require a PR against the enum file.
+
+    Surfaces: declared Capability ids (and their `replacedBy`) in each
+    artifact's `capabilities[]` array, plus any `cap:`-prefixed `source`
+    or `target` on a relation. Each violation names the producer and the
+    JSON pointer to the offending field.
+    """
+    enum_ids = load_capability_enum()
+    messages: list[str] = []
+    for pid in sorted(docs):
+        doc = docs[pid]
+        for i, cap in enumerate(doc.get("capabilities") or []):
+            if cap["id"] not in enum_ids:
+                messages.append(
+                    f"{pid}: at /capabilities/{i}/id: capability "
+                    f"{cap['id']!r} not in enums/capabilities.yaml"
+                )
+            replaced_by = cap.get("replacedBy")
+            if replaced_by is not None and replaced_by not in enum_ids:
+                messages.append(
+                    f"{pid}: at /capabilities/{i}/replacedBy: capability "
+                    f"{replaced_by!r} not in enums/capabilities.yaml"
+                )
+        for i, rel in enumerate(doc.get("relations") or []):
+            for field in ("source", "target"):
+                ref = rel[field]
+                if ref.startswith("cap:") and ref not in enum_ids:
+                    messages.append(
+                        f"{pid}: at /relations/{i}/{field}: capability "
+                        f"{ref!r} not in enums/capabilities.yaml"
+                    )
+
+    if messages:
+        raise CollectorError("capability-enum", messages)
+
+
 def _fail(err: CollectorError) -> None:
     click.echo(f"FAIL [{err.phase}] {len(err.messages)} error(s):", err=True)
     for m in err.messages:
@@ -177,8 +217,15 @@ def main(producers_path: Path, input_dir: Path, output_dir: Path) -> None:
 
     click.echo(f"Per-artifact validation: {len(docs)} producer artifact(s) clean.")
 
-    # Later work items extend this scaffold: capability-enum reconciliation,
-    # merge, cross-ref, alias-hint, triple-matrix, grouping, emit.
+    try:
+        reconcile_capability_enum(docs)
+    except CollectorError as e:
+        _fail(e)
+
+    click.echo("Capability-enum reconciliation: every cap: reference resolved.")
+
+    # Later work items extend this scaffold: merge, cross-ref, alias-hint,
+    # triple-matrix, grouping, emit.
     _ = output_dir
 
 
