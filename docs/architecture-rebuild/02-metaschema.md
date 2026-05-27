@@ -201,33 +201,39 @@ The schema describes the system, not the diagram. The following are removed from
 
 Render concerns live in the viewer (auto-layout, filter rules, named views).
 
-## JSON Schema publication
+## JSON Schema publication (executed form)
 
-The schema is published as JSON Schema from the new repo:
+Authored as YAML under `schema/v0.1/` (envelope, per-kind generated schemas,
+enums, vendored ArchiMate XSD + matrix); served as both `.yaml` and `.json`
+from the validation-service container. Canonical URLs locked in
+[`../features/validation-service.md`](../features/validation-service.md);
+the envelope is `https://architecture.webathome.org/schema/v0.1/architecture.schema.json`.
 
-- Versioned: `schema/v0.1/architecture.schema.json`, `schema/v0.1/enums/*.json`.
-- Served from the architecture container at `https://architecture.webathome.org/schema/v0.1/architecture.schema.json` (and the container hosts schemas at stable URLs for every published version).
-- The schema repo itself is the SSOT; the container is the CDN.
+**v0.1 is immutable.** Once published, the v0.1 documents are not mutated in
+place. New fields, new enum values, or new kinds bump to v0.2 (a new
+`schema/v0.2/` directory; v0.1 stays online). The validation service accepts
+only artifacts whose top-level `schemaVersion` matches a still-supported
+version — at v0.1, only `"0.1"`.
 
-Schema version bumps:
-- **Patch (0.1 → 0.1.1):** clarifications, descriptions, non-breaking additions.
-- **Minor (0.1 → 0.2):** new optional fields, new enum values, new edge types.
-- **Major (0.x → 1.0, 1.x → 2.0):** field renames, removed fields, semantic changes.
+The schema-bump taxonomy described originally (patch / minor / major) is
+retained in spirit but expressed via the `0.x` directory layout: each minor
+version is its own immutable URL space.
 
-Producers declare the schema version they emit against in the artifact's top-level `schema-version` field. The collector accepts artifacts within a configured compatibility window (probably "latest minor of the current major").
+## Validation service (executed form)
 
-## Validator CLI
+Validation is **hosted**, not distributed as a standalone binary. The
+architecture container exposes `POST /api/validate` (accepting JSON and YAML);
+producer repos drop a small bash script (`scripts/arch-validate`) into their
+own tree which POSTs the artifact, prints LLM-friendly errors, and sets exit
+0 / 1 / 2 (valid / invalid / transport-error). Same exit-code contract as the
+original brainstorm; different distribution mechanism.
 
-Distribute a single-binary validator:
+The full contract — endpoint shape, error response format, CLI behaviour,
+`/healthz` and `/metrics`, `$schema` pragma, schema-change PR flow — is in
+[`../features/validation-service.md`](../features/validation-service.md).
 
-- `architecture-validate <path-to-artifact.json>` — validates against the published schema.
-- Exit codes: `0` valid, `1` invalid, `2` infrastructure error.
-- Output: machine-readable JSON to stdout, human-readable to stderr.
-- Available as a published binary release for Linux/macOS and as a Docker image for CI.
-
-Implementation: thin wrapper around a mature JSON Schema validator. No bespoke schema engine.
-
-Producer CI uses this; failure fails the producer's Jenkins build (the user's stated requirement). See `04-producer-protocol.md`.
+Producer CI still calls `arch-validate`; failure still fails the producer's
+Jenkins build. See [`04-producer-protocol.md`](./04-producer-protocol.md).
 
 ## Anti-patterns the schema explicitly rejects
 
@@ -240,10 +246,22 @@ Producer CI uses this; failure fails the producer's Jenkins build (the user's st
 
 ## Decisions locked
 
-- **GUID format:** UUIDv4.
-- **Schema language:** raw JSON Schema. Revisit a DSL (TypeSpec, CUE) only if hand-maintenance becomes painful.
+- **GUID format:** UUIDv4 (for element ids that are minted rather than enumerated).
+- **Schema language:** JSON Schema 2020-12, authored in YAML, served as both YAML
+  and JSON. Generator at `tooling/generate.py` builds the per-kind schemas from
+  `subset.yaml` + the vendored ArchiMate XSD + Archi relationship matrix.
+- **Reference model:** ArchiMate 3.2 (the executed spec landed there rather than
+  this doc's three-kind brainstorm). See
+  [`../features/metaschema-design.md`](../features/metaschema-design.md).
+- **Validation distribution:** hosted endpoint + thin CLI, not standalone binary.
+- **v0.1 is immutable**; vocabulary growth happens via v0.2 etc., not in-place edits.
 
-## Open questions for v1 finalization
+## Open questions (resolved)
 
-- **Where does the capability/product enum live in the repo?** Probably `schema/v0.1/enums/capabilities.yaml` and `products.yaml`, with the JSON Schema referencing them. Concrete during v1 execution.
-- **Component `producer` field — derived or declared?** If artifacts arrive in profile-named paths in Jenkins (e.g., `architecture/cluster-services/*.json`), `producer` is derivable. Declaring it explicitly is more robust to repo reorganization. Lean declared.
+- ~~Where does the capability/product enum live in the repo?~~ → resolved:
+  `schema/v0.1/enums/capabilities.yaml`, `schema/v0.1/enums/producer-profiles.yaml`,
+  `schema/v0.1/enums/lifecycle-states.yaml`, `schema/v0.1/enums/environments.yaml`.
+  The generator inlines them into the per-kind schemas at build time.
+- ~~Component `producer` field — derived or declared?~~ → resolved: **declared.**
+  Every element carries an explicit `producer: art:<repo>` back-pointer. The
+  envelope's top-level `producer` declares the artifact's owning producer.
