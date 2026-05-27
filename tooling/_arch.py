@@ -22,6 +22,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_DIR = REPO_ROOT / "schema" / "v0.1"
 GENERATED_DIR = SCHEMA_DIR / "generated"
 ENUMS_DIR = SCHEMA_DIR / "enums"
+PIPELINE_PRODUCERS_FILE = REPO_ROOT / "pipeline-producers.yaml"
+PIPELINE_PRODUCERS_SCHEMA = REPO_ROOT / "pipeline-producers.schema.yaml"
 
 
 def normalize(obj: Any) -> Any:
@@ -108,6 +110,43 @@ def load_capability_enum() -> set[str]:
     """Set of capability ids declared in enums/capabilities.yaml."""
     doc = load_yaml(ENUMS_DIR / "capabilities.yaml")
     return {entry["id"] for entry in doc["entries"]}
+
+
+def load_pipeline_producers(
+    yaml_path: Path = PIPELINE_PRODUCERS_FILE,
+    schema_path: Path = PIPELINE_PRODUCERS_SCHEMA,
+) -> list[dict]:
+    """Load and validate the producer registry. Returns the list of entries
+    (each a dict with `id`, `profile`, `jenkinsJob`). Raises ValueError on
+    schema violation or duplicate id — fail fast at collector startup, no
+    partial recovery.
+    """
+    schema = load_yaml(schema_path)
+    doc = load_yaml(yaml_path)
+    Draft202012Validator.check_schema(schema)
+    errors = sorted(
+        Draft202012Validator(schema).iter_errors(doc),
+        key=lambda e: list(e.absolute_path),
+    )
+    if errors:
+        rel = yaml_path.relative_to(REPO_ROOT) if yaml_path.is_relative_to(REPO_ROOT) else yaml_path
+        lines = [f"{rel}: {len(errors)} schema error(s):"]
+        for e in errors:
+            pointer = "/" + "/".join(str(p) for p in e.absolute_path)
+            lines.append(f"  at {pointer}: {e.message}")
+        raise ValueError("\n".join(lines))
+
+    producers = doc["producers"]
+    seen: dict[str, int] = {}
+    for i, p in enumerate(producers):
+        if p["id"] in seen:
+            rel = yaml_path.relative_to(REPO_ROOT) if yaml_path.is_relative_to(REPO_ROOT) else yaml_path
+            raise ValueError(
+                f"{rel}: duplicate producer id "
+                f"{p['id']!r} at indexes {seen[p['id']]} and {i}"
+            )
+        seen[p["id"]] = i
+    return producers
 
 
 def load_allowed_triples() -> set[tuple[str, str, str]]:

@@ -1,0 +1,42 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://architecture.webathome.org/pipeline-producers.schema.yaml
+title: pipeline-producers
+description: |
+  Registry of architecture producers consumed by both the Jenkinsfile (for
+  copyArtifacts calls) and tooling/collect.py (for "must be present" checks).
+  Schema-validated at collector startup; entries that don't match fail the run.
+
+type: object
+additionalProperties: false
+required: [producers]
+properties:
+  producers:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required: [id, profile, jenkinsJob]
+      properties:
+        id:
+          type: string
+          description: |
+            Producer id. Kebab-case. Doubles as the directory name under
+            producer-artifacts/<id>/architecture.yaml.
+          pattern: ^[a-z][a-z0-9-]*$
+        profile:
+          type: string
+          description: |
+            Producer profile. Descriptive metadata only — the collector does
+            not enforce a per-kind allow-list. Keep in sync with
+            schema/v0.1/enums/producer-profiles.yaml.
+          enum:
+            - infra-physical
+            - cluster-services
+            - images
+            - application
+        jenkinsJob:
+          type: string
+          description: |
+            Jenkins job path, typically `<folder>/<branch>` (e.g.,
+            `ansible/master`). Used by the Jenkinsfile's copyArtifacts step.
+          minLength: 1
