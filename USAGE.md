@@ -55,7 +55,7 @@ specific schema or enum file relevant to the error.
     {
       "path": "/nodes/0/id",
       "keyword": "pattern",
-      "message": "value 'Node_BadId' does not match the required pattern /^node:[a-z][a-z0-9-]*$/",
+      "message": "value 'Node_BadId' does not match the required pattern /^node:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/",
       "value": "Node_BadId",
       "schemaUrl": "https://architecture.webathome.org/schema/v0.1/generated/node.schema.json",
       "hint": "see the schema's pattern for the exact rule"
@@ -69,6 +69,26 @@ matrix on every relation whose endpoints are present in the submitted
 artifact. Cross-producer references (ids not present locally) are skipped —
 the Architecture pipeline's collector enforces them at merge time. Matrix
 violations are reported with `keyword: "x-allowedTriples"`.
+
+## Merged-dataset endpoints
+
+The Architecture pipeline runs the federation collector (`tooling/collect.py`)
+during the image build, merges every registered producer's last-successful
+`architecture.yaml` into a single consolidated dataset, and bakes the three
+output files into the container. The validation service serves them
+verbatim from disk.
+
+| URL | content |
+|---|---|
+| `/data/v0.1/architecture.yaml` | merged dataset (YAML) — every element kind, every relation, derived `groupings` and `capabilityRealizations` maps |
+| `/data/v0.1/architecture.json` | same content, canonical JSON |
+| `/data/v0.1/validation-report.json` | `summary` + `warnings[]` + `divergences[]` for the last successful pipeline run |
+
+Errors fail the pipeline before emission, so the report never carries
+errors — only non-fatal observations (deprecated-target references,
+alias-hint divergence across producers, etc.). The Jenkinsfile also
+archives `validation-report.json` as a Jenkins build artifact for
+historical traceability.
 
 ## Schema URLs
 
@@ -104,7 +124,6 @@ artifacts:
     summary: Producer artifact for my repo.
     introduced: 2026-05-27
     lifecycle: active
-    producer: art:my-repo
     stereotype: Producer
     url: https://github.com/example/my-repo
     role: source

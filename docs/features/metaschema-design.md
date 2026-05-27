@@ -40,21 +40,19 @@ The matrix is, however, machine-readable from another source: the Archi modellin
 - **Importability:** v0.1 artifacts are structurally compatible with ArchiMate Exchange XML by construction. A formal YAML↔XML exporter is v0.2; the path is open.
 - **Deferred to v0.2:** image identity, build provenance, variant matrices, certificate / rotation tracking, multi-environment rendering.
 
-## Pending v0.1 tightening (next session)
+## v0.1 tightening landed (v3, 2026-05-27)
 
-Two changes to land before the first real producer (Ansible) starts emitting. Both came out of the producer-protocol discussion on 2026-05-27.
+Two changes from the producer-protocol discussion landed during v3 — but
+not exactly as originally framed.
 
-1. **UUIDs canonical for instance kinds.** Tighten the ID regexes on `Node`, `Device`, `SystemSoftware` (instance), `ApplicationComponent` (instance), `Artifact`, `ApplicationService`, `TechnologyService`, `ApplicationInterface`, `TechnologyInterface`, and `Grouping` to **require UUIDv4** (drop the kebab-case alternative). Curated kinds (`Capability`, `BusinessService`) and `«SoftwareProduct»`-stereotyped catalog entries keep kebab-case enumeration IDs — those are catalogue identities, not instance identities.
+1. **Composite ids for instance kinds.** `Node`, `Device`, `SystemSoftware` (instance), `ApplicationComponent` (instance), `Artifact` (non-stereotyped), `ApplicationService`, `TechnologyService`, `ApplicationInterface`, `TechnologyInterface`, `Grouping` require the composite form `<kind>:<hint>,<uuid4>` at the declaration site. References on relation source/target may use any of three forms: composite, uuid-only, or hint-only (internal-only). Curated kinds (`Capability`, `BusinessService`) and `«SoftwareProduct»` / `«Repository»` / `«Producer»` catalog entries keep bare kebab-case ids.
 
-2. **`aliasHint` field on instance kinds.** A new optional attribute carrying the producer's human-readable kebab-case nickname for an element. The hint exists for diagnostics (so log lines and validation errors say `node:prd-cluster` rather than `node:7f3a2b1c-…`). The collector warns on alias-hint divergence across artifacts referencing the same UUID; same UUID, different hints = warning in the validation report (not a build failure). See [`../architecture-rebuild/04-producer-protocol.md`](../architecture-rebuild/04-producer-protocol.md) § Cross-producer references for the full rule.
+2. **Hint baked into the id, not a separate `aliasHint` attribute.** The hint portion of the composite id is the diagnostic alias; there is no `aliasHint` field on element schemas. The collector compares the hint portion of every composite reference against the owner's declared hint and warns on divergence.
 
-Mechanical changes implied:
+Two additional cleanups also landed:
 
-- Update the appropriate `idRegex` entries in `schema/v0.1/subset.yaml`.
-- Add `aliasHint` to `commonAttributes` (or as a per-kind addition on the instance kinds only).
-- Re-run `tooling/generate.py`; commit the regenerated `generated/*.yaml`.
-- Update `schema/v0.1/examples/valid-*.yaml` and `valid-full.yaml` to use UUIDv4s with `aliasHint` annotations.
-- Update the corresponding tables and ID-format section in this doc.
+3. **`producer:` attribute removed.** Provenance is now expressed as an Association relation synthesised by the collector from the artifact's «Producer» Artifact to each declared element. Producers don't emit those relations explicitly.
+4. **`replacedBy:` and lifecycle conditional rules removed.** No more "`deprecated` requires `replacedBy` or `retirementBy`" / "`removed` forbids both". `retirementBy` stays as plain optional informational metadata.
 
 ## ArchiMate subset for v0.1
 
@@ -94,12 +92,17 @@ Layered on every element kind via `subset.yaml`. ArchiMate's exchange format all
 | `summary` | string | yes | all | The ArchiMate `documentation`. One or two sentences. |
 | `introduced` | ISO-8601 date | yes | all | First declared in the architecture. |
 | `lifecycle` | enum | yes | all | `active` \| `deprecated` \| `removed`. |
-| `replacedBy` | id-of-same-kind | conditional | all | Required iff `lifecycle == deprecated` and a replacement exists. |
-| `retirementBy` | ISO-8601 date | conditional | all | Required iff `lifecycle == deprecated` and no replacement. Forbidden iff `lifecycle == removed`. |
+| `retirementBy` | ISO-8601 date | optional | all | Informational target retirement date. No conditional rule. |
 | `environment` | enum | conditional | Node, Artifact, ApplicationComponent, SystemSoftware | `dev` \| `tst` \| `uat` \| `prd`. **Custom attribute, not Plateau.** |
 | `cluster` | string | optional | elements scoped to a Kubernetes cluster | Cluster identifier. |
-| `producer` | reference to a `«Producer»` Artifact | yes | all (declared by a producer) | Back-pointer to the Repository that declared this element. |
 | `stats` | free-form string→string map | optional | all | Non-load-bearing facts: versions, URLs, image tags. Render hints. |
+
+Provenance is no longer a per-element attribute. The artifact's
+top-level `producer:` field still names the «Producer» Artifact that
+emitted the file; the collector synthesises one Association relation
+per declared element from that Artifact to the element, so the
+federation graph carries producer back-pointers as real ArchiMate
+edges.
 
 Stereotype-specific attributes are carried only when the stereotype applies. The generator validates that no custom attribute name collides with a name reserved by the XSD.
 
@@ -179,9 +182,7 @@ schema/v0.1/
     valid-minimal.yaml
     valid-full.yaml
     invalid-additional-property.yaml
-    invalid-unknown-capability.yaml
     invalid-malformed-id.yaml
-    invalid-deprecation-rule.yaml
     invalid-unknown-relationship-type.yaml
 
 tooling/
@@ -346,10 +347,13 @@ Under `schema/v0.1/examples/`:
 - `valid-minimal.yaml` — one Node, one SystemSoftware, one TechnologyService, one capability reference.
 - `valid-full.yaml` — exercises every subset element kind and a representative relationship of each type.
 - `invalid-additional-property.yaml` — element with a `position` field. Expected error: `additionalProperties` rejection.
-- `invalid-unknown-capability.yaml` — element references `cap:does-not-exist`. Expected error: capability not found.
-- `invalid-malformed-id.yaml` — element with `id: node:NOT-KEBAB`. Expected error: pattern mismatch.
-- `invalid-deprecation-rule.yaml` — element with `lifecycle: deprecated` and neither `replacedBy` nor `retirementBy`. Expected error: conditional violation.
+- `invalid-malformed-id.yaml` — element with `id: node:Bad_ID`. Expected error: composite-id pattern mismatch.
 - `invalid-unknown-relationship-type.yaml` — `relations` entry with `type: HypotheticalRelationship`. Expected error: not in XSD enumeration.
+
+(Cross-cutting failure modes like dangling references, capability-enum
+violations, duplicate ids, cross-producer Groupings, etc. are exercised
+at merge time by the collector fixture set under
+`tooling/tests/fixtures/`, not by per-artifact `arch-validate`.)
 
 **Exit criteria:**
 

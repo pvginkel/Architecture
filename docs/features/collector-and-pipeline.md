@@ -27,10 +27,10 @@ Extract the schema-load / registry-build / per-artifact validate machinery from 
 
 **Exit criteria:**
 
-- [ ] `poetry run python tooling/validate.py meta` behaves identically to before.
-- [ ] `poetry run python tooling/validate.py <artifact>` behaves identically to before.
-- [ ] Module exposes at minimum: `load_master_schema()`, `build_registry()`, `validate_doc(doc) -> list[error]`, `load_allowed_triples()`, `load_capability_enum()`.
-- [ ] `collect.py` (later items) uses the module without re-implementing parsing.
+- [x] `poetry run python tooling/validate.py meta` behaves identically to before.
+- [x] `poetry run python tooling/validate.py <artifact>` behaves identically to before.
+- [x] Module exposes at minimum: `load_master_schema()`, `build_registry()`, `validate_doc(doc) -> list[error]`, `load_allowed_triples()`, `load_capability_enum()`.
+- [x] `collect.py` (later items) uses the module without re-implementing parsing.
 
 ### 2. Producer registry — `pipeline-producers.yaml`
 
@@ -52,9 +52,9 @@ JSON-schema-validated at collector startup; the schema lives next to the file.
 
 **Exit criteria:**
 
-- [ ] `pipeline-producers.yaml` committed at repo root with `producers: []`.
-- [ ] JSON schema for the file (inline or sibling) committed; entries that don't match fail collector startup.
-- [ ] Collector reads the file and treats it as authoritative for "which producers must be present in `producer-artifacts/`".
+- [x] `pipeline-producers.yaml` committed at repo root with `producers: []`.
+- [x] JSON schema for the file (inline or sibling) committed; entries that don't match fail collector startup.
+- [x] Collector reads the file and treats it as authoritative for "which producers must be present in `producer-artifacts/`".
 
 ### 3. Per-artifact validation pass
 
@@ -62,9 +62,9 @@ JSON-schema-validated at collector startup; the schema lives next to the file.
 
 **Exit criteria:**
 
-- [ ] Per-artifact validation error fails the run with a clear message naming the producer and the JSON pointer.
-- [ ] Missing-producer-artifact fails the run.
-- [ ] Extra directories in `producer-artifacts/` not listed in `pipeline-producers.yaml` fail the run (no stowaway producers).
+- [x] Per-artifact validation error fails the run with a clear message naming the producer and the JSON pointer.
+- [x] Missing-producer-artifact fails the run.
+- [x] Extra directories in `producer-artifacts/` not listed in `pipeline-producers.yaml` fail the run (no stowaway producers).
 
 ### 4. Capability-enum reconciliation
 
@@ -72,9 +72,9 @@ Every `Capability` id referenced from any merged element must exist in `schema/v
 
 **Exit criteria:**
 
-- [ ] Unknown capability id fails the run.
-- [ ] Known capability id passes.
-- [ ] Test fixture covers both cases.
+- [x] Unknown capability id fails the run.
+- [x] Known capability id passes.
+- [x] Test fixture covers both cases.
 
 ### 5. Merge + duplicate-id detection
 
@@ -82,9 +82,13 @@ Combine all element-kind arrays across artifacts. Detect two producers emitting 
 
 **Exit criteria:**
 
-- [ ] Merged dataset is the union of valid producers' arrays.
-- [ ] Duplicate id across producers fails the run.
-- [ ] Producer back-pointer (`producer` attribute) is preserved on every merged element.
+- [x] Merged dataset is the union of valid producers' arrays.
+- [x] Duplicate id across producers fails the run.
+- [x] *(Implementation deviation)* The `producer` attribute on individual
+      elements was removed. Provenance is now expressed as a synthesised
+      Association relation per declared element from the artifact's
+      «Producer» Artifact (top-level `producer:`); see `05` § Producer-
+      relation synthesis.
 
 ### 6. Cross-producer reference resolution
 
@@ -92,20 +96,32 @@ Every relation's `source` and `target` id must resolve to an element in the merg
 
 **Exit criteria:**
 
-- [ ] Dangling reference fails the run with the offending relation pointer.
-- [ ] `removed`-target reference fails the run.
-- [ ] `deprecated`-target reference is captured as a warning in the report; run succeeds.
-- [ ] Both UUID and kebab-case `«SoftwareProduct»` references are handled by the same code path.
+- [x] Dangling reference fails the run with the offending relation pointer.
+- [x] `removed`-target reference fails the run.
+- [x] `deprecated`-target reference is captured as a warning in the report; run succeeds.
+- [x] All three id forms (composite `<kind>:<hint>,<uuid>`, uuid-only,
+      hint-only) and bare-kebab catalog/curated refs flow through the
+      same `ResolutionIndex.resolve()` lookup. Hint-only refs only
+      resolve within the relation's own producer; cross-producer
+      hint-only refs surface as dangling with a message pointing the
+      author at the UUID.
 
 ### 7. Alias-hint reconciliation
 
-Same UUID with different `aliasHint` strings across artifacts produces a warning. The owner's hint (artifact whose `producer` matches the element's `producer` back-pointer) is the one retained in the merged dataset.
+*(Implementation deviation)* No `aliasHint` field was added. The hint
+rides in the id itself: instance-kind declarations are composite
+(`<kind>:<hint>,<uuid4>`), and references may carry the hint portion
+alongside the UUID. The collector compares the hint portion of every
+composite reference against the owner's declared hint; differing
+spellings of the same UUID are captured as divergences in the report.
 
 **Exit criteria:**
 
-- [ ] Divergent hints captured per-id in the report, with all observed hints listed.
-- [ ] Owner-retained hint behaviour exercised by a fixture.
-- [ ] Convergent hints (same UUID, same hint everywhere) produce no warning.
+- [x] Divergent hints captured per-id in the report, with all observed hints listed.
+- [x] Owner-retained hint (the declaring artifact's spelling) is what
+      lands in the merged dataset's element id.
+- [x] Convergent hints (composite reference matches the owner's hint)
+      produce no entry. Uuid-only references also produce no entry.
 
 ### 8. Cross-producer triple-matrix check
 
@@ -113,8 +129,8 @@ Every relation's `(source-kind, type, target-kind)` triple must be in `x-allowed
 
 **Exit criteria:**
 
-- [ ] Cross-producer triple violation fails the run.
-- [ ] Triple-matrix data loaded once via the shared module from item 1.
+- [x] Cross-producer triple violation fails the run.
+- [x] Triple-matrix data loaded once via the shared module from item 1.
 
 ### 9. Grouping checks + rollup
 
@@ -122,9 +138,9 @@ Groupings are producer-local. A Grouping that aggregates members owned by a diff
 
 **Exit criteria:**
 
-- [ ] Cross-producer Grouping fails the run.
-- [ ] Missing Grouping member fails the run.
-- [ ] Rolled-up structures present in `architecture.json`.
+- [x] Cross-producer Grouping fails the run.
+- [x] Missing Grouping member fails the run.
+- [x] Rolled-up structures present in `architecture.json`.
 
 ### 10. Emit `dist/data/v0.1/`
 
@@ -132,9 +148,9 @@ Write `architecture.yaml`, `architecture.json`, `validation-report.json` with de
 
 **Exit criteria:**
 
-- [ ] All three files written.
-- [ ] Re-run with identical inputs produces byte-identical outputs (sha256 match).
-- [ ] `validation-report.json` shape locked: top-level `summary`, `warnings[]`, `divergences[]` at minimum. Errors don't appear here because errors fail the run before emit.
+- [x] All three files written.
+- [x] Re-run with identical inputs produces byte-identical outputs (sha256 match).
+- [x] `validation-report.json` shape locked: top-level `summary`, `warnings[]`, `divergences[]` at minimum. Errors don't appear here because errors fail the run before emit.
 
 ### 11. Test fixtures + local end-to-end run
 
@@ -142,9 +158,9 @@ Fixture set under `tooling/tests/fixtures/`: two synthetic producer artifacts (o
 
 **Exit criteria:**
 
-- [ ] `poetry run python tooling/collect.py --producers tests/fixtures/pipeline-producers.yaml --in tests/fixtures/producer-artifacts --out tmp/dist` succeeds on the happy-path fixture.
-- [ ] One fixture per failure mode (per-artifact invalid, missing producer artifact, unknown capability, duplicate id, dangling ref, removed-target ref, cross-producer triple violation, cross-producer Grouping, missing Grouping member) is driven by a single test runner; each asserts the expected exit code and error key.
-- [ ] Golden `architecture.yaml` / `architecture.json` / `validation-report.json` for the happy-path fixture committed.
+- [x] `poetry run python tooling/collect.py --producers tests/fixtures/pipeline-producers.yaml --in tests/fixtures/producer-artifacts --out tmp/dist` succeeds on the happy-path fixture.
+- [x] One fixture per failure mode (per-artifact invalid, missing producer artifact, unknown capability, duplicate id, dangling ref, removed-target ref, cross-producer triple violation, cross-producer Grouping, missing Grouping member) is driven by a single test runner; each asserts the expected exit code and error key.
+- [x] Golden `architecture.yaml` / `architecture.json` / `validation-report.json` for the happy-path fixture committed.
 
 ### 12. Dockerfile: add `run-collector` stage
 
@@ -154,12 +170,12 @@ New stage in the multi-stage build, after `check-schemas` and before the final r
 
 **Exit criteria:**
 
-- [ ] Stage builds successfully when `producer-artifacts/` is empty (v3 launch state).
-- [ ] Stage fails clearly when `producer-artifacts/` is missing entirely.
-- [ ] Stage fails clearly on any collector error (per-artifact invalid, dangling ref, etc.).
-- [ ] Built image serves `/data/v0.1/architecture.yaml`, `architecture.json`, `validation-report.json` (validation service already routes these).
-- [ ] `.dockerignore` excludes `producer-artifacts/` by default.
-- [ ] The `RUN mkdir -p ./data/v0.1` placeholder is gone.
+- [x] Stage builds successfully when `producer-artifacts/` is empty (v3 launch state).
+- [x] Stage fails clearly when `producer-artifacts/` is missing entirely.
+- [x] Stage fails clearly on any collector error (per-artifact invalid, dangling ref, etc.).
+- [x] Built image serves `/data/v0.1/architecture.yaml`, `architecture.json`, `validation-report.json` (validation service already routes these).
+- [x] `.dockerignore` excludes `producer-artifacts/` by default.
+- [x] The `RUN mkdir -p ./data/v0.1` placeholder is gone.
 
 ### 13. Jenkinsfile rewrite
 
@@ -179,21 +195,21 @@ Triggers per `05-collector-and-pipeline.md` §Triggers (producer upstream-builds
 
 **Exit criteria:**
 
-- [ ] All steps run green on an empty `pipeline-producers.yaml`.
-- [ ] `validation-report.json` archived as a Jenkins artifact (extraction-from-image approach decided and implemented; see `05` open question).
-- [ ] At least one producer-success upstream trigger wired to validate the dispatch path (a throwaway downstream-trigger from a known job is acceptable for v3 verification; real producer wiring is v4).
-- [ ] Helm-deploy step preserved.
+- [x] All steps run green on an empty `pipeline-producers.yaml`.
+- [x] `validation-report.json` archived as a Jenkins artifact (extraction-from-image approach decided and implemented; see `05` open question).
+- [x] At least one producer-success upstream trigger wired to validate the dispatch path (a throwaway downstream-trigger from a known job is acceptable for v3 verification; real producer wiring is v4).
+- [x] Helm-deploy step preserved.
 
 ### 14. Documentation pass
 
-- [ ] `00-roadmap.md` v3 entry updated when items 1–13 land; status flipped to **done**.
-- [ ] `USAGE.md` — short subsection on the merged-dataset endpoints (`/data/v0.1/*`) and the validation-report URL.
-- [ ] Any deviations from `04` / `05` introduced at implementation time backfilled into those docs.
+- [x] `00-roadmap.md` v3 entry updated when items 1–13 land; status flipped to **done**.
+- [x] `USAGE.md` — short subsection on the merged-dataset endpoints (`/data/v0.1/*`) and the validation-report URL.
+- [x] Any deviations from `04` / `05` introduced at implementation time backfilled into those docs.
 
 ## Exit criteria for the phase
 
-- [ ] `collect.py` runs end-to-end against fixtures and produces the three `dist/data/` files.
-- [ ] Dockerfile builds the container with the real `data/` payload from the `run-collector` stage.
-- [ ] Jenkinsfile runs the full pipeline on an empty producer list and produces a deployable image.
-- [ ] All cross-check failure modes verified by fixture (per-artifact invalid, missing artifact, unknown capability, duplicate id, dangling ref, removed-target ref, cross-producer triple, cross-producer Grouping, missing Grouping member).
-- [ ] Documentation updated.
+- [x] `collect.py` runs end-to-end against fixtures and produces the three `dist/data/` files.
+- [x] Dockerfile builds the container with the real `data/` payload from the `run-collector` stage.
+- [x] Jenkinsfile runs the full pipeline on an empty producer list and produces a deployable image.
+- [x] All cross-check failure modes verified by fixture (per-artifact invalid, missing artifact, unknown capability, duplicate id, dangling ref, removed-target ref, cross-producer triple, cross-producer Grouping, missing Grouping member).
+- [x] Documentation updated.

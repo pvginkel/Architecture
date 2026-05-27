@@ -42,36 +42,44 @@ Implementation:
 2. `arch-validate` POSTs to `https://architecture.webathome.org/api/validate`.
 3. Exit code is the build step's exit code: `0` valid, `1` invalid, `2` transport / server error.
 
-The hosted validator (the v2 service) does **per-artifact** validation: schema conformance, the lifecycle conditional rules, the ArchiMate relationship-type enumeration, the relationship triple matrix narrowed to the v0.1 subset. It does **not** check cross-producer references — that's the collector's job because only the collector sees the full merged dataset.
+The hosted validator (the v2 service) does **per-artifact** validation: schema conformance, the ArchiMate relationship-type enumeration, the relationship triple matrix narrowed to the v0.1 subset. It does **not** check cross-producer references — that's the collector's job because only the collector sees the full merged dataset.
 
 What the per-artifact validator catches (today, against `schema/v0.1/`):
 
 - Schema violations (missing required fields, wrong types, render-only `position` keys).
-- ID format violations (kind-specific regexes; UUID-only for instance kinds once the v0.1 schema tightens — see [`../features/metaschema-design.md`](../features/metaschema-design.md) "Pending v0.1 tightening").
-- Lifecycle conditional rules (`deprecated` requires `replacedBy` or `retirementBy`; `removed` forbids both).
+- ID format violations (kind-specific regexes; instance kinds require the composite `<kind>:<hint>,<uuid4>` form at declarations).
 - Stereotype-specific required attributes (e.g., a «Repository» Artifact must declare `url`, `role`, `owner`).
 - Relationship `type` not in the ArchiMate enumeration; relationship triples not permitted by ArchiMate 3.2.
 
 What it does **not** catch (collector concerns, see `05`):
 
-- Whether a referenced UUID or kebab-case id exists in the merged dataset.
-- alias-hint divergence (two producers referencing the same UUID with different alias hints).
-- Capability id existence when the reference is cross-producer (today the per-artifact validator enforces capability-id existence in `enums/capabilities.yaml` for in-artifact references; the same check runs at merge time for cross-producer references).
+- Whether a referenced UUID, hint, or kebab-case id exists in the merged dataset.
+- Hint-portion divergence on composite references.
+- Capability id existence (the merge-time pass enforces this against `enums/capabilities.yaml` for every cap: appearance).
 
 **Collector behavior on per-artifact errors**: any per-artifact schema error during the merge fails the entire pipeline build. The merged dataset never ships in a partial state; one bad producer is enough to refuse the rollout. Producer CI catches the same errors first, so by the time a producer's artifact reaches the collector it should already be clean; if it isn't, the failure surfaces immediately at merge time rather than degrading the published dataset.
 
-## Cross-producer references — UUIDs and alias hints
+## Cross-producer references — composite ids
 
-**Canonical: UUIDs.** Every cross-producer reference target is a UUIDv4 minted once by the producer that owns the element. Stable. Never re-minted. Never renamed.
+**Three id forms** for every instance-kind reference:
 
-This applies to every instance kind: `Node`, `Device`, `SystemSoftware` (instance), `ApplicationComponent` (instance), `Artifact`, `ApplicationService`, `TechnologyService`, `ApplicationInterface`, `TechnologyInterface`, `Grouping`. Curated kinds (`Capability`, `BusinessService`) and `«SoftwareProduct»`-stereotyped product identities use kebab-case enumeration IDs, not UUIDs — those are catalog identities, not instance identities.
+- **composite** — `<kind>:<hint>,<uuid4>`  — mandatory at the declaration site;
+  both the human-readable hint and the UUIDv4 are present.
+- **uuid-only** — `<kind>:<uuid4>`         — accepted on references; carries no
+  hint, so divergence cannot arise.
+- **hint-only** — `<kind>:<hint>`          — accepted on references **only when
+  the target is owned by the same producer** (internal reference). The
+  collector resolves these via a per-producer hint index; cross-producer
+  hint-only references fail with a message pointing the author at the UUID.
 
-**Hint: a human-readable alias.** Producers may optionally provide an `aliasHint` on instance elements: a kebab-case name that says, "this is my preferred local nickname for this thing." The hint exists for diagnostics (so log lines and validation errors say `node:prd-cluster` rather than `node:7f3a2b1c-…`). It is **not** the load-bearing reference; relations always target the UUID.
+This applies to every instance kind: `Node`, `Device`, `SystemSoftware` (instance), `ApplicationComponent` (instance), `Artifact` (non-stereotyped), `ApplicationService`, `TechnologyService`, `ApplicationInterface`, `TechnologyInterface`, `Grouping`. Curated kinds (`Capability`, `BusinessService`) and `«SoftwareProduct»` / `«Repository»` / `«Producer»`-stereotyped catalog entries use bare kebab-case ids — those are catalog identities, not instance identities.
+
+UUIDs are minted once by the producer that owns the element. Stable. Never re-minted. Never renamed. The hint portion is informational — readers see `node:prd-cluster,7f3a…` rather than a bare UUID. It can be edited freely (the UUID is the load-bearing identity); cross-producer references that disagree on the hint surface as a divergence warning.
 
 The collector merges artifacts and runs two related checks:
 
-- **Resolution.** Every `source` and `target` id in every `relations` entry must resolve to an element in the merged dataset. Dangling = build failure.
-- **Alias-hint divergence.** When multiple producers describe the same element (e.g., Helm references Ansible's `node:7f3a…` cluster and tags its own `aliasHint: node:prd-cluster-helms-view`), the collector compares hints. Same UUID, different hints across artifacts = **warning** (not failure). The merged dataset retains the owner's hint (the one in the artifact whose `producer` field matches the element's `producer` back-pointer); other producers' hints surface in the validation report.
+- **Resolution.** Every `source` and `target` id in every `relations` entry must resolve to an element in the merged dataset. Dangling = build failure. The same resolution code path handles all three id forms plus bare-kebab catalog refs.
+- **Hint divergence.** For every composite reference, the collector compares the hint portion against the owner's declared hint. Same UUID, different hints = **warning** (not failure). The owner's spelling is what lands in the merged element's id; referring producers' divergent spellings surface in the validation report.
 
 This is intentionally cheap. Naming-convention drift is detected without forcing it to fail every cross-producer reference.
 
@@ -146,9 +154,9 @@ Mostly v0.2 work (image identity, build provenance, parent-image graph). For v0.
 ## How a producer integrates (the recipe)
 
 1. **Decide where the source lives.** Hand-maintained YAML in the producer repo (`architecture/architecture.yaml` checked in) is the default. Generated-at-build-time from existing manifests (e.g., Helm `values.yaml` parsed into architecture YAML) is fine where it pays off.
-2. **Mint UUIDs.** First integration: generate a UUIDv4 for each instance the producer owns; commit them in a UUID table file (`architecture/ids.yaml` or similar). Subsequent: reuse existing IDs; never re-mint.
-3. **Author SoftwareProduct entries for products this repo publishes.** Kebab-case ids, `«SoftwareProduct»` stereotype, `homepage`/`logo`/`sourceRepository` attributes. These live in the same artifact as the instances that specialize them, until ownership of the upstream product moves to another repo.
-4. **Look up cross-producer UUIDs.** Pull the current merged artifact (`https://architecture.webathome.org/data/v0.1/architecture.yaml`) once; copy the UUIDs and SoftwareProduct ids you need into your own source.
+2. **Mint composite ids.** First integration: pick a kebab-case hint and generate a UUIDv4 for each instance the producer owns; the declared id is `<kind>:<hint>,<uuid4>`. Subsequent: reuse the existing composite id; never re-mint the UUID. The hint can drift; the UUID can't.
+3. **Author SoftwareProduct entries for products this repo publishes.** Bare kebab-case ids, `«SoftwareProduct»` stereotype, `homepage`/`logo`/`sourceRepository` attributes. These live in the same artifact as the instances that specialize them, until ownership of the upstream product moves to another repo.
+4. **Look up cross-producer ids.** Pull the current merged artifact (`https://architecture.webathome.org/data/v0.1/architecture.yaml`) once; copy the composite ids you need into your own source. Cross-producer references must carry the UUID portion; using the composite form is recommended so log lines stay readable.
 5. **Add the validator step to the Jenkinsfile.** `arch-validate architecture.yaml`, fail the build on non-zero exit.
 6. **Archive the artifact.** Jenkins `archiveArtifacts artifacts: 'architecture.yaml', fingerprint: true`.
 7. **Register with the Architecture pipeline.** PR against `pipeline-producers.yaml` in this repo. Add an upstream-build trigger so the Architecture job re-runs when this producer's build succeeds.

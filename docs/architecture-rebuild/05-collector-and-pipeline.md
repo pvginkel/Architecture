@@ -62,16 +62,17 @@ Concurrent producer completions are coalesced by Jenkins's pending-build merging
 
 ## Collector responsibilities (in order)
 
-1. **Discover.** Walk `producer-artifacts/`. Each `<producer-id>/architecture.yaml` is a candidate input. Producers listed in `pipeline-producers.yaml` but missing from `producer-artifacts/` fail the build (the Jenkinsfile should have copied them in; the collector refuses to silently merge a partial set).
+1. **Discover.** Walk `producer-artifacts/`. Each `<producer-id>/architecture.yaml` is a candidate input. Producers listed in `pipeline-producers.yaml` but missing from `producer-artifacts/` fail the build (the Jenkinsfile should have copied them in; the collector refuses to silently merge a partial set). Stowaway directories (present in `producer-artifacts/`, not registered) also fail the build.
 2. **Per-artifact validate** against `schema/v0.1/architecture.schema.yaml` (using the shared validator module). Any per-artifact error fails the entire build. No drop-and-continue, no warn-and-merge — a single invalid artifact is enough to refuse the rollout.
 3. **Reconcile the capability enum.** Every `Capability` id referenced from any artifact must exist in `schema/v0.1/enums/capabilities.yaml`. Unknown reference = build failure (a producer must PR the enum first).
-4. **Merge.** Combine all element-kind arrays across artifacts. Detect duplicate ids (UUIDs *or* kebab-case catalog ids) — a real ownership conflict, fail the build with both producers reported.
-5. **Cross-reference resolution.** Every relation's `source` and `target` id must resolve to an element in the merged dataset. Dangling = build failure. Reference to a `deprecated` element = warning. Reference to a `removed` element = build failure. The same machinery handles UUID references and kebab-case `«SoftwareProduct»` references; no special-casing.
-6. **Alias-hint reconciliation.** Same UUID with different `aliasHint` strings across producers = warning, captured in the report. Owner's hint (matched by element's `producer` back-pointer to its owning artifact) is the one retained in the merged dataset.
-7. **Triple-matrix check.** Every relation's `(source-kind, type, target-kind)` triple must be in the allowed-triples enumeration (already encoded as `x-allowedTriples` in `generated/relations.schema.yaml`). Cross-producer triples are checked at merge time; in-artifact triples are already caught at per-artifact validation. Violations fail the build.
-8. **Grouping checks.** Groupings are producer-local. A Grouping that aggregates members from a different producer fails the build. Missing Grouping members fail the build.
-9. **Rollup.** Compute Grouping memberships, Capability-realisation maps, and any derived view structures.
-10. **Emit.** Write `dist/data/v0.1/architecture.yaml`, `architecture.json`, and `validation-report.json` with deterministic key ordering so the image build is reproducible.
+4. **Synthesise producer-relations.** For every declared element, append an Association relation from the artifact's top-level «Producer» Artifact to the element. Relation ids are deterministic uuid5 over `(producer-id, element-id)` so reruns produce byte-identical output. Producers don't have to emit these; the federation graph carries provenance as real ArchiMate edges rather than an attribute on every element. The Association type was chosen because the matrix permits `Artifact Association *` for every v0.1 kind, where `Aggregation` / `Composition` only allow Artifact and Grouping targets.
+5. **Merge.** Combine all element-kind arrays across artifacts. Detect duplicate ids (composite or bare kebab) — a real ownership conflict, fail the build with both producers reported.
+6. **Cross-reference resolution.** A single `ResolutionIndex` over the merged set offers three lookups: UUID (the UUID portion of any composite id), full string (catalogue / curated kebab ids), and per-producer hint (instance-kind hint-only refs, internal-only). Every relation's `source` and `target` id must resolve. Dangling = build failure. Reference to a `deprecated` element = warning. Reference to a `removed` element = build failure.
+7. **Hint divergence.** For every composite reference, compare the hint portion against the owner's declared hint. Same UUID, different hints = warning, captured in the report. The owner's spelling lands in the merged element's id; uuid-only and matching-hint references produce no entry.
+8. **Triple-matrix check.** Every relation's `(source-kind, type, target-kind)` triple must be in the allowed-triples enumeration (already encoded as `x-allowedTriples` in `generated/relations.schema.yaml`). JSON Schema doesn't enforce the matrix on its own — the collector enforces it for both in-artifact and cross-artifact relations.
+9. **Grouping checks.** Groupings are producer-local. A Grouping that aggregates members from a different producer fails the build. A Grouping with zero Aggregation relations sourced from it (empty Grouping) also fails the build — dead data.
+10. **Rollup.** Compute Grouping memberships and Capability-realisation maps; sort and de-duplicate so reruns are byte-identical.
+11. **Emit.** Write `dist/data/v0.1/architecture.yaml`, `architecture.json`, and `validation-report.json` with deterministic key ordering so the image build is reproducible. No `generatedAt` field at the top level (would defeat byte-identical reruns and isn't load-bearing).
 
 ## Failure modes summary
 
@@ -84,10 +85,11 @@ Concurrent producer completions are coalesced by Jenkins's pending-build merging
 | Dangling cross-producer id reference | Build fails. |
 | Reference to a `removed` element | Build fails. |
 | Reference to a `deprecated` element | Warning. |
-| Alias-hint divergence (same UUID, different hints) | Warning. |
-| Triple-matrix violation (cross-producer) | Build fails. |
-| Grouping references missing member | Build fails. |
+| Hint divergence (composite refs with differing hint portion) | Warning. |
+| Triple-matrix violation (in-artifact or cross-artifact) | Build fails. |
+| Grouping has no Aggregation members declared | Build fails. |
 | Grouping spans producers | Build fails (groupings are producer-local). |
+| Hint-only cross-producer reference | Build fails (use UUID for cross-producer refs). |
 
 The validation report is a first-class artifact of the build. The viewer eventually exposes a "data quality" link surfacing it in the UI.
 
@@ -129,4 +131,4 @@ At full federation, the merged dataset is maybe a few thousand elements. Python 
 
 - **Should named-view authoring be lifted earlier than v5?** If the merged dataset is large enough mid-bootstrap that filter presets help, yes. Defer the decision until we have real Ansible + Helm data flowing.
 - **Should the collector publish a producer-readable index** (`/data/v0.1/index.yaml` enumerating every id with its owning producer and aliasHint)? Useful for producer authors looking up UUIDs without scanning the full merged dataset. Low-cost. Likely yes; finalise when the second producer comes online.
-- **How does the validation report get out of the image** for Jenkins archival? Options: extract via `docker create` + `docker cp` after kaniko, or have the collector stage also write to a path that the post-build step reads via `kubectl cp` from the kaniko pod. Decide at Jenkinsfile-implementation time.
+- ~~**How does the validation report get out of the image** for Jenkins archival?~~ **Resolved (v3 #13).** The Jenkinsfile runs the collector twice: once Jenkins-side in a Python sidecar (output archived via `archiveArtifacts`), once inside the `run-collector` Dockerfile stage (baked into the image at `/data/v0.1/`). Same inputs produce byte-identical outputs by the collector's determinism guarantee, so the archived report matches what the running container serves.
