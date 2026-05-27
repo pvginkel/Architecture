@@ -188,19 +188,22 @@ groupings:
     producer: art:helmcharts
 
 relations:
-  - id: rel:ei-frontend-runs-on-cluster
-    source: app:ei-frontend-prd
-    target: node:prd-cluster
-    type: Assignment
+  # ArchiMate 3.2 puts active technology elements on the *source* side of
+  # Realization/Assignment when they enable application elements, hence the
+  # node-as-source direction here.
+  - id: rel:cluster-realises-ei-frontend
+    source: node:prd-cluster
+    target: app:ei-frontend-prd
+    type: Realization
 
-  - id: rel:ei-backend-runs-on-cluster
-    source: app:ei-backend-prd
-    target: node:prd-cluster
-    type: Assignment
+  - id: rel:cluster-realises-ei-backend
+    source: node:prd-cluster
+    target: app:ei-backend-prd
+    type: Realization
 
-  - id: rel:keycloak-runs-on-cluster
-    source: ss:keycloak-prd
-    target: node:prd-cluster
+  - id: rel:cluster-runs-keycloak
+    source: node:prd-cluster
+    target: ss:keycloak-prd
     type: Assignment
 
   - id: rel:ei-frontend-uses-backend
@@ -208,10 +211,12 @@ relations:
     target: svc:ei-backend-api
     type: Serving
 
-  - id: rel:ei-backend-accesses-shared-pg
-    source: app:ei-backend-prd
-    target: svc:postgres-shared
-    type: Access
+  # TechnologyService serves the consuming application (Serving runs from the
+  # provider to the consumer in ArchiMate).
+  - id: rel:shared-pg-serves-ei-backend
+    source: svc:postgres-shared
+    target: app:ei-backend-prd
+    type: Serving
 
   - id: rel:oidc-realises-iam
     source: svc:oidc-issuer
@@ -233,14 +238,18 @@ relations:
     target: cap:relational-database
     type: Realization
 
-  - id: rel:postgres-interface-on-service
-    source: if:postgres-5432
-    target: svc:postgres-shared
+  # The running Postgres composes the TCP interface it exposes; the interface
+  # is a structural part of the system-software, not of the technology-service.
+  - id: rel:postgres-instance-composes-5432
+    source: ss:postgres-shared-prd
+    target: if:postgres-5432
     type: Composition
 
-  - id: rel:iam-realises-sso
-    source: cap:iam
-    target: bsvc:single-sign-on
+  # BusinessService realises Capability (the SSO service realises the IAM
+  # capability), reversing the natural English direction.
+  - id: rel:sso-realises-iam
+    source: bsvc:single-sign-on
+    target: cap:iam
     type: Realization
 
   - id: rel:grouping-aggregates-frontend
