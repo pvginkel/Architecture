@@ -1,0 +1,125 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://architecture.webathome.org/schema/v0.1/generated/applicationcomponent.schema.yaml
+title: ApplicationComponent (ArchiMate ApplicationComponent)
+description: User-facing app workload. EI backend, EI frontend, DA portal, DA worker.
+type: object
+additionalProperties: false
+required:
+- id
+- label
+- summary
+- introduced
+- lifecycle
+- producer
+properties:
+  id:
+    type: string
+    pattern: ^app:([a-z][a-z0-9-]*|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$
+    description: Stable identifier. Prefix + format per element kind.
+  label:
+    description: Display string. May change without ID change.
+    type: string
+    minLength: 1
+  summary:
+    description: One or two sentences. Maps to ArchiMate documentation.
+    type: string
+    minLength: 1
+  introduced:
+    description: ISO-8601 date when the element was first declared.
+    type: string
+    format: date
+  lifecycle:
+    description: Lifecycle state.
+    type: string
+    enum:
+    - active
+    - deprecated
+    - removed
+  replacedBy:
+    description: Required iff lifecycle == deprecated and a replacement exists.
+    type: string
+    pattern: ^app:([a-z][a-z0-9-]*|[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$
+  retirementBy:
+    description: Required iff lifecycle == deprecated and no replacement. Forbidden iff lifecycle == removed.
+    type: string
+    format: date
+  producer:
+    description: "The \xABProducer\xBB Artifact (repo) that declared this element."
+    type: string
+    pattern: '^art:'
+  stats:
+    description: "Non-load-bearing facts (versions, URLs, image tags). Render hints. Free-form string\u2192string."
+    type: object
+    additionalProperties:
+      type: string
+  environment:
+    description: DTAP stage. Custom attribute, not ArchiMate's Plateau.
+    type: string
+    enum:
+    - dev
+    - tst
+    - uat
+    - prd
+  cluster:
+    description: Cluster identifier when the element lives inside one.
+    type: string
+    minLength: 1
+  stereotype:
+    type: string
+    enum:
+    - SoftwareProduct
+    description: Optional stereotype marker.
+  homepage:
+    description: Upstream product homepage, if applicable.
+    type: string
+    format: uri
+  logo:
+    description: Filename under viewer/public/logos/.
+    type: string
+    minLength: 1
+  sourceRepository:
+    description: Source repository for in-house products.
+    type: string
+    pattern: '^art:'
+allOf:
+- if:
+    properties:
+      lifecycle:
+        const: deprecated
+    required:
+    - lifecycle
+  then:
+    oneOf:
+    - required:
+      - replacedBy
+    - required:
+      - retirementBy
+- if:
+    properties:
+      lifecycle:
+        const: removed
+    required:
+    - lifecycle
+  then:
+    allOf:
+    - not:
+        required:
+        - replacedBy
+    - not:
+        required:
+        - retirementBy
+- if:
+    not:
+      required:
+      - stereotype
+  then:
+    allOf:
+    - not:
+        required:
+        - homepage
+    - not:
+        required:
+        - logo
+    - not:
+        required:
+        - sourceRepository

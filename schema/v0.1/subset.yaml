@@ -171,6 +171,7 @@ kinds:
         type: enum
         enumRef: ./enums/environments.yaml
         required: false
+        description: DTAP stage. Custom attribute, not ArchiMate's Plateau.
       cluster:
         type: string
         required: false
@@ -195,9 +196,11 @@ kinds:
         type: enum
         enumRef: ./enums/environments.yaml
         required: false
+        description: DTAP stage. Custom attribute, not ArchiMate's Plateau.
       cluster:
         type: string
         required: false
+        description: Cluster identifier when the element lives inside one.
 
   ApplicationComponent:
     layer: application
@@ -211,9 +214,11 @@ kinds:
         type: enum
         enumRef: ./enums/environments.yaml
         required: false
+        description: DTAP stage. Custom attribute, not ArchiMate's Plateau.
       cluster:
         type: string
         required: false
+        description: Cluster identifier when the element lives inside one.
 
   ApplicationService:
     layer: application
@@ -255,6 +260,7 @@ kinds:
         type: enum
         enumRef: ./enums/environments.yaml
         required: false
+        description: DTAP stage this Artifact targets. Custom attribute, not Plateau.
 
   Capability:
     layer: strategy

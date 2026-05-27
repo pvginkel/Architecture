@@ -1,0 +1,81 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://architecture.webathome.org/schema/v0.1/generated/applicationservice.schema.yaml
+title: ApplicationService (ArchiMate ApplicationService)
+description: App-layer consumption surface (an internal HTTP API).
+type: object
+additionalProperties: false
+required:
+- id
+- label
+- summary
+- introduced
+- lifecycle
+- producer
+properties:
+  id:
+    type: string
+    pattern: ^svc:[a-z][a-z0-9-]*$
+    description: Stable identifier. Prefix + format per element kind.
+  label:
+    description: Display string. May change without ID change.
+    type: string
+    minLength: 1
+  summary:
+    description: One or two sentences. Maps to ArchiMate documentation.
+    type: string
+    minLength: 1
+  introduced:
+    description: ISO-8601 date when the element was first declared.
+    type: string
+    format: date
+  lifecycle:
+    description: Lifecycle state.
+    type: string
+    enum:
+    - active
+    - deprecated
+    - removed
+  replacedBy:
+    description: Required iff lifecycle == deprecated and a replacement exists.
+    type: string
+    pattern: ^svc:[a-z][a-z0-9-]*$
+  retirementBy:
+    description: Required iff lifecycle == deprecated and no replacement. Forbidden iff lifecycle == removed.
+    type: string
+    format: date
+  producer:
+    description: "The \xABProducer\xBB Artifact (repo) that declared this element."
+    type: string
+    pattern: '^art:'
+  stats:
+    description: "Non-load-bearing facts (versions, URLs, image tags). Render hints. Free-form string\u2192string."
+    type: object
+    additionalProperties:
+      type: string
+allOf:
+- if:
+    properties:
+      lifecycle:
+        const: deprecated
+    required:
+    - lifecycle
+  then:
+    oneOf:
+    - required:
+      - replacedBy
+    - required:
+      - retirementBy
+- if:
+    properties:
+      lifecycle:
+        const: removed
+    required:
+    - lifecycle
+  then:
+    allOf:
+    - not:
+        required:
+        - replacedBy
+    - not:
+        required:
+        - retirementBy
