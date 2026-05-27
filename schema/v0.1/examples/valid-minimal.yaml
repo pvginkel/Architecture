@@ -17,7 +17,7 @@ artifacts:
     owner: Pieter van Ginkel
 
 nodes:
-  - id: node:prd-cluster
+  - id: node:prd-cluster,33333333-3333-4333-8333-333333333331
     label: Production Kubernetes cluster
     summary: Three-node microk8s cluster on srvk8s1/2/3.
     introduced: 2024-07-12
@@ -25,7 +25,7 @@ nodes:
     cluster: prd
 
 systemSoftware:
-  - id: ss:keycloak-prd
+  - id: ss:keycloak-prd,44444444-4444-4444-8444-444444444441
     label: Keycloak (prd)
     summary: Production Keycloak instance providing IAM.
     introduced: 2024-09-04
@@ -34,7 +34,7 @@ systemSoftware:
     cluster: prd
 
 technologyServices:
-  - id: svc:oidc-issuer
+  - id: svc:oidc-issuer,66666666-6666-4666-8666-666666666662
     label: OIDC issuer
     summary: auth.webathome.org OpenID Connect issuer.
     introduced: 2024-09-04

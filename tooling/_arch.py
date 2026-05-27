@@ -8,6 +8,7 @@ CLI concerns. Callers shape user-facing output.
 from __future__ import annotations
 
 import datetime as dt
+import re
 from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
@@ -17,6 +18,10 @@ import yaml
 from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
+
+UUID4_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_DIR = REPO_ROOT / "schema" / "v0.1"
@@ -110,6 +115,39 @@ def load_capability_enum() -> set[str]:
     """Set of capability ids declared in enums/capabilities.yaml."""
     doc = load_yaml(ENUMS_DIR / "capabilities.yaml")
     return {entry["id"] for entry in doc["entries"]}
+
+
+def parse_id(s: str) -> tuple[str, str | None, str | None]:
+    """Split a v0.1 element id into (kind, hint, uuid). Each component
+    may be present or None depending on which of the three forms the
+    string takes:
+
+    * composite — ``<kind>:<hint>,<uuid4>``      (declarations of instance kinds)
+    * uuid-only — ``<kind>:<uuid4>``             (external reference)
+    * hint-only — ``<kind>:<hint>``              (internal reference / catalog
+                                                  / curated kind)
+
+    The split is purely syntactic — the function does not enforce which
+    form is legal in which position. Callers (per-artifact schema regex,
+    collector resolution rules) layer that on top.
+
+    Example:
+        parse_id("node:prd-cluster,7f3a2b1c-9d4a-4e8c-b2f1-1a2b3c4d5e6f")
+            -> ("node", "prd-cluster", "7f3a2b1c-9d4a-4e8c-b2f1-1a2b3c4d5e6f")
+        parse_id("cap:iam")
+            -> ("cap", "iam", None)
+        parse_id("node:7f3a2b1c-9d4a-4e8c-b2f1-1a2b3c4d5e6f")
+            -> ("node", None, "7f3a2b1c-9d4a-4e8c-b2f1-1a2b3c4d5e6f")
+    """
+    kind, sep, rest = s.partition(":")
+    if not sep:
+        raise ValueError(f"id {s!r}: missing ':' separator")
+    if "," in rest:
+        hint, _, uuid_str = rest.partition(",")
+        return kind, hint or None, uuid_str or None
+    if UUID4_RE.match(rest):
+        return kind, None, rest
+    return kind, rest, None
 
 
 def load_pipeline_producers(
