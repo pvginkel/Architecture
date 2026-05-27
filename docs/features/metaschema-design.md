@@ -19,7 +19,9 @@ The Open Group's **ArchiMate Model Exchange File Format XSD** is vendored under 
 
 The XSDs published by The Open Group are versioned `3.1` and serve **both ArchiMate 3.1 and ArchiMate 3.2** — the exchange format did not change across that revision. See `schema/v0.1/archimate/SOURCE` for the retrieval URLs and date.
 
-What is **not** in the XSD: the per-(source, relation, target) triple matrix from the ArchiMate specification appendices. The XSD treats relationships as untyped IDREF pairs with a type discriminator; it does not enforce which relationship types are valid between which element types. v0.1 of this metaschema validates element-type names and relationship-type names against the XSD enumerations but does not enforce the full triple matrix. (Deferred to v0.2.)
+What is **not** in the XSD: the per-(source, relation, target) triple matrix from the ArchiMate specification appendices. The XSD treats relationships as untyped IDREF pairs with a type discriminator; it does not enforce which relationship types are valid between which element types.
+
+The matrix is, however, machine-readable from another source: the Archi modelling tool (https://www.archimatetool.com/, MIT-licensed) ships ArchiMate 3.2's full triple matrix as `relationships.xml` + a key-letter dictionary `relationships-keys.xml`. Both files are vendored under `schema/v0.1/archimate/` and parsed by the generator. v0.1 of this metaschema therefore validates element-type names, relationship-type names, **and** the (source-kind, relation-type, target-kind) triple matrix at single-artifact time.
 
 ## Locked decisions
 
@@ -28,7 +30,7 @@ What is **not** in the XSD: the per-(source, relation, target) triple matrix fro
   1. The vendored ArchiMate XSDs are canonical for element kinds, relationship kinds, and structural base attributes.
   2. `schema/v0.1/subset.yaml` declares which element kinds we include for v0.1 plus our custom stereotypes and custom attributes.
   3. Per-kind JSON Schemas under `schema/v0.1/generated/` are **generated** from XSD + `subset.yaml`. They are not hand-authored.
-- **Relationships:** the full ArchiMate relationship vocabulary is in scope. `subset.yaml` does not enumerate relationships; the generator extracts the relationship-type enumeration from the XSD and emits a `relations.schema.yaml` accepting any of those types between any subset-included element kinds.
+- **Relationships:** the full ArchiMate relationship vocabulary is in scope. `subset.yaml` does not enumerate relationships; the generator extracts the relationship-type enumeration from the XSD and the (source, relation, target) triple matrix from the vendored Archi `relationships.xml`, and emits a `relations.schema.yaml` that accepts exactly the triples permitted by ArchiMate 3.2 between subset-included element kinds.
 - **DTAP and lifecycle:** custom attributes layered on top of ArchiMate. ArchiMate's `Plateau` exists for time-state architecture snapshots and is **not** reused for per-element environment tagging — distinct concept.
 - **Stereotypes (custom profile on ArchiMate):**
   - `«SoftwareProduct»` on `ApplicationComponent` and `SystemSoftware` — marks product identity (`prod:keycloak`) as distinct from a running instance.
@@ -36,7 +38,7 @@ What is **not** in the XSD: the per-(source, relation, target) triple matrix fro
   - `«Producer»` marker on a `«Repository»` Artifact — the repo emits artifacts into the federation pipeline.
 - **Naming:** vocabulary names are not abbreviated. ArchiMate names retained verbatim (`ApplicationComponent`, not `AppComp`).
 - **Importability:** v0.1 artifacts are structurally compatible with ArchiMate Exchange XML by construction. A formal YAML↔XML exporter is v0.2; the path is open.
-- **Deferred to v0.2:** image identity, build provenance, variant matrices, certificate / rotation tracking, the ArchiMate (source, relation, target) triple matrix, multi-environment rendering.
+- **Deferred to v0.2:** image identity, build provenance, variant matrices, certificate / rotation tracking, multi-environment rendering.
 
 ## ArchiMate subset for v0.1
 
@@ -122,7 +124,7 @@ Relationship usage mapping for common architectural facts:
 | `delivered-by` (BusinessService is delivered by IAM Capability) | `Realization` | BusinessService ← Capability |
 | `aggregated-in` (a Grouping aggregates members) | `Aggregation` | Grouping → any |
 
-The v0.1 generator validates that each relation's `type` is a known ArchiMate relationship type and that its `source` and `target` are subset-included element kinds. It does **not** validate that the specific (source-kind, relation-type, target-kind) triple is permitted by the ArchiMate specification — that matrix is in the spec PDF, not the XSD, and is deferred to v0.2.
+The v0.1 generator validates that each relation's `type` is a known ArchiMate relationship type, that its `source` and `target` are subset-included element kinds, **and** that the specific (source-kind, relation-type, target-kind) triple is permitted by ArchiMate 3.2 as encoded in the vendored `schema/v0.1/archimate/relationships.xml`.
 
 ## Repository layout
 
@@ -132,6 +134,9 @@ schema/v0.1/
     archimate3_Model.xsd                 # vendored from The Open Group
     archimate3_View.xsd
     archimate3_Diagram.xsd
+    relationships.xml                    # ArchiMate 3.2 triple matrix (vendored from Archi, MIT)
+    relationships-keys.xml               # key-letter dictionary for the matrix
+    LICENSE-archi.txt                    # MIT license covering relationships*.xml
     SOURCE                               # retrieval URLs + date
   subset.yaml                            # included element kinds + custom additions
   architecture.schema.yaml               # top-level artifact wrapper (hand-authored)
@@ -209,7 +214,7 @@ relations: []                            # {id, source, target, type}
    - All custom attributes from `subset.yaml`
    - Lifecycle conditional rules (`if`/`then`/`else` on `replacedBy` / `retirementBy`)
    - The ID regex for the kind
-5. The generator emits `relations.schema.yaml` enumerating the XSD's relationship-type values; relations validate against this without further triple constraints in v0.1.
+5. The generator parses the vendored `relationships.xml` and `relationships-keys.xml`, expands the key-letter dictionary into full relationship type names, restricts the resulting triple matrix to source/target kinds in our subset, and emits `relations.schema.yaml` encoding the allowed `(source-kind, relation-type, target-kind)` triples.
 6. Generated files are committed. CI re-runs the generator and gates on a clean diff.
 
 ## Anti-patterns rejected at validation time
@@ -222,13 +227,13 @@ These are catchable at single-artifact JSON Schema time:
 - Element with `lifecycle: deprecated` and neither `replacedBy` nor `retirementBy`.
 - Element with `lifecycle: removed` and a `replacedBy` or `retirementBy` present.
 - A `relation` entry whose `type` is not a known ArchiMate relationship type.
+- A `relation` entry whose `(source-kind, type, target-kind)` triple is not permitted by ArchiMate 3.2.
 
 Caught only at collector time, listed for completeness:
 
 - Reference to an element id that doesn't exist in the merged dataset.
 - Two elements with the same id.
 - Producer declaring an element kind not permitted by its profile.
-- (v0.2) A relationship that violates the ArchiMate triple matrix.
 
 ## Inclusion rule
 
