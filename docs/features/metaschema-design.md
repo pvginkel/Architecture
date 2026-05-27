@@ -1,55 +1,173 @@
 # Metaschema v0.1 — design
 
-The executable design of the architecture metaschema. Delivers the `schema/v0.1/` package: per-kind schemas, enum files, master artifact wrapper.
+The executable design of the architecture metaschema. Delivers the `schema/v0.1/` package: the vendored ArchiMate XSDs, a `subset.yaml` declaring what we use, generated per-kind JSON Schemas, enum files, the master artifact wrapper, and golden examples.
 
-Inspiration and rationale: [`docs/architecture-rebuild/02-metaschema.md`](../architecture-rebuild/02-metaschema.md). That doc is the brainstorm; this doc is the spec to execute against. Where they differ, this doc wins; cross-references back to `02` exist for the "why."
+Inspiration and rationale: [`docs/architecture-rebuild/02-metaschema.md`](../architecture-rebuild/02-metaschema.md). That doc is the original brainstorm; this doc is the spec to execute against. Where they differ, this doc wins; cross-references back to `02` exist for the "why" of individual choices.
 
-This doc is schema-only. The validation service that consumes these schemas is in [`validation-service.md`](./validation-service.md). Data migration of the existing 145 nodes is in [`docs/architecture-rebuild/03-data-migration.md`](../architecture-rebuild/03-data-migration.md).
+This doc is schema-only. The validation service that consumes the schemas is in [`validation-service.md`](./validation-service.md). Data migration of the existing 145 nodes is in [`docs/architecture-rebuild/03-data-migration.md`](../architecture-rebuild/03-data-migration.md).
 
-## Decisions locked
+## Reference model: ArchiMate 3.x
 
-- **JSON Schema dialect:** `https://json-schema.org/draft/2020-12/schema`.
-- **Authoring format:** YAML. Files live in the repo as `.yaml`; the service exposes both `.yaml` and a canonical `.json` form at the public URLs.
-- **Validator library (downstream concern, called out here):** `ajv` with `ajv-formats`. Schemas must compile under `ajv --strict`.
-- **ID formats:**
-  - Components: `comp:<uuid4>`.
-  - Capabilities: `cap:<kebab-case>` (lowercase letters, digits, hyphens; must start with a letter).
-  - Products: `prod:<kebab-case>`.
-  - Groups: `group:<uuid4>`.
-  - Edges: `edge:<uuid4>`.
-- **`additionalProperties: false` on every object schema.** Producers cannot smuggle in render-only or speculative fields.
-- **Enum constraints for capability and product references are NOT encoded in the JSON Schema.** They are looked up at validation time against the loaded enum files. This keeps the schema files static while letting the enum lists evolve independently.
-- **Edge types, lifecycle states, and producer profiles ARE encoded as JSON Schema enums.** Their value space is small, churn is low, and changes deserve a schema-version bump.
-- **The component `producer` field is declared, not derived.** Required on every component.
-- **Render-only fields are rejected by schema, not by convention.** No `position`, no `x`/`y`, no hardcoded sizes, no layer assignments anywhere in artifacts.
+The metaschema **is a constrained subset of ArchiMate 3.x**. We adopt The Open Group's vocabulary outright — element kinds, layer assignments, relationship grammar, and the Service / Interface distinction — rather than inventing parallel names. ArchiMate is the user's professional working vocabulary and it cleanly resolves several distinctions the original brainstorm conflated (Capability vs. BusinessService, ApplicationComponent vs. SystemSoftware, Service vs. Interface).
+
+The Open Group's **ArchiMate Model Exchange File Format XSD** is vendored under `schema/v0.1/archimate/` and is the **authoritative source** for:
+
+- The set of valid element type names (the `xsi:type` enumeration in the XSD).
+- The set of valid relationship type names.
+- The structural base attributes that every element carries (identifier, name, documentation, properties).
+- The structural base attributes that every relationship carries (source, target, plus the inherited element base).
+
+The XSDs published by The Open Group are versioned `3.1` and serve **both ArchiMate 3.1 and ArchiMate 3.2** — the exchange format did not change across that revision. See `schema/v0.1/archimate/SOURCE` for the retrieval URLs and date.
+
+What is **not** in the XSD: the per-(source, relation, target) triple matrix from the ArchiMate specification appendices. The XSD treats relationships as untyped IDREF pairs with a type discriminator; it does not enforce which relationship types are valid between which element types. v0.1 of this metaschema validates element-type names and relationship-type names against the XSD enumerations but does not enforce the full triple matrix. (Deferred to v0.2.)
+
+## Locked decisions
+
+- **Authoring format:** YAML. The validation service exposes both YAML and canonical JSON at stable URLs.
+- **Source of truth, layered:**
+  1. The vendored ArchiMate XSDs are canonical for element kinds, relationship kinds, and structural base attributes.
+  2. `schema/v0.1/subset.yaml` declares which element kinds we include for v0.1 plus our custom stereotypes and custom attributes.
+  3. Per-kind JSON Schemas under `schema/v0.1/generated/` are **generated** from XSD + `subset.yaml`. They are not hand-authored.
+- **Relationships:** the full ArchiMate relationship vocabulary is in scope. `subset.yaml` does not enumerate relationships; the generator extracts the relationship-type enumeration from the XSD and emits a `relations.schema.yaml` accepting any of those types between any subset-included element kinds.
+- **DTAP and lifecycle:** custom attributes layered on top of ArchiMate. ArchiMate's `Plateau` exists for time-state architecture snapshots and is **not** reused for per-element environment tagging — distinct concept.
+- **Stereotypes (custom profile on ArchiMate):**
+  - `«SoftwareProduct»` on `ApplicationComponent` and `SystemSoftware` — marks product identity (`prod:keycloak`) as distinct from a running instance.
+  - `«Repository»` on `Artifact` — source / spec / config repositories.
+  - `«Producer»` marker on a `«Repository»` Artifact — the repo emits artifacts into the federation pipeline.
+- **Naming:** vocabulary names are not abbreviated. ArchiMate names retained verbatim (`ApplicationComponent`, not `AppComp`).
+- **Importability:** v0.1 artifacts are structurally compatible with ArchiMate Exchange XML by construction. A formal YAML↔XML exporter is v0.2; the path is open.
+- **Deferred to v0.2:** image identity, build provenance, variant matrices, certificate / rotation tracking, the ArchiMate (source, relation, target) triple matrix, multi-environment rendering.
+
+## ArchiMate subset for v0.1
+
+Eleven element kinds across four ArchiMate layers. Renderer colors follow ArchiMate convention (green / blue / pink / yellow).
+
+| Layer | Element kind | Purpose | Concrete examples |
+|---|---|---|---|
+| Technology (green) | `Node` | Execution host | Proxmox server, VM, Kubernetes cluster, Proxmox cluster, ESP32 device |
+| Technology (green) | `Device` | Physical hardware | Switches, APs, IoT hardware, server hardware |
+| Technology (green) | `SystemSoftware` | Infra/middleware runtime | A running Keycloak, Postgres, nginx, OpenBao daemon, dnsmasq |
+| Technology (green) | `TechnologyService` | Infra consumption surface | Postgres on 5432, OIDC issuer, ZFS volume allocator API, GitHub API |
+| Technology (green) | `TechnologyInterface` | Addressable point on a TechnologyService | A queue, topic, OpenBao path, database, CephFS subvolume, hostPath mount |
+| Technology (green) | `Artifact` | Deployable bundle / repository content | Helm chart, Ansible role, TF module, source repo, Jenkinsfile |
+| Application (blue) | `ApplicationComponent` | User-facing app workload | EI backend pod, EI frontend pod, DA portal, DA Celery worker |
+| Application (blue) | `ApplicationService` | App-layer consumption surface | Internal HTTP API between app workloads |
+| Application (blue) | `ApplicationInterface` | Addressable point on an ApplicationService | A specific endpoint path |
+| Strategy (pink) | `Capability` | Business-architecture role | IAM, observability, secrets-management, messaging, data-store, etc. |
+| Business (yellow, optional) | `BusinessService` | What the system delivers to humans | SSO (realized by IAM), self-service tooling |
+| Cross-cutting | `Grouping` | Cosmetic clustering; no semantics | Producer-declared logical clusters |
+
+## Stereotypes (v0.1 profile)
+
+ArchiMate supports custom stereotypes natively. v0.1 defines three:
+
+- **`«SoftwareProduct»`** — applicable to `ApplicationComponent` and `SystemSoftware`. Marks an element as a product identity (`Keycloak`, `Postgres`, `EI`) rather than a running instance. Instances reach the product via ArchiMate's `Specialization` relation. Carries `homepage`, `logo`, `sourceRepository`.
+- **`«Repository»`** — applicable to `Artifact`. The Artifact is a source / spec / config repository. Carries `url`, `role` (`source` | `spec` | `config`), `languageMix`, `owner`.
+- **`«Producer»`** — marker on a `«Repository»` Artifact. The repo emits architecture artifacts into the federation pipeline. Used by the collector to dispatch and authorize.
+
+## Custom attributes (v0.1 profile)
+
+Layered on every element kind via `subset.yaml`. ArchiMate's exchange format allows arbitrary `properties` (string key/value), which is where these land at serialization time; the JSON Schema enforces shape and required-ness.
+
+| Attribute | Type | Required | Applies to | Notes |
+|---|---|---|---|---|
+| `id` | string | yes | all | The ArchiMate `identifier`. Subset-defined regex per kind. |
+| `label` | string | yes | all | The ArchiMate `name`. Display string; may change without ID change. |
+| `summary` | string | yes | all | The ArchiMate `documentation`. One or two sentences. |
+| `introduced` | ISO-8601 date | yes | all | First declared in the architecture. |
+| `lifecycle` | enum | yes | all | `active` \| `deprecated` \| `removed`. |
+| `replacedBy` | id-of-same-kind | conditional | all | Required iff `lifecycle == deprecated` and a replacement exists. |
+| `retirementBy` | ISO-8601 date | conditional | all | Required iff `lifecycle == deprecated` and no replacement. Forbidden iff `lifecycle == removed`. |
+| `environment` | enum | conditional | Node, Artifact, ApplicationComponent, SystemSoftware | `dev` \| `tst` \| `uat` \| `prd`. **Custom attribute, not Plateau.** |
+| `cluster` | string | optional | elements scoped to a Kubernetes cluster | Cluster identifier. |
+| `producer` | reference to a `«Producer»` Artifact | yes | all (declared by a producer) | Back-pointer to the Repository that declared this element. |
+| `stats` | free-form string→string map | optional | all | Non-load-bearing facts: versions, URLs, image tags. Render hints. |
+
+Stereotype-specific attributes are carried only when the stereotype applies. The generator validates that no custom attribute name collides with a name reserved by the XSD.
+
+## ID formats
+
+| Element kind | ID prefix | Format | Notes |
+|---|---|---|---|
+| `Node` | `node:` | kebab-case | `node:pve1`, `node:prd-cluster` |
+| `Device` | `device:` | kebab-case | `device:switch-rack1` |
+| `SystemSoftware` (instance) | `ss:` | UUIDv4 | Producer-minted |
+| `SystemSoftware` («SoftwareProduct») | `ss:` | kebab-case | `ss:keycloak`, `ss:postgresql` |
+| `ApplicationComponent` (instance) | `app:` | UUIDv4 | Producer-minted |
+| `ApplicationComponent` («SoftwareProduct») | `app:` | kebab-case | `app:electronics-inventory` |
+| `ApplicationService` / `TechnologyService` | `svc:` | kebab-case | `svc:oidc-issuer`, `svc:postgres-shared` |
+| `ApplicationInterface` / `TechnologyInterface` | `if:` | kebab-case | `if:postgres-5432`, `if:iotsupport-events-queue` |
+| `Artifact` | `art:` | kebab-case or UUIDv4 | `art:ei-prd-chart`, `art:helmcharts-repo` |
+| `Capability` | `cap:` | kebab-case | `cap:iam`, `cap:observability` |
+| `BusinessService` | `bsvc:` | kebab-case | `bsvc:single-sign-on` |
+| `Grouping` | `grp:` | UUIDv4 or kebab-case | Producer-declared |
+
+UUIDv4 is used where stable cross-repo reference is needed (instance identities minted by producers). Kebab-case is used for curated enumerated entries (products, capabilities, named hosts).
+
+## Relationships
+
+The full ArchiMate relationship vocabulary is in scope, sourced from the XSD's relationship-type enumeration. v0.1 accepts any of: `Composition`, `Aggregation`, `Assignment`, `Realization`, `Used-By` (`Serving`), `Access`, `Flow`, `Triggering`, `Specialization`, `Association`, `Influence`, `AndJunction`, `OrJunction`.
+
+Relationship usage mapping for common architectural facts:
+
+| Architectural fact | ArchiMate relationship | Source kind → Target kind |
+|---|---|---|
+| `runs-on` (a pod runs on a cluster) | `Assignment` | ApplicationComponent / SystemSoftware → Node |
+| `realizes` (a Service realizes a Capability) | `Realization` | TechnologyService / ApplicationService → Capability |
+| `routes-to` (frontend routes to backend) | `Serving` | ApplicationComponent → ApplicationComponent (via Service) |
+| `stores-in` (a pod stores data in Postgres) | `Access` | ApplicationComponent → TechnologyService |
+| `publishes-to` / `subscribes-to` | `Triggering` + `Flow` | ApplicationComponent ↔ TechnologyInterface |
+| `composed-of` (chart contains pods) | `Composition` | Artifact → ApplicationComponent / SystemSoftware |
+| `specializes` (an instance specializes a «SoftwareProduct») | `Specialization` | instance → product |
+| `delivered-by` (BusinessService is delivered by IAM Capability) | `Realization` | BusinessService ← Capability |
+| `aggregated-in` (a Grouping aggregates members) | `Aggregation` | Grouping → any |
+
+The v0.1 generator validates that each relation's `type` is a known ArchiMate relationship type and that its `source` and `target` are subset-included element kinds. It does **not** validate that the specific (source-kind, relation-type, target-kind) triple is permitted by the ArchiMate specification — that matrix is in the spec PDF, not the XSD, and is deferred to v0.2.
 
 ## Repository layout
 
 ```
-schema/
-  v0.1/
-    architecture.schema.yaml     # top-level artifact wrapper
+schema/v0.1/
+  archimate/
+    archimate3_Model.xsd                 # vendored from The Open Group
+    archimate3_View.xsd
+    archimate3_Diagram.xsd
+    SOURCE                               # retrieval URLs + date
+  subset.yaml                            # included element kinds + custom additions
+  architecture.schema.yaml               # top-level artifact wrapper (hand-authored)
+  generated/                             # generated from XSD + subset.yaml; committed
+    node.schema.yaml
+    device.schema.yaml
+    systemsoftware.schema.yaml
+    applicationcomponent.schema.yaml
+    applicationservice.schema.yaml
+    applicationinterface.schema.yaml
+    technologyservice.schema.yaml
+    technologyinterface.schema.yaml
+    artifact.schema.yaml
     capability.schema.yaml
-    component.schema.yaml
-    product.schema.yaml
-    edge.schema.yaml
-    group.schema.yaml
-    enums/
-      capabilities.yaml
-      products.yaml
-      edge-types.yaml
-      lifecycle-states.yaml
-      producer-profiles.yaml
-    examples/
-      valid-minimal.yaml
-      valid-full.yaml
-      invalid-render-field.yaml
-      invalid-unknown-capability.yaml
-      invalid-uuid.yaml
-      invalid-duplicate-edge.yaml
-```
+    businessservice.schema.yaml
+    grouping.schema.yaml
+    relations.schema.yaml                # accepts any XSD relationship type
+  enums/
+    capabilities.yaml
+    lifecycle-states.yaml
+    environments.yaml
+    producer-profiles.yaml
+  examples/
+    valid-minimal.yaml
+    valid-full.yaml
+    invalid-additional-property.yaml
+    invalid-unknown-capability.yaml
+    invalid-malformed-id.yaml
+    invalid-deprecation-rule.yaml
+    invalid-unknown-relationship-type.yaml
 
-The `examples/` directory holds golden artifacts used by the service's test suite and by anyone reading the schemas to understand them. Each example is small, single-purpose, and either valid (`valid-*`) or invalid in one specific way (`invalid-*`).
+tooling/
+  pyproject.toml                         # Poetry; xmlschema + jsonschema + pyyaml
+  generate.py                            # XSD + subset.yaml → schema/v0.1/generated/
+  validate.py                            # ajv wrapper for examples + CI
+```
 
 ## Artifact envelope (master schema)
 
@@ -57,251 +175,60 @@ Every artifact submitted to the validator is one document with this shape:
 
 ```yaml
 schemaVersion: "0.1"
-producer: cluster-services        # one of the producer-profiles enum entries
-generatedAt: 2026-05-26T14:00:00Z # ISO-8601, optional; informational
-capabilities: []                  # array of capability documents (optional)
-components: []                    # array of component documents
-products: []                      # array of product documents (optional)
-edges: []                         # array of edge documents
-groups: []                        # array of group documents (optional)
+producer: art:helmcharts-repo            # a «Producer» «Repository» Artifact id
+generatedAt: 2026-05-27T14:00:00Z        # ISO-8601, optional; informational
+nodes: []                                # arrays per element kind (all optional)
+devices: []
+systemSoftware: []
+applicationComponents: []
+applicationServices: []
+applicationInterfaces: []
+technologyServices: []
+technologyInterfaces: []
+artifacts: []
+capabilities: []
+businessServices: []
+groupings: []
+relations: []                            # {id, source, target, type}
 ```
 
-- `schemaVersion` is required and must equal the schema version this artifact is being validated against. v0.1 accepts only `"0.1"`.
-- `producer` is required and constrains what the artifact may declare — see "Producer profiles" below. The constraint is structural (which arrays may be non-empty, which document IDs may appear) but is enforced at the collector level, not at the per-artifact JSON Schema level. The schema permits any profile to emit any kind; the collector rejects out-of-profile content.
-- All document arrays default to empty. An artifact that declares only edges is valid.
+- `schemaVersion` is required and must equal `"0.1"` for v0.1 artifacts.
+- `producer` is required and matches an Artifact id stereotyped as «Producer».
+- All element-kind arrays default to empty.
+- `relations` carries the relationship documents. The `type` field is validated against the XSD's relationship-type enumeration.
 
-## Document kinds
+## Schema generation flow
 
-### Capability
+1. The vendored `archimate3_Model.xsd` is parsed by `tooling/generate.py` (using the `xmlschema` Python library).
+2. The generator extracts the enumerations of element types and relationship types.
+3. The generator loads `subset.yaml` and validates that every element kind named there exists in the XSD enumeration, and that custom attribute names do not collide with names reserved by the XSD (`identifier`, `name`, `documentation`, `properties`, `source`, `target`).
+4. For each subset-included element kind, the generator emits a per-kind JSON Schema under `schema/v0.1/generated/`. Each schema includes:
+   - `additionalProperties: false`
+   - `description` on every field
+   - `id`/`label`/`summary`/`introduced` (mapped from ArchiMate identifier/name/documentation)
+   - All custom attributes from `subset.yaml`
+   - Lifecycle conditional rules (`if`/`then`/`else` on `replacedBy` / `retirementBy`)
+   - The ID regex for the kind
+5. The generator emits `relations.schema.yaml` enumerating the XSD's relationship-type values; relations validate against this without further triple constraints in v0.1.
+6. Generated files are committed. CI re-runs the generator and gates on a clean diff.
 
-Defines a logical role the system needs filled. Curated as a finite enumeration; producers may reference but not declare new capabilities.
+## Anti-patterns rejected at validation time
 
-```yaml
-id: cap:sso
-label: Single Sign-On
-summary: Centralized identity for browser-based and CLI clients.
-lifecycle: active                 # active | deprecated | removed
-introduced: 2024-07-12            # ISO-8601 date, required
-replacedBy: cap:other             # required iff lifecycle=deprecated AND a replacement exists
-retirementBy: 2026-12-31          # required iff lifecycle=deprecated AND no replacement
-```
+These are catchable at single-artifact JSON Schema time:
 
-Fields:
+- Any document with a render-only field (`additionalProperties: false`).
+- ID that fails its kind's regex.
+- Reference to a `capability` not declared in `enums/capabilities.yaml`.
+- Element with `lifecycle: deprecated` and neither `replacedBy` nor `retirementBy`.
+- Element with `lifecycle: removed` and a `replacedBy` or `retirementBy` present.
+- A `relation` entry whose `type` is not a known ArchiMate relationship type.
 
-| field | type | required | notes |
-|---|---|---|---|
-| `id` | string | yes | matches `^cap:[a-z][a-z0-9-]*$` |
-| `label` | string | yes | display string; may change without ID change |
-| `summary` | string | yes | one or two sentences |
-| `lifecycle` | enum | yes | from `lifecycle-states.yaml` |
-| `introduced` | date | yes | first declared in the architecture |
-| `replacedBy` | string | conditional | matches `^cap:[a-z][a-z0-9-]*$` |
-| `retirementBy` | date | conditional | |
+Caught only at collector time, listed for completeness:
 
-Conditional rules expressed via `if`/`then`/`else` in the schema:
-
-- `lifecycle == deprecated` → exactly one of `replacedBy` or `retirementBy` must be present.
-- `lifecycle == removed` → both `replacedBy` and `retirementBy` are forbidden.
-
-### Component
-
-The concrete runtime instance — a Helm release, a VM, a pod. Carries a GUID for stable cross-repo referencing. The bulk of the data in the system is components.
-
-```yaml
-id: comp:7f3a2b1c-1234-4abc-9def-1234567890ab
-label: Keycloak (prd)
-summary: Production Keycloak instance backing all internal apps.
-realizes:
-  - cap:sso
-packagedAs: prod:keycloak
-group: group:9c1d2e3f-...         # optional
-lifecycle: active
-producer: cluster-services
-introduced: 2024-09-04
-replacedBy: comp:other-uuid       # required iff lifecycle=deprecated AND a replacement exists
-retirementBy: 2026-12-31          # required iff lifecycle=deprecated AND no replacement
-stats:                             # free-form key/value bag, shape-checked but not value-checked
-  sourceRepo: pvginkel/HelmCharts
-  version: "24.0.4"
-  url: https://auth.webathome.org
-```
-
-Fields:
-
-| field | type | required | notes |
-|---|---|---|---|
-| `id` | string | yes | matches `^comp:<uuid4-regex>$` |
-| `label` | string | yes | display string |
-| `summary` | string | yes | |
-| `realizes` | array of cap-id | yes | min 1; "a component without `realizes` is rejected" per 02 |
-| `packagedAs` | string | yes | a prod-id; required even when the product is trivial (e.g., bespoke services get their own `prod:*`) |
-| `group` | string | no | a group-id |
-| `lifecycle` | enum | yes | from `lifecycle-states.yaml` |
-| `producer` | enum | yes | from `producer-profiles.yaml`; declared, not derived |
-| `introduced` | date | yes | |
-| `replacedBy` | string | conditional | matches `^comp:<uuid4-regex>$` |
-| `retirementBy` | date | conditional | |
-| `stats` | object | no | free-form string→string; render hints, links, version stamps |
-
-Same conditional rules around `lifecycle == deprecated/removed` as Capability.
-
-### Product
-
-The software identity that joins the architecture diagram to the webathome.org stack ticker. Curated enumeration; producers may reference but not declare.
-
-```yaml
-id: prod:keycloak
-label: Keycloak
-summary: Open-source IAM.
-lifecycle: active
-homepage: https://www.keycloak.org/
-logo: keycloak.svg
-introduced: 2024-07-12
-```
-
-Fields:
-
-| field | type | required | notes |
-|---|---|---|---|
-| `id` | string | yes | matches `^prod:[a-z][a-z0-9-]*$` |
-| `label` | string | yes | |
-| `summary` | string | yes | |
-| `lifecycle` | enum | yes | |
-| `homepage` | uri | no | |
-| `logo` | string | no | filename under `viewer/public/logos/` |
-| `introduced` | date | yes | |
-| `replacedBy` / `retirementBy` | | conditional | as above |
-
-### Edge
-
-Connects two components. Capability and product nodes never appear as edge endpoints — those are derived views.
-
-```yaml
-id: edge:1a2b3c4d-...
-source: comp:7f3a2b1c-...
-target: comp:8a9b0c1d-...
-type: authenticates-via
-protocol: oidc                    # optional, free-text
-criticality: primary              # primary | secondary (default primary)
-summary: optional free text
-```
-
-Fields:
-
-| field | type | required | notes |
-|---|---|---|---|
-| `id` | string | yes | `^edge:<uuid4-regex>$` |
-| `source` | string | yes | component-id |
-| `target` | string | yes | component-id |
-| `type` | enum | yes | from `edge-types.yaml` |
-| `protocol` | string | no | free-text; render hint |
-| `criticality` | enum | no | `primary` (default) or `secondary` |
-| `summary` | string | no | |
-
-Cardinality rules (collector-enforced, not schema-enforced because they need merged-dataset context):
-
-- A given `(source, target, type)` triple may appear at most once across the whole merged artifact set.
-- Different types between the same pair are allowed.
-
-### Group
-
-A producer-declared logical cluster of components. The viewer collapses groups at higher zoom levels.
-
-```yaml
-id: group:9c1d2e3f-...
-label: Observability
-summary: Logs, metrics, traces.
-producer: cluster-services
-```
-
-Fields:
-
-| field | type | required | notes |
-|---|---|---|---|
-| `id` | string | yes | `^group:<uuid4-regex>$` |
-| `label` | string | yes | |
-| `summary` | string | yes | |
-| `producer` | enum | yes | groups cannot span producers |
-
-A component declares its group membership via the component's `group` field, not via group-side enumeration.
-
-## Enums
-
-### `capabilities.yaml`
-
-Curated list of capability IDs the system recognizes. Each entry carries its own metadata so capabilities can be queried without needing them as standalone documents in artifacts.
-
-```yaml
-$id: https://architecture.webathome.org/schema/v0.1/enums/capabilities.json
-entries:
-  - id: cap:sso
-    label: Single Sign-On
-    lifecycle: active
-    introduced: 2024-07-12
-  - id: cap:object-storage
-    label: Object Storage
-    lifecycle: active
-    introduced: 2024-07-12
-  # … rest of the curated set
-```
-
-Initial entries — derived from `02-metaschema.md` examples and the existing 145-node taxonomy — get authored as part of work item 1 below. Capability enum is the gate the user wanted: adding a capability requires a PR to this repo.
-
-### `products.yaml`
-
-Same shape as `capabilities.yaml`. Should align one-to-one with the webathome.org stack ticker (`src/data/stack.ts`). One-time reconciliation pass is part of work item 1.
-
-### `edge-types.yaml`
-
-Closed set; the full list from `02-metaschema.md`:
-
-```yaml
-$id: https://architecture.webathome.org/schema/v0.1/enums/edge-types.json
-entries:
-  - id: depends-on
-    description: Generic dependency, when no more specific edge applies. Discouraged.
-  - id: routes-to
-    description: HTTP, gRPC, TCP traffic.
-  - id: authenticates-via
-    description: A trusts B for identity.
-  # … rest
-```
-
-Encoded in the per-kind schema as a JSON Schema `enum` referencing the entry IDs.
-
-### `lifecycle-states.yaml`
-
-```yaml
-$id: https://architecture.webathome.org/schema/v0.1/enums/lifecycle-states.json
-entries:
-  - id: active
-    description: Live, referenceable.
-  - id: deprecated
-    description: Being phased out. Requires replacedBy or retirementBy.
-  - id: removed
-    description: No longer deployed. Producer still emits the entry until references are gone.
-```
-
-### `producer-profiles.yaml`
-
-```yaml
-$id: https://architecture.webathome.org/schema/v0.1/enums/producer-profiles.json
-entries:
-  - id: infra-physical
-    description: Ansible-owned hardware, VMs, OS-level installs.
-  - id: cluster-services
-    description: HelmCharts-owned shared cluster services.
-  - id: images
-    description: DockerImages-owned image identity and build provenance.
-  - id: application
-    description: Application repos (EI, IOT, others) — own pods, queues, storage, ingress.
-```
-
-## Producer profiles — constraint placement
-
-The "profile constrains what an artifact may declare" rule lives at the collector layer, not the JSON Schema layer. The schema accepts any producer declaring any kind; the collector applies the matrix in `02-metaschema.md` and rejects mismatches.
-
-Rationale: per-artifact JSON Schema validation is the wrong place to express "this producer may only own these node kinds" because it requires knowledge that lives one level up (the matrix in the collector config). Keeping the schema simple here also means a misconfigured producer can still produce a parseable artifact — and get a clear collector-level error rather than a cryptic schema error.
+- Reference to an element id that doesn't exist in the merged dataset.
+- Two elements with the same id.
+- Producer declaring an element kind not permitted by its profile.
+- (v0.2) A relationship that violates the ArchiMate triple matrix.
 
 ## Inclusion rule
 
@@ -317,103 +244,100 @@ Not enforced by schema (it's a judgment, not a constraint), but documented here 
 
 Source: `02-metaschema.md`, "Inclusion rule." Repeated here verbatim because every producer author will read this doc and many will not read `02`.
 
-## Anti-patterns rejected at validation time
-
-These are catchable at single-artifact JSON Schema time and so live in this design:
-
-- Component without a `realizes` capability (`minItems: 1` on the array).
-- Edge whose `source` or `target` doesn't match the component ID regex (catches typo'd or wrong-kind references; existence is still a collector concern).
-- Any document with a render-only field (`additionalProperties: false`).
-- ID that fails its kind's regex.
-- Component with `lifecycle: deprecated` and neither `replacedBy` nor `retirementBy`.
-- Component with `lifecycle: removed` and a `replacedBy` or `retirementBy` field present.
-
-Caught only at collector time, listed for completeness:
-
-- Reference to a component GUID that doesn't exist in the merged dataset.
-- Two components with the same GUID.
-- Multiple edges of the same type between the same pair of components.
-- Producer declaring a kind not permitted by its profile.
-
 ## Versioning policy
 
 - **`v0.1`** is the initial version. Files at `schema/v0.1/...` are the canonical reference.
 - **Patch (0.1 → 0.1.1):** clarifications, descriptions, non-breaking additions. Patches overwrite in place at the same URL; cache TTL on the published files is short (300s) to bound staleness.
-- **Minor (0.1 → 0.2):** new optional fields, new enum entries that don't break old artifacts, new edge types. Cuts a new directory `schema/v0.2/`; the old `v0.1/` URLs remain live.
+- **Minor (0.1 → 0.2):** new optional fields, new enum entries that don't break old artifacts, additional ArchiMate element kinds brought into the subset, addition of the triple matrix. Cuts a new directory `schema/v0.2/`; the old `v0.1/` URLs remain live.
 - **Major (0.x → 1.0):** field renames, removed fields, semantic changes. New directory, new URL space.
 
 ### Schema-version compatibility window
 
-The validation service accepts artifacts whose `schemaVersion` matches a configured allowlist. The rule:
+The validation service accepts artifacts whose `schemaVersion` matches a configured allowlist:
 
-- **At v0.1:** the service accepts only `"0.1"`. No compatibility window yet because there's only one version. Don't pre-build the multi-version dispatcher.
+- **At v0.1:** the service accepts only `"0.1"`. No compatibility window yet because there's only one version.
 - **When `v0.2` lands:** the service accepts `["0.1", "0.2"]`. Each compiles against its own schema files.
-- **When `v1.0` lands:** the service accepts the current major's minors plus the previous major for **one release cycle** of the previous major (i.e., until `v1.1` ships, `v0.x` is still accepted). After that, the previous major returns `400 Unknown schema-version`.
+- **When `v1.0` lands:** the service accepts the current major's minors plus the previous major for **one release cycle** of the previous major. After that, the previous major returns `400 Unknown schema-version`.
 
 Implementation: a small list in the service config, not a dynamic policy. When the list changes, that's the deployment that bumps the compatibility window.
 
 ## Work items
 
-### 1. Author the enum files
+### 1. Vendor the ArchiMate 3.x XSDs
 
-Create all five enum files with their initial entries:
+Done. See `schema/v0.1/archimate/` and `SOURCE` for retrieval details.
 
-- `capabilities.yaml` — derived from the existing 145-node taxonomy + the canonical capability list from `02-metaschema.md`. Cross-check against the broken `CapabilityId` union in `viewer/src/data/architecture.ts` and rationalize (the current set conflates layer-ish things — `compute`, `delivery` — with real capabilities — `identity`, `observability`).
-- `products.yaml` — derived from `viewer/src/data/architecture.ts` and `webathome.org`'s `src/data/stack.ts` (one-time reconciliation; flag mismatches in a comment).
-- `edge-types.yaml` — exactly the 13 types listed in `02-metaschema.md`.
-- `lifecycle-states.yaml` — `active`, `deprecated`, `removed`.
-- `producer-profiles.yaml` — `infra-physical`, `cluster-services`, `images`, `application`.
+### 2. Author `schema/v0.1/subset.yaml`
 
-**Exit criteria:**
+A single document declaring:
 
-- [ ] All five files committed under `schema/v0.1/enums/`.
-- [ ] Capability set is sufficient to express every existing node's role (verify by spot-check against the 145 nodes; full migration is `03`'s job).
-- [ ] Product set aligns with the stack ticker; mismatches documented.
-
-### 2. Author the per-kind schemas
-
-Five files: `capability.schema.yaml`, `component.schema.yaml`, `product.schema.yaml`, `edge.schema.yaml`, `group.schema.yaml`. Each:
-
-- Declares `$id`, `$schema`, `type: object`, `additionalProperties: false`.
-- Enumerates required and optional fields per the tables above.
-- Encodes regexes for IDs, the `lifecycle == deprecated` conditional rules, the `lifecycle == removed` forbidden-field rules, and enum references where applicable.
-- Carries `description` on every field — these are user-facing docs when JSON Schema tooling renders them.
+- The list of included element kinds with their ArchiMate layer.
+- The applicable stereotype set for each kind.
+- The ID regex for each kind.
+- The shared custom-attribute set (applied to every kind).
+- Stereotype definitions (the attributes added when each stereotype applies).
+- Inline JSON Schema for the subset document itself, at the top.
 
 **Exit criteria:**
 
-- [ ] Each file compiles under `ajv --strict` with no warnings.
-- [ ] `additionalProperties: false` confirmed on every object.
-- [ ] Conditional rules verified against the example artifacts in step 4.
+- [ ] `subset.yaml` parses and self-validates against its inline schema.
+- [ ] Every element kind named matches an XSD element-type enumeration value.
+- [ ] No custom attribute name collides with an XSD-reserved name (`identifier`, `name`, `documentation`, `properties`, `source`, `target`).
 
-### 3. Author the master schema (`architecture.schema.yaml`)
+### 3. Build `tooling/generate.py`
 
-The artifact-envelope wrapper. `$ref`s into the five per-kind schemas via `items` constraints on each array. Required top-level fields: `schemaVersion`, `producer`. Optional: `generatedAt`, all five document arrays.
+Python (Poetry-managed). Reads the XSD via `xmlschema`. Loads `subset.yaml`. Validates the subset against XSD-derived metadata. Emits per-kind JSON Schemas + `relations.schema.yaml`.
+
+**Exit criteria:**
+
+- [ ] `poetry run python tooling/generate.py` is idempotent (CI re-run is a no-op).
+- [ ] Each generated file compiles under `ajv --strict` with no warnings.
+- [ ] `additionalProperties: false` confirmed on every generated object.
+
+### 4. Author `schema/v0.1/architecture.schema.yaml`
+
+The artifact-envelope wrapper. `$ref`s into the generated per-kind schemas via `items` constraints on each array. Required top-level fields: `schemaVersion`, `producer`. Optional: `generatedAt`, all twelve element-kind arrays, the `relations` array.
 
 **Exit criteria:**
 
 - [ ] Master compiles standalone via `ajv` after resolving all `$ref`s from the repo.
 - [ ] An artifact with only `{schemaVersion, producer}` and empty arrays is valid.
 
-### 4. Author golden example artifacts
+### 5. Author the enum files
 
-Under `schema/v0.1/examples/`:
+Under `schema/v0.1/enums/`:
 
-- `valid-minimal.yaml` — one component, one edge, one capability reference.
-- `valid-full.yaml` — exercises every optional field across all five kinds.
-- `invalid-render-field.yaml` — component with a `position` field; expected error: `additionalProperties` rejection at the component's path.
-- `invalid-unknown-capability.yaml` — component references a `cap:does-not-exist`; expected error: capability not found at validation time (collector-style check the service does at validate time against loaded enums).
-- `invalid-uuid.yaml` — component with `id: comp:not-a-uuid`; expected error: pattern mismatch.
-- `invalid-duplicate-edge.yaml` — two edges with the same `(source, target, type)`; documented but **not failing** at single-artifact time (this is a collector check). Annotate the example to call out that schema validation passes; collector validation does not.
+- `capabilities.yaml` — coarse business-arch level: `cap:iam`, `cap:observability`, `cap:secrets-management`, `cap:messaging`, `cap:data-store`, `cap:ingress`, `cap:dns`, `cap:pki`, `cap:object-storage`, `cap:shared-filesystem`, `cap:block-storage`, `cap:metrics`, `cap:logging`. Each entry: `id`, `label`, `summary`, `lifecycle`, `introduced`.
+- `lifecycle-states.yaml` — `active`, `deprecated`, `removed`.
+- `environments.yaml` — `dev`, `tst`, `uat`, `prd`.
+- `producer-profiles.yaml` — initial set: `ansible`, `helmcharts`, `dockerimages`, plus an `application` slot for individual app repos.
 
 **Exit criteria:**
 
-- [ ] All examples committed.
+- [ ] All four files committed.
+- [ ] Capability set is sufficient to express every existing node's role (verify by spot-check against the 145 nodes; full migration is `03`'s job).
+
+### 6. Author golden example artifacts
+
+Under `schema/v0.1/examples/`:
+
+- `valid-minimal.yaml` — one Node, one SystemSoftware, one TechnologyService, one capability reference.
+- `valid-full.yaml` — exercises every subset element kind and a representative relationship of each type.
+- `invalid-additional-property.yaml` — element with a `position` field. Expected error: `additionalProperties` rejection.
+- `invalid-unknown-capability.yaml` — element references `cap:does-not-exist`. Expected error: capability not found.
+- `invalid-malformed-id.yaml` — element with `id: node:NOT-KEBAB`. Expected error: pattern mismatch.
+- `invalid-deprecation-rule.yaml` — element with `lifecycle: deprecated` and neither `replacedBy` nor `retirementBy`. Expected error: conditional violation.
+- `invalid-unknown-relationship-type.yaml` — `relations` entry with `type: HypotheticalRelationship`. Expected error: not in XSD enumeration.
+
+**Exit criteria:**
+
+- [ ] All examples committed with a header comment naming the expected JSON pointer of the validation error.
 - [ ] `valid-*` examples pass `ajv` against the master schema.
-- [ ] `invalid-*` examples fail in the expected way (capture expected error JSON pointer in a comment header).
+- [ ] `invalid-*` examples fail in the expected way.
 
-### 5. Self-meta-validate
+### 7. Self-meta-validate
 
-Every schema file is itself JSON Schema 2020-12. The repo's CI (later, via the validation service's test suite) loads each schema and meta-validates it against `https://json-schema.org/draft/2020-12/schema`. This catches structural mistakes (misspelled keywords, invalid `enum` shapes).
+Every schema file is itself JSON Schema 2020-12. The repo's CI (later, via the validation service's test suite) loads each schema and meta-validates it against `https://json-schema.org/draft/2020-12/schema`. This catches structural mistakes.
 
 **Exit criteria:**
 
@@ -421,10 +345,10 @@ Every schema file is itself JSON Schema 2020-12. The repo's CI (later, via the v
 
 ## Exit criteria for the design phase
 
-- [ ] All schema files committed under `schema/v0.1/` (work items 1, 2, 3).
+- [ ] All schema files committed under `schema/v0.1/` (work items 2, 3, 4, 5).
 - [ ] All enum files have entries sufficient for the existing 145-node taxonomy.
-- [ ] Golden examples committed and behave as specified (work item 4).
-- [ ] Schema self-meta-validation wired into the service test suite (work item 5).
+- [ ] Golden examples committed and behave as specified (work item 6).
+- [ ] Schema self-meta-validation wired into the service test suite (work item 7).
 - [ ] Versioning policy and compatibility window documented (this doc).
 
-Once these are met, the validation service work in [`validation-service.md`](./validation-service.md) becomes unblocked and the data migration in [`03-data-migration.md`](../architecture-rebuild/03-data-migration.md) has a stable target to migrate to.
+Once these are met, the validation service work in [`validation-service.md`](./validation-service.md) becomes unblocked and the data migration in [`03-data-migration.md`](../architecture-rebuild/03-data-migration.md) has a stable target.
