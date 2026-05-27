@@ -112,19 +112,30 @@ URLs:
 
 ```
 https://architecture.webathome.org/schema/v0.1/architecture.schema.json
-https://architecture.webathome.org/schema/v0.1/component.schema.json
-https://architecture.webathome.org/schema/v0.1/capability.schema.json
-https://architecture.webathome.org/schema/v0.1/product.schema.json
-https://architecture.webathome.org/schema/v0.1/edge.schema.json
-https://architecture.webathome.org/schema/v0.1/group.schema.json
+https://architecture.webathome.org/schema/v0.1/subset.json
+https://architecture.webathome.org/schema/v0.1/generated/node.schema.json
+https://architecture.webathome.org/schema/v0.1/generated/device.schema.json
+https://architecture.webathome.org/schema/v0.1/generated/systemsoftware.schema.json
+https://architecture.webathome.org/schema/v0.1/generated/applicationcomponent.schema.json
+https://architecture.webathome.org/schema/v0.1/generated/applicationservice.schema.json
+https://architecture.webathome.org/schema/v0.1/generated/applicationinterface.schema.json
+https://architecture.webathome.org/schema/v0.1/generated/technologyservice.schema.json
+https://architecture.webathome.org/schema/v0.1/generated/technologyinterface.schema.json
+https://architecture.webathome.org/schema/v0.1/generated/artifact.schema.json
+https://architecture.webathome.org/schema/v0.1/generated/capability.schema.json
+https://architecture.webathome.org/schema/v0.1/generated/businessservice.schema.json
+https://architecture.webathome.org/schema/v0.1/generated/grouping.schema.json
+https://architecture.webathome.org/schema/v0.1/generated/relations.schema.json
 https://architecture.webathome.org/schema/v0.1/enums/capabilities.json
-https://architecture.webathome.org/schema/v0.1/enums/products.json
-https://architecture.webathome.org/schema/v0.1/enums/edge-types.json
 https://architecture.webathome.org/schema/v0.1/enums/lifecycle-states.json
+https://architecture.webathome.org/schema/v0.1/enums/environments.json
 https://architecture.webathome.org/schema/v0.1/enums/producer-profiles.json
+https://architecture.webathome.org/schema/v0.1/archimate/archimate3_Model.xsd
+https://architecture.webathome.org/schema/v0.1/archimate/relationships.xml
+https://architecture.webathome.org/schema/v0.1/archimate/relationships-keys.xml
 ```
 
-Each is also served at the same path with `.yaml`.
+Each YAML schema is also served at the same path with `.yaml`. The vendored ArchiMate XSD and the Archi relationship matrix are served as-is (XML); the validation service does not transform them.
 
 Headers:
 
@@ -253,6 +264,15 @@ No per-error-keyword metrics, no per-producer metrics. If a need shows up later,
 Multi-stage, three stages. Drops the `FROM nginx:alpine` stage entirely.
 
 ```
+FROM python:3.13-slim AS check-schemas
+WORKDIR /work
+RUN pip install --no-cache-dir poetry
+COPY tooling/pyproject.toml tooling/poetry.lock ./tooling/
+RUN cd tooling && poetry install --no-root --only main
+COPY schema/ ./schema/
+COPY tooling/ ./tooling/
+RUN cd tooling && poetry run python generate.py --check
+
 FROM node:20-alpine AS build-viewer
 WORKDIR /app
 COPY viewer/package*.json ./
@@ -272,12 +292,14 @@ WORKDIR /app
 COPY --from=build-service /app/dist ./dist
 COPY --from=build-service /app/node_modules ./node_modules
 COPY --from=build-viewer /app/dist ./viewer-dist
-COPY schema/ ./schema
+COPY --from=check-schemas /work/schema ./schema
 COPY USAGE.md ./USAGE.md
 ENV NODE_ENV=production
 EXPOSE 8080
 ENTRYPOINT ["node", "dist/index.js"]
 ```
+
+The `check-schemas` stage runs `generate.py --check` against the committed `schema/v0.1/generated/` tree; the build fails if the generator would produce different output (i.e. if `subset.yaml` was changed without re-running the generator). The image then copies `schema/` from that stage, guaranteeing the in-container schemas match the checked-in form.
 
 The service's `static.ts` resolves `./viewer-dist`, `./schema`, `./USAGE.md` relative to the working directory.
 
@@ -311,7 +333,11 @@ Create `service/` with `package.json`, `tsconfig.json`, the empty source-file sk
 
 ### 2. Schema loader
 
-Parses every `schema/v0.1/*.yaml` and `schema/v0.1/enums/*.yaml` at startup. Compiles each into an `ajv` validator. Meta-validates every schema against the JSON Schema 2020-12 self-meta. Fails the service boot if any schema is malformed.
+Parses every YAML schema under `schema/v0.1/` at startup — specifically `architecture.schema.yaml`, `subset.schema.yaml`, `generated/*.yaml`, and `enums/*.yaml`. The per-kind schemas under `generated/` are produced by `tooling/generate.py` from `schema/v0.1/subset.yaml` + the vendored ArchiMate XSD + Archi relationship matrix; the Docker build verifies they are up to date by running `poetry run python tooling/generate.py --check` before assembling the image.
+
+Compiles each YAML schema into an `ajv` validator. Meta-validates every schema against the JSON Schema 2020-12 self-meta. Fails the service boot if any schema is malformed.
+
+Loads the `x-allowedTriples` block embedded in `generated/relations.schema.yaml` and exposes it as a structured lookup so the validate handler can enforce the (source-kind, type, target-kind) matrix at request time.
 
 Also builds an in-memory map for the static handler: `path → { yaml: string, json: string, etag: string }`.
 
@@ -320,6 +346,7 @@ Also builds an in-memory map for the static handler: `path → { yaml: string, j
 - [ ] All schema files load without error.
 - [ ] A deliberately broken schema in a test fixture causes the loader to throw with a clear path-and-reason error.
 - [ ] Schema-meta-validation wired in; covered by a test.
+- [ ] Triple matrix loaded from `x-allowedTriples` and queryable in O(1).
 
 ### 3. Static handler — `/viewer/`, `/schema/`
 
@@ -338,8 +365,9 @@ Parses by `Content-Type`. Dispatches by `schemaVersion`. Runs the compiled `ajv`
 
 **Exit criteria:**
 
-- [ ] Endpoint passes for each `schema/v0.1/examples/valid-*.yaml`.
-- [ ] Endpoint fails (with the right error path) for each `schema/v0.1/examples/invalid-*.yaml`.
+- [ ] Endpoint passes for each `schema/v0.1/examples/valid-*.yaml` (committed under that path; `valid-minimal.yaml` and `valid-full.yaml` exist today).
+- [ ] Endpoint fails with the JSON pointer recorded in the example's `# expect:` header for each `schema/v0.1/examples/invalid-*.yaml` (today: `additional-property`, `malformed-id`, `deprecation-rule`, `removed-with-replacedby`, `unknown-relationship-type`).
+- [ ] Relations validation enforces the triple matrix from `x-allowedTriples` in `generated/relations.schema.yaml`.
 - [ ] Test suite covers: missing `schemaVersion`, unknown `schemaVersion`, malformed JSON, malformed YAML, oversized body, unsupported `Content-Type`.
 
 ### 5. Error translation
