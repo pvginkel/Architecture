@@ -3,18 +3,7 @@
 # Node id violates the kebab-case regex (uppercase + underscore not allowed).
 
 schemaVersion: "0.1"
-producer: art:helmcharts
-
-artifacts:
-  - id: art:helmcharts
-    label: HelmCharts repo
-    summary: Producer artifact.
-    introduced: 2024-07-12
-    lifecycle: active
-    stereotype: Producer
-    url: https://github.com/pvginkel/HelmCharts
-    role: source
-    owner: Pieter van Ginkel
+producer: helmcharts
 
 nodes:
   - id: node:Bad_ID

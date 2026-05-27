@@ -69,9 +69,10 @@ properties:
     type: string
     minLength: 1
   sourceRepository:
-    description: Source repository for in-house products.
+    description: "Free-form source-repository identifier for in-house products, e.g. `git:pvginkel/Ansible`. Informational\
+      \ only \u2014 no graph edge is derived from this field.\n"
     type: string
-    pattern: '^art:'
+    minLength: 1
 allOf:
 - if:
     not:

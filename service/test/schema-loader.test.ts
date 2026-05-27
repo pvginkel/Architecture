@@ -60,7 +60,7 @@ describe("schema-loader against the real schema/v0.1 tree", () => {
   it("validates a known-good envelope minimally", () => {
     const minimal = {
       schemaVersion: "0.1",
-      producer: "art:test-producer",
+      producer: "test-producer",
     };
     const ok = bundle.artifactValidator(minimal);
     expect(ok).toBe(true);
@@ -69,7 +69,7 @@ describe("schema-loader against the real schema/v0.1 tree", () => {
   it("rejects an envelope with the wrong schemaVersion", () => {
     const bad = {
       schemaVersion: "0.2",
-      producer: "art:test-producer",
+      producer: "test-producer",
     };
     const ok = bundle.artifactValidator(bad);
     expect(ok).toBe(false);

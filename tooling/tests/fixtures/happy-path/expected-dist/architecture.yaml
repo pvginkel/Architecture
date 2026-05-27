@@ -11,6 +11,7 @@ nodes:
   introduced: '2024-07-12'
   lifecycle: active
   cluster: prd
+  producer: ansible
 devices: []
 systemSoftware:
 - id: ss:keycloak-prd,44444444-4444-4444-8444-444444444441
@@ -20,36 +21,19 @@ systemSoftware:
   lifecycle: active
   environment: prd
   cluster: prd
+  producer: helm
 applicationComponents: []
 applicationServices: []
 applicationInterfaces: []
 technologyServices: []
 technologyInterfaces: []
-artifacts:
-- id: art:ansible
-  label: Ansible repo
-  summary: Ansible producer.
-  introduced: '2024-07-12'
-  lifecycle: active
-  stereotype: Producer
-  url: https://example.invalid/ansible
-  role: source
-  owner: nobody
-- id: art:helmcharts
-  label: HelmCharts repo
-  summary: Helm producer.
-  introduced: '2024-07-12'
-  lifecycle: active
-  stereotype: Producer
-  url: https://example.invalid/helm
-  role: source
-  owner: nobody
 capabilities:
 - id: cap:iam
   label: Identity & Access Management
   summary: IAM capability.
   introduced: '2024-07-12'
   lifecycle: active
+  producer: helm
 businessServices: []
 groupings:
 - id: grp:identity,88888888-8888-4888-8888-888888888881
@@ -57,11 +41,8 @@ groupings:
   summary: All identity-related services in the prd cluster.
   introduced: '2024-09-04'
   lifecycle: active
+  producer: helm
 relations:
-- id: rel:576ec22d-97c4-52ca-a6d4-df7a702de859
-  source: art:ansible
-  target: node:prd-cluster,33333333-3333-4333-8333-333333333331
-  type: Association
 - id: rel:cluster-runs-keycloak
   source: node:prd-cluster,33333333-3333-4333-8333-333333333331
   target: ss:keycloak-prd,44444444-4444-4444-8444-444444444441
@@ -74,18 +55,6 @@ relations:
   source: grp:identity,88888888-8888-4888-8888-888888888881
   target: ss:keycloak-prd,44444444-4444-4444-8444-444444444441
   type: Aggregation
-- id: rel:a6d8bfea-7799-596b-b3f5-4d37d8c7d073
-  source: art:helmcharts
-  target: ss:keycloak-prd,44444444-4444-4444-8444-444444444441
-  type: Association
-- id: rel:4ca3ac8a-d3ca-5178-bd36-74350a27cca8
-  source: art:helmcharts
-  target: cap:iam
-  type: Association
-- id: rel:4ab8515d-b1a0-5345-af9c-b415a7a7aa13
-  source: art:helmcharts
-  target: grp:identity,88888888-8888-4888-8888-888888888881
-  type: Association
 derived:
   groupings:
     grp:identity,88888888-8888-4888-8888-888888888881:

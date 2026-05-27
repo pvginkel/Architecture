@@ -56,19 +56,8 @@ published merged dataset into your repo's source.
 
 ```yaml
 schemaVersion: "0.1"
-producer: art:<this-producer-id>       # bare kebab; matches a declared «Producer» Artifact entry below
+producer: <this-producer-id>           # bare kebab; matches this repo's entry in pipeline-producers.yaml
 generatedAt: 2026-05-27T12:00:00Z      # optional, informational
-
-artifacts:                              # required: at least the «Producer» Artifact for this repo
-  - id: art:<this-producer-id>
-    label: ...
-    summary: ...
-    introduced: 2024-07-12
-    lifecycle: active
-    stereotype: Producer
-    url: https://github.com/owner/repo
-    role: source
-    owner: <human or team>
 
 # all of the following arrays are optional; emit what this repo owns:
 nodes: [...]
@@ -86,11 +75,13 @@ relations: [...]
 ```
 
 `additionalProperties: false` applies everywhere — any extra field
-that isn't in the schema fails validation.
+that isn't in the schema fails validation. In particular, do NOT add
+a `producer:` field on individual elements; the collector stamps that
+attribute onto every merged element from the envelope key above.
 
 ## Element kinds
 
-Twelve kinds. Each has a fixed id prefix and a declaration form.
+Ten kinds. Each has a fixed id prefix and a declaration form.
 References between elements (in `relations`) use the same ids.
 
 | Kind | Prefix | Declaration form | Use for |
@@ -105,11 +96,17 @@ References between elements (in `relations`) use the same ids.
 | `ApplicationInterface` | `if:` | composite | Addressable point on an ApplicationService (specific endpoint path) |
 | `TechnologyService` | `svc:` | composite | Infra consumption surface (Postgres-on-5432, OIDC issuer, Proxmox API) |
 | `TechnologyInterface` | `if:` | composite | Addressable point on a TechnologyService (queue, topic, vault path, db name) |
-| `Artifact` («Repository», «Producer») | `art:` | bare kebab | Source/spec/config repository, including the «Producer» entry for this repo |
-| `Artifact` (non-stereotyped) | `art:` | composite | Deployable bundle (Helm chart, Ansible role, TF module) |
 | `Capability` | `cap:` | bare kebab | Business-architecture role (centrally curated; see appendix) |
 | `BusinessService` | `bsvc:` | bare kebab | What the system delivers to humans (SSO, self-service tooling) |
 | `Grouping` | `grp:` | composite | Cosmetic clustering of producer-local members |
+
+Container images, repos, Helm charts, Ansible roles, and other build
+artifacts are deliberately not modelled as architecture elements.
+They're sources of statements about the architecture, not elements of
+it — splitting or merging a repo doesn't change what runs where. The
+repo identity lives on the envelope `producer:` key (which the
+collector lifts onto each element) and, for in-house products, in the
+optional `sourceRepository:` string attribute on `«SoftwareProduct»`.
 
 ## ID grammar
 
@@ -121,10 +118,9 @@ across edits; the UUID cannot — mint it once, commit it, never
 re-mint.
 
 **Bare kebab** is `<kind-prefix>:<kebab-name>` — for example
-`cap:iam`, `ss:keycloak`, `art:helmcharts`. Used by curated kinds
-(Capability, BusinessService) and stereotyped catalog identities
-(SoftwareProduct on SystemSoftware/ApplicationComponent; Repository
-or Producer on Artifact).
+`cap:iam`, `ss:keycloak`. Used by curated kinds (Capability,
+BusinessService) and stereotyped catalog identities («SoftwareProduct»
+on SystemSoftware / ApplicationComponent).
 
 **References** in `relations.source` / `relations.target` accept three
 forms:
@@ -156,18 +152,17 @@ missing ones.
 
 Per-kind additions:
 
-- `environment` (optional, on Node/Artifact/ApplicationComponent/SystemSoftware): `dev` \| `tst` \| `uat` \| `prd`
+- `environment` (optional, on Node/ApplicationComponent/SystemSoftware): `dev` \| `tst` \| `uat` \| `prd`
 - `cluster` (optional, on Node/SystemSoftware/ApplicationComponent): cluster identifier
 
-**No `producer:` attribute on elements.** Provenance is synthesised
-automatically by the collector — an Association relation per declared
-element, from the top-level `producer:` («Producer» Artifact) to the
-element. You do not emit those relations yourself.
+**Do not emit a `producer:` attribute on elements.** The collector
+stamps it onto every merged element from the envelope `producer:` key.
+Per-kind schemas reject `producer:` via `additionalProperties: false`,
+so producer CI catches this before submission.
 
 ## Stereotypes
 
-Optional marker that adds extra required attributes. Three exist in
-v0.1:
+Optional marker that adds extra attributes. Only one exists in v0.1:
 
 ### «SoftwareProduct»
 
@@ -181,7 +176,9 @@ Added attributes:
 
 - `homepage` — URI, optional
 - `logo` — filename under `viewer/public/logos/`, optional
-- `sourceRepository` — id of an Artifact, optional (for in-house products)
+- `sourceRepository` — free-form string for in-house products, optional
+  (convention: `git:<owner>/<repo>`, e.g. `git:pvginkel/Ansible`).
+  Informational only — no graph edge is derived from this.
 
 Example:
 
@@ -201,45 +198,6 @@ The producer that **publishes** a product (the upstream lives in this
 repo's domain) emits the catalog entry. Ansible owns
 `ss:kubernetes`, the ZFS allocator's product entry, etc. Other
 producers reference those entries by id; they don't redeclare them.
-
-### «Repository»
-
-Applies to: `Artifact`.
-
-Marks the Artifact as a source/spec/config repository.
-
-Added attributes:
-
-- `url` — URI, required
-- `role` — `source` \| `spec` \| `config`, required
-- `owner` — string, required (human or team)
-- `languageMix` — string→string map (e.g. `{Python: "85", YAML: "15"}`), optional
-
-### «Producer»
-
-Applies to: `Artifact`. Additionally requires the `Repository` stereotype.
-
-Marker only — no added attributes of its own beyond what Repository
-brings. Identifies a Repository as a producer of architecture data,
-so the federation pipeline knows it's an authoritative emitter.
-
-This is what your repo's own Artifact entry uses. The top-level
-`producer:` envelope key must point at exactly this Artifact's id.
-
-Example (the entry your producer.yaml should always contain):
-
-```yaml
-artifacts:
-  - id: art:ansible                     # whatever this repo's producer id is
-    label: Ansible repo
-    summary: Owns Proxmox/k8s/OpenBao/HAProxy/step-ca infrastructure architecture.
-    introduced: 2024-07-12
-    lifecycle: active
-    stereotype: Producer
-    url: https://github.com/pvginkel/Ansible
-    role: source
-    owner: Pieter van Ginkel
-```
 
 ## Relations
 
@@ -276,13 +234,7 @@ the manual doesn't enumerate it; common mappings:
 | A daemon exposes a service | `Composition` or `Realization` | SystemSoftware → TechnologyService |
 | A service exposes an interface | `Composition` | TechnologyService → TechnologyInterface |
 | An instance is a particular SoftwareProduct | `Specialization` | instance → SoftwareProduct |
-| A producing repo is composed of charts/roles | `Composition` | Artifact (Producer) → Artifact |
 | A grouping aggregates its members | `Aggregation` | Grouping → any |
-
-**Do not emit producer-Association relations from your «Producer»
-Artifact to each declared element.** The collector synthesises those
-automatically. If you emit them by hand, the merge will fail on
-duplicate ids.
 
 `Specialization` from an instance to its product catalog entry is
 expected on every stereotyped instance — e.g. a running Keycloak
@@ -429,9 +381,9 @@ downstream.
 | Profile | Used by | Typically owns |
 |---|---|---|
 | `infra-physical` | Ansible | Devices, Nodes (hypervisors/VMs/clusters), VM-level daemons, OS-layer services |
-| `cluster-services` | HelmCharts | Cluster-deployed SystemSoftware, ApplicationServices/Interfaces, Helm chart Artifacts, SoftwareProduct entries for cluster-published software |
+| `cluster-services` | HelmCharts | Cluster-deployed SystemSoftware, ApplicationServices/Interfaces, SoftwareProduct entries for cluster-published software |
 | `application` | per-app repos | ApplicationComponents (pods), ApplicationServices/Interfaces, app-specific SoftwareProduct entries |
-| `images` | DockerImages | Image identity, build provenance (mostly v0.2 territory) |
+| `images` | DockerImages | Image identity, build provenance (v0.2 territory — no v0.1 element kind for container images) |
 
 The profile is **descriptive metadata only** — the collector does not
 enforce a per-kind allow-list. Conventions above are guidance for
@@ -439,22 +391,11 @@ review-time judgment.
 
 ## Worked example
 
-A minimal valid two-element artifact, for shape reference:
+A minimal valid artifact, for shape reference:
 
 ```yaml
 schemaVersion: "0.1"
-producer: art:example
-
-artifacts:
-  - id: art:example
-    label: Example repo
-    summary: Demonstrates the minimal envelope.
-    introduced: 2026-05-27
-    lifecycle: active
-    stereotype: Producer
-    url: https://github.com/example/repo
-    role: source
-    owner: Example Owner
+producer: example
 
 nodes:
   - id: node:prd-cluster,7f3a2b1c-9d4a-4e8c-b2f1-1a2b3c4d5e6f

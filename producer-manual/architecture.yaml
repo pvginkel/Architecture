@@ -1,9 +1,9 @@
 # Architecture artifact starter skeleton.
 #
 # Replace placeholders. Drop the sections you don't need; everything
-# except `schemaVersion`, `producer`, and the matching «Producer»
-# Artifact entry is optional at the envelope level. Per-element
-# required fields are enforced by the validator — run
+# except `schemaVersion` and `producer` is optional at the envelope
+# level. Per-element required fields are enforced by the validator —
+# run
 #   ./scripts/arch-validate architecture.yaml
 # after each edit until it's clean.
 #
@@ -12,28 +12,18 @@
 #     Mint UUIDs with: python -c 'import uuid; print(uuid.uuid4())'
 #     Once minted, NEVER re-mint. Commit them next to this file so
 #     they're stable across builds.
-#   - Curated / catalog / Repository / Producer kinds → bare kebab.
+#   - Curated / catalog kinds → bare kebab.
 #
-# Relations: the collector synthesises one Association relation per
-# declared element from the «Producer» Artifact below to the element,
-# automatically. Do NOT emit those relations yourself.
+# Provenance: the collector stamps a `producer:` attribute on every
+# merged element from the envelope key below. Producers must NOT emit
+# `producer:` on individual elements — per-kind schemas reject it via
+# additionalProperties: false.
 #
 # See MANUAL.md for the full vocabulary, allowed relation triples,
 # stereotype rules, and inclusion criteria.
 
 schemaVersion: "0.1"
-producer: art:<PRODUCER-ID>     # bare kebab; must match the «Producer» Artifact id below
-
-artifacts:
-  - id: art:<PRODUCER-ID>
-    label: <repo display name>
-    summary: <one or two sentences describing what this repo produces>
-    introduced: 2026-05-27       # ISO date when this repo became a producer
-    lifecycle: active
-    stereotype: Producer
-    url: https://github.com/<owner>/<repo>
-    role: source
-    owner: <human or team>
+producer: <PRODUCER-ID>          # bare kebab; must match this repo's entry in pipeline-producers.yaml
 
 # ─── Replace / remove sections below as appropriate ─────────────────
 
@@ -70,6 +60,7 @@ artifacts:
 #     stereotype: SoftwareProduct
 #     homepage: https://...
 #     logo: <name>.svg
+#     sourceRepository: git:<owner>/<repo>    # optional, informational
 
 # applicationComponents:
 #   - id: app:<hint>,<uuid4>

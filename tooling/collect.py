@@ -5,10 +5,7 @@ producer's `architecture.yaml` from `producer-artifacts/<producer-id>/`,
 validates each artifact, merges them, runs cross-producer checks, and writes
 the consolidated dataset to `dist/data/v0.1/`.
 
-v3 ships with `pipeline-producers.yaml` empty; later work items fill in the
-capability-enum, merge, cross-ref, alias-hint, triple-matrix, grouping, and
-emit stages. This file currently covers work items 2 (load registry) and
-3 (discovery + per-artifact validation).
+v3 ships with `pipeline-producers.yaml` empty; producers come online in v4.
 
 Usage:
 
@@ -22,7 +19,6 @@ from __future__ import annotations
 
 import json
 import sys
-import uuid
 from pathlib import Path
 from typing import Any
 
@@ -41,11 +37,6 @@ from _arch import (
     validate_doc,
 )
 
-# Stable namespace for uuid5-derived synthesised producer-relation ids.
-# Same (producer-id, element-id) input always yields the same uuid, which
-# keeps the merged dataset byte-identical across reruns.
-PRODUCER_RELATION_NAMESPACE = uuid.UUID("41a96d77-cf3a-4f53-9e75-2ad5e8d3e7c4")
-
 
 ELEMENT_KIND_ARRAYS: tuple[str, ...] = (
     "nodes",
@@ -56,7 +47,6 @@ ELEMENT_KIND_ARRAYS: tuple[str, ...] = (
     "applicationInterfaces",
     "technologyServices",
     "technologyInterfaces",
-    "artifacts",
     "capabilities",
     "businessServices",
     "groupings",
@@ -74,7 +64,6 @@ ARRAY_TO_ARCHIMATE: dict[str, str] = {
     "applicationInterfaces": "ApplicationInterface",
     "technologyServices": "TechnologyService",
     "technologyInterfaces": "TechnologyInterface",
-    "artifacts": "Artifact",
     "capabilities": "Capability",
     "businessServices": "BusinessService",
     "groupings": "Grouping",
@@ -206,52 +195,26 @@ def reconcile_capability_enum(docs: dict[str, Any]) -> None:
         raise CollectorError("capability-enum", messages)
 
 
-def synthesize_producer_relations(docs: dict[str, Any]) -> int:
-    """Append one Association relation per declared element from the
-    artifact's top-level «Producer» Artifact to that element. Mutates each
-    doc's `relations` array in place. Producers don't have to emit these
-    by hand — provenance falls out of the merged dataset structurally,
-    expressed as real ArchiMate edges rather than an attribute on every
-    element.
+def synthesize_provenance_attribute(docs: dict[str, Any]) -> int:
+    """Stamp a `producer: <producer-id>` attribute onto every declared
+    element. The envelope already names the producer; this lifts that
+    fact onto each element so the merged dataset answers "who declared
+    this?" without a graph traversal. Producers do not — and may not —
+    emit this attribute themselves; per-kind schemas reject it via
+    additionalProperties: false, and per-artifact validation runs before
+    this step.
 
-    Relation type is Association (matches every v0.1 element kind in the
-    triple matrix from Artifact-as-source; Aggregation/Composition would
-    only permit Artifact and Grouping targets).
-
-    Relation ids are uuid5(NAMESPACE, "<producer-id>|<element-id>") so the
-    output is deterministic across reruns. The producer's own «Producer»
-    Artifact entry is skipped (no self-Association).
-
-    Pre-merge: synthesised relations join their owning artifact's relations
-    array, which means they pass through dup-id detection and cross-ref
-    resolution like producer-emitted relations.
-
-    Returns the total number of relations synthesised across all artifacts.
+    Returns the total number of elements stamped across all artifacts.
     """
-    synthesised = 0
+    stamped = 0
     for pid in sorted(docs):
         doc = docs[pid]
         producer_id = doc["producer"]
-        relations = doc.setdefault("relations", []) or []
-        doc["relations"] = relations
         for kind in ELEMENT_KIND_ARRAYS:
             for elem in doc.get(kind) or []:
-                if elem["id"] == producer_id:
-                    continue
-                rel_uuid = uuid.uuid5(
-                    PRODUCER_RELATION_NAMESPACE,
-                    f"{producer_id}|{elem['id']}",
-                )
-                relations.append(
-                    {
-                        "id": f"rel:{rel_uuid}",
-                        "source": producer_id,
-                        "target": elem["id"],
-                        "type": "Association",
-                    }
-                )
-                synthesised += 1
-    return synthesised
+                elem["producer"] = producer_id
+                stamped += 1
+    return stamped
 
 
 def merge_artifacts(docs: dict[str, Any]) -> dict[str, list]:
@@ -259,9 +222,10 @@ def merge_artifacts(docs: dict[str, Any]) -> dict[str, list]:
     Fails the run if any id appears in more than one place, reporting
     both the original producer + kind and the conflicting producer + kind.
 
-    Element `producer` back-pointers are preserved verbatim — the merge
-    does not rewrite them. Producer iteration is in sorted order so the
-    merged array order is deterministic for the same input set.
+    The `producer:` attribute stamped on each element by
+    synthesize_provenance_attribute is preserved verbatim. Producer
+    iteration is in sorted order so the merged array order is
+    deterministic for the same input set.
     """
     merged: dict[str, list] = {name: [] for name in (*ELEMENT_KIND_ARRAYS, "relations")}
     seen: dict[str, tuple[str, str]] = {}  # id -> (kind, producer)
@@ -404,11 +368,6 @@ def check_triple_matrix(
     over in-artifact and cross-artifact relations — JSON Schema doesn't
     enforce triples on its own, so the collector is the enforcement
     point for both.
-
-    Synthesised producer-Association edges land in the same relation
-    arrays as producer-emitted ones; they're checked here too. (Artifact,
-    Association, *) is permitted for every v0.1 element kind, which is
-    why Association is the synthesis type.
     """
     allowed = load_allowed_triples()
     messages: list[str] = []
@@ -748,9 +707,9 @@ def main(producers_path: Path, input_dir: Path, output_dir: Path) -> None:
 
     click.echo("Capability-enum reconciliation: every cap: reference resolved.")
 
-    synth_total = synthesize_producer_relations(docs)
+    stamped_total = synthesize_provenance_attribute(docs)
     click.echo(
-        f"Producer-relation synthesis: appended {synth_total} Association edge(s) "
+        f"Provenance synthesis: stamped `producer:` onto {stamped_total} element(s) "
         f"across {len(docs)} artifact(s)."
     )
 

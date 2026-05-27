@@ -77,7 +77,7 @@ describe("scripts/arch-validate", () => {
   it("validates JSON when extension is .json", async () => {
     // Minimal valid JSON artifact (date as 'YYYY-MM-DD' string, matching the
     // `format: date` constraint without going through js-yaml's Date parsing).
-    const doc = { schemaVersion: "0.1", producer: "art:x" };
+    const doc = { schemaVersion: "0.1", producer: "x" };
     const tmp = path.join(REPO_ROOT, "service", `.tmp-${Date.now()}.json`);
     const fs = await import("node:fs/promises");
     await fs.writeFile(tmp, JSON.stringify(doc));

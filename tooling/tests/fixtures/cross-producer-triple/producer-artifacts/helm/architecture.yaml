@@ -1,15 +1,5 @@
 schemaVersion: "0.1"
-producer: art:helmcharts
-artifacts:
-  - id: art:helmcharts
-    label: Helm
-    summary: Producer.
-    introduced: 2024-07-12
-    lifecycle: active
-    stereotype: Producer
-    url: https://example.invalid/helm
-    role: source
-    owner: nobody
+producer: helm
 nodes:
   - id: node:cluster-b,33333333-3333-4333-8333-333333333332
     label: B

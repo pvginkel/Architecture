@@ -29,11 +29,13 @@ properties:
 
   producer:
     type: string
-    pattern: '^art:'
+    pattern: '^[a-z][a-z0-9-]*$'
     description: >
-      The «Producer» Artifact (Repository) id that produced this artifact.
-      Must exist in the merged dataset as a Repository Artifact with the
-      «Producer» stereotype.
+      Producer id. Bare kebab-case. Must match an entry in
+      pipeline-producers.yaml. The collector copies this value into a
+      synthesised `producer:` attribute on every element this artifact
+      declares (post-validation), so producers do not — and may not —
+      emit a `producer:` field on individual elements.
 
   generatedAt:
     type: string
@@ -87,12 +89,6 @@ properties:
     description: TechnologyInterface elements.
     items:
       $ref: ./generated/technologyinterface.schema.yaml
-
-  artifacts:
-    type: array
-    description: Artifact elements (repos, charts, modules, scripts).
-    items:
-      $ref: ./generated/artifact.schema.yaml
 
   capabilities:
     type: array

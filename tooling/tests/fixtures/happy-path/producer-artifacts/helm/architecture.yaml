@@ -1,15 +1,5 @@
 schemaVersion: "0.1"
-producer: art:helmcharts
-artifacts:
-  - id: art:helmcharts
-    label: HelmCharts repo
-    summary: Helm producer.
-    introduced: 2024-07-12
-    lifecycle: active
-    stereotype: Producer
-    url: https://example.invalid/helm
-    role: source
-    owner: nobody
+producer: helm
 systemSoftware:
   - id: ss:keycloak-prd,44444444-4444-4444-8444-444444444441
     label: Keycloak (prd)

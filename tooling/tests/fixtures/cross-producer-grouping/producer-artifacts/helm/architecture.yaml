@@ -1,15 +1,5 @@
 schemaVersion: "0.1"
-producer: art:helmcharts
-artifacts:
-  - id: art:helmcharts
-    label: Helm
-    summary: Producer.
-    introduced: 2024-07-12
-    lifecycle: active
-    stereotype: Producer
-    url: https://example.invalid/helm
-    role: source
-    owner: nobody
+producer: helm
 groupings:
   - id: grp:cross,88888888-8888-4888-8888-888888888881
     label: Cross

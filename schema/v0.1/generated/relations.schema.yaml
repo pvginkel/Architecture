@@ -42,9 +42,6 @@ properties:
 x-allowedTriples:
 - source: ApplicationComponent
   type: Access
-  target: Artifact
-- source: ApplicationComponent
-  type: Access
   target: Grouping
 - source: ApplicationComponent
   type: Aggregation
@@ -70,9 +67,6 @@ x-allowedTriples:
 - source: ApplicationComponent
   type: Association
   target: ApplicationService
-- source: ApplicationComponent
-  type: Association
-  target: Artifact
 - source: ApplicationComponent
   type: Association
   target: BusinessService
@@ -225,9 +219,6 @@ x-allowedTriples:
   target: TechnologyService
 - source: ApplicationInterface
   type: Access
-  target: Artifact
-- source: ApplicationInterface
-  type: Access
   target: Grouping
 - source: ApplicationInterface
   type: Aggregation
@@ -252,9 +243,6 @@ x-allowedTriples:
   target: ApplicationService
 - source: ApplicationInterface
   type: Association
-  target: Artifact
-- source: ApplicationInterface
-  type: Association
   target: BusinessService
 - source: ApplicationInterface
   type: Association
@@ -393,9 +381,6 @@ x-allowedTriples:
   target: TechnologyService
 - source: ApplicationService
   type: Access
-  target: Artifact
-- source: ApplicationService
-  type: Access
   target: Grouping
 - source: ApplicationService
   type: Aggregation
@@ -412,9 +397,6 @@ x-allowedTriples:
 - source: ApplicationService
   type: Association
   target: ApplicationService
-- source: ApplicationService
-  type: Association
-  target: Artifact
 - source: ApplicationService
   type: Association
   target: BusinessService
@@ -553,96 +535,6 @@ x-allowedTriples:
 - source: ApplicationService
   type: Triggering
   target: TechnologyService
-- source: Artifact
-  type: Aggregation
-  target: Artifact
-- source: Artifact
-  type: Aggregation
-  target: Grouping
-- source: Artifact
-  type: Association
-  target: ApplicationComponent
-- source: Artifact
-  type: Association
-  target: ApplicationInterface
-- source: Artifact
-  type: Association
-  target: ApplicationService
-- source: Artifact
-  type: Association
-  target: Artifact
-- source: Artifact
-  type: Association
-  target: BusinessService
-- source: Artifact
-  type: Association
-  target: Capability
-- source: Artifact
-  type: Association
-  target: Device
-- source: Artifact
-  type: Association
-  target: Grouping
-- source: Artifact
-  type: Association
-  target: Node
-- source: Artifact
-  type: Association
-  target: SystemSoftware
-- source: Artifact
-  type: Association
-  target: TechnologyInterface
-- source: Artifact
-  type: Association
-  target: TechnologyService
-- source: Artifact
-  type: Composition
-  target: Artifact
-- source: Artifact
-  type: Composition
-  target: Grouping
-- source: Artifact
-  type: Influence
-  target: Grouping
-- source: Artifact
-  type: Realization
-  target: ApplicationComponent
-- source: Artifact
-  type: Realization
-  target: ApplicationInterface
-- source: Artifact
-  type: Realization
-  target: ApplicationService
-- source: Artifact
-  type: Realization
-  target: Artifact
-- source: Artifact
-  type: Realization
-  target: BusinessService
-- source: Artifact
-  type: Realization
-  target: Capability
-- source: Artifact
-  type: Realization
-  target: Grouping
-- source: Artifact
-  type: Realization
-  target: SystemSoftware
-- source: Artifact
-  type: Realization
-  target: TechnologyInterface
-- source: Artifact
-  type: Realization
-  target: TechnologyService
-- source: Artifact
-  type: Specialization
-  target: Artifact
-- source: Artifact
-  type: Specialization
-  target: Grouping
-- source: BusinessService
-  type: Access
-  target: Artifact
 - source: BusinessService
   type: Access
   target: Grouping
@@ -661,9 +553,6 @@ x-allowedTriples:
 - source: BusinessService
   type: Association
   target: ApplicationService
-- source: BusinessService
-  type: Association
-  target: Artifact
 - source: BusinessService
   type: Association
   target: BusinessService
@@ -816,9 +705,6 @@ x-allowedTriples:
   target: ApplicationService
 - source: Capability
   type: Association
-  target: Artifact
-- source: Capability
-  type: Association
   target: BusinessService
 - source: Capability
   type: Association
@@ -879,9 +765,6 @@ x-allowedTriples:
   target: Grouping
 - source: Device
   type: Access
-  target: Artifact
-- source: Device
-  type: Access
   target: Grouping
 - source: Device
   type: Aggregation
@@ -895,9 +778,6 @@ x-allowedTriples:
 - source: Device
   type: Aggregation
   target: TechnologyInterface
-- source: Device
-  type: Assignment
-  target: Artifact
 - source: Device
   type: Assignment
   target: Grouping
@@ -919,9 +799,6 @@ x-allowedTriples:
 - source: Device
   type: Association
   target: ApplicationService
-- source: Device
-  type: Association
-  target: Artifact
 - source: Device
   type: Association
   target: BusinessService
@@ -1086,9 +963,6 @@ x-allowedTriples:
   target: TechnologyService
 - source: Grouping
   type: Access
-  target: Artifact
-- source: Grouping
-  type: Access
   target: Grouping
 - source: Grouping
   type: Aggregation
@@ -1099,9 +973,6 @@ x-allowedTriples:
 - source: Grouping
   type: Aggregation
   target: ApplicationService
-- source: Grouping
-  type: Aggregation
-  target: Artifact
 - source: Grouping
   type: Aggregation
   target: BusinessService
@@ -1129,9 +1000,6 @@ x-allowedTriples:
 - source: Grouping
   type: Assignment
   target: ApplicationService
-- source: Grouping
-  type: Assignment
-  target: Artifact
 - source: Grouping
   type: Assignment
   target: BusinessService
@@ -1167,9 +1035,6 @@ x-allowedTriples:
   target: ApplicationService
 - source: Grouping
   type: Association
-  target: Artifact
-- source: Grouping
-  type: Association
   target: BusinessService
 - source: Grouping
   type: Association
@@ -1201,9 +1066,6 @@ x-allowedTriples:
 - source: Grouping
   type: Composition
   target: ApplicationService
-- source: Grouping
-  type: Composition
-  target: Artifact
 - source: Grouping
   type: Composition
   target: BusinessService
@@ -1275,9 +1137,6 @@ x-allowedTriples:
   target: ApplicationService
 - source: Grouping
   type: Realization
-  target: Artifact
-- source: Grouping
-  type: Realization
   target: BusinessService
 - source: Grouping
   type: Realization
@@ -1342,9 +1201,6 @@ x-allowedTriples:
 - source: Grouping
   type: Specialization
   target: ApplicationService
-- source: Grouping
-  type: Specialization
-  target: Artifact
 - source: Grouping
   type: Specialization
   target: BusinessService
@@ -1404,9 +1260,6 @@ x-allowedTriples:
   target: TechnologyService
 - source: Node
   type: Access
-  target: Artifact
-- source: Node
-  type: Access
   target: Grouping
 - source: Node
   type: Aggregation
@@ -1423,9 +1276,6 @@ x-allowedTriples:
 - source: Node
   type: Aggregation
   target: TechnologyInterface
-- source: Node
-  type: Assignment
-  target: Artifact
 - source: Node
   type: Assignment
   target: BusinessService
@@ -1456,9 +1306,6 @@ x-allowedTriples:
 - source: Node
   type: Association
   target: ApplicationService
-- source: Node
-  type: Association
-  target: Artifact
 - source: Node
   type: Association
   target: BusinessService
@@ -1629,9 +1476,6 @@ x-allowedTriples:
   target: TechnologyService
 - source: SystemSoftware
   type: Access
-  target: Artifact
-- source: SystemSoftware
-  type: Access
   target: Grouping
 - source: SystemSoftware
   type: Aggregation
@@ -1642,9 +1486,6 @@ x-allowedTriples:
 - source: SystemSoftware
   type: Aggregation
   target: TechnologyInterface
-- source: SystemSoftware
-  type: Assignment
-  target: Artifact
 - source: SystemSoftware
   type: Assignment
   target: Grouping
@@ -1666,9 +1507,6 @@ x-allowedTriples:
 - source: SystemSoftware
   type: Association
   target: ApplicationService
-- source: SystemSoftware
-  type: Association
-  target: Artifact
 - source: SystemSoftware
   type: Association
   target: BusinessService
@@ -1830,9 +1668,6 @@ x-allowedTriples:
   target: TechnologyService
 - source: TechnologyInterface
   type: Access
-  target: Artifact
-- source: TechnologyInterface
-  type: Access
   target: Grouping
 - source: TechnologyInterface
   type: Aggregation
@@ -1855,9 +1690,6 @@ x-allowedTriples:
 - source: TechnologyInterface
   type: Association
   target: ApplicationService
-- source: TechnologyInterface
-  type: Association
-  target: Artifact
 - source: TechnologyInterface
   type: Association
   target: BusinessService
@@ -2004,9 +1836,6 @@ x-allowedTriples:
   target: TechnologyService
 - source: TechnologyService
   type: Access
-  target: Artifact
-- source: TechnologyService
-  type: Access
   target: Grouping
 - source: TechnologyService
   type: Aggregation
@@ -2023,9 +1852,6 @@ x-allowedTriples:
 - source: TechnologyService
   type: Association
   target: ApplicationService
-- source: TechnologyService
-  type: Association
-  target: Artifact
 - source: TechnologyService
   type: Association
   target: BusinessService

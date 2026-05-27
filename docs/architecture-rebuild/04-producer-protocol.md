@@ -14,7 +14,7 @@ The producer-profile enum (`schema/v0.1/enums/producer-profiles.yaml`) currently
 
 ## Artifact shape
 
-The artifact is a single YAML document conforming to the v0.1 master schema. The two required top-level fields are `schemaVersion` (`"0.1"`) and `producer` (the id of this producer's «Producer» Repository Artifact). Per-kind element arrays are optional.
+The artifact is a single YAML document conforming to the v0.1 master schema. The two required top-level fields are `schemaVersion` (`"0.1"`) and `producer` (a bare kebab token matching this producer's `id` in `pipeline-producers.yaml`). Per-kind element arrays are optional. The collector stamps a `producer:` attribute onto every merged element from the envelope key — producers must not emit `producer:` on individual elements (rejected by `additionalProperties: false`).
 
 The full envelope is documented in [`../features/metaschema-design.md`](../features/metaschema-design.md) under "Artifact envelope." See `schema/v0.1/examples/valid-full.yaml` for a worked-out example exercising every element kind.
 
@@ -48,7 +48,7 @@ What the per-artifact validator catches (today, against `schema/v0.1/`):
 
 - Schema violations (missing required fields, wrong types, render-only `position` keys).
 - ID format violations (kind-specific regexes; instance kinds require the composite `<kind>:<hint>,<uuid4>` form at declarations).
-- Stereotype-specific required attributes (e.g., a «Repository» Artifact must declare `url`, `role`, `owner`).
+- Stereotype-specific required attributes when a stereotype is set.
 - Relationship `type` not in the ArchiMate enumeration; relationship triples not permitted by ArchiMate 3.2.
 
 What it does **not** catch (collector concerns, see `05`):
@@ -72,7 +72,7 @@ What it does **not** catch (collector concerns, see `05`):
   collector resolves these via a per-producer hint index; cross-producer
   hint-only references fail with a message pointing the author at the UUID.
 
-This applies to every instance kind: `Node`, `Device`, `SystemSoftware` (instance), `ApplicationComponent` (instance), `Artifact` (non-stereotyped), `ApplicationService`, `TechnologyService`, `ApplicationInterface`, `TechnologyInterface`, `Grouping`. Curated kinds (`Capability`, `BusinessService`) and `«SoftwareProduct»` / `«Repository»` / `«Producer»`-stereotyped catalog entries use bare kebab-case ids — those are catalog identities, not instance identities.
+This applies to every instance kind: `Node`, `Device`, `SystemSoftware` (instance), `ApplicationComponent` (instance), `ApplicationService`, `TechnologyService`, `ApplicationInterface`, `TechnologyInterface`, `Grouping`. Curated kinds (`Capability`, `BusinessService`) and `«SoftwareProduct»`-stereotyped catalog entries use bare kebab-case ids — those are catalog identities, not instance identities.
 
 UUIDs are minted once by the producer that owns the element. Stable. Never re-minted. Never renamed. The hint portion is informational — readers see `node:prd-cluster,7f3a…` rather than a bare UUID. It can be edited freely (the UUID is the load-bearing identity); cross-producer references that disagree on the hint surface as a divergence warning.
 
@@ -115,7 +115,6 @@ Typically owns:
 - `Node` — execution hosts: Proxmox cluster as a hypervisor Node, individual VMs, k8s clusters (prd + dev).
 - `SystemSoftware` — VM-installed daemons (OpenBao, keepalived, HAProxy at the OS layer, step-ca-VM, node_exporter).
 - `TechnologyService` and `TechnologyInterface` — VM-level service surfaces (OpenBao API at `secrets.home`, the ZFS volume allocator's API, the Proxmox API).
-- `Artifact` — the Ansible repo as a `«Repository»` `«Producer»` Artifact; possibly per-role Artifacts.
 - The `«SoftwareProduct»`-stereotyped SystemSoftware catalog entries for the things it stands up (Kubernetes, the ZFS allocator, etc.).
 
 Edges typically declared: `Assignment` (a daemon assigned to a VM), `Composition` (cluster aggregates its VMs), `Realization` (Service realises a Capability), `Specialization` (instance specialises a «SoftwareProduct» entry).
@@ -127,7 +126,6 @@ Typically owns:
 - `SystemSoftware` (instance) — Helm-deployed running services: Keycloak, shared Postgres, dnsmasq, registry, Jenkins, Gitblit, Grafana, Prometheus, Filebeat, ES/Kibana, RabbitMQ, Mosquitto, External Secrets, step-ca, ingress nginx, the CSI drivers, etc.
 - `SystemSoftware` («SoftwareProduct») — software identity entries for the products *this repo* publishes: `ss:keycloak`, `ss:postgresql`, `ss:nginx`, etc. When a product moves to its own repo, the entry moves with it.
 - `ApplicationService`, `TechnologyService`, `ApplicationInterface`, `TechnologyInterface` — every consumption surface those services provide.
-- `Artifact` — Helm charts as Artifacts; the HelmCharts repo as the `«Producer»` Artifact.
 - `Grouping` — visual clusters (observability stack, media stack, etc.).
 
 References (by UUID) elements owned by `infra-physical` — typically the cluster Node, occasionally specific VMs or VIPs.
@@ -141,7 +139,6 @@ Typically owns:
 - `ApplicationComponent` — application pods (frontend, backend, worker, job, cronjob — one per distinct runtime identity, not per replica).
 - `ApplicationComponent` («SoftwareProduct») — the application's own product identity (`app:electronics-inventory`, etc.) when the app is a discrete product rather than a generic service.
 - `ApplicationService`, `ApplicationInterface` — internal HTTP APIs, queue names, topic names, bucket names the app owns.
-- `Artifact` — the app repo as a `«Producer»` Artifact; possibly per-environment chart Artifacts.
 
 References (by UUID): cluster Services from `cluster-services` (shared Postgres, OIDC issuer, secrets store, queues, etc.), occasionally Nodes from `infra-physical`.
 
@@ -149,7 +146,7 @@ Edges typically declared: `Serving` (frontend served by backend), `Access` (back
 
 ### `images` — DockerImages
 
-Mostly v0.2 work (image identity, build provenance, parent-image graph). For v0.1, the profile exists in the enum and the repo can emit a `«Repository»` `«Producer»` Artifact + perhaps `«SoftwareProduct»` SystemSoftware entries for in-house images, with `sourceRepository` back-pointers to repos in the DockerImages monorepo.
+Mostly v0.2 work (image identity, build provenance, parent-image graph). For v0.1, the profile exists in the enum; if DockerImages onboards now, it does so under the `application` profile for any apps it bundles. Container images are not a v0.1 element kind — they live as metadata on the running element (e.g. `stats.image: registry/foo:sha256:…`).
 
 ## How a producer integrates (the recipe)
 

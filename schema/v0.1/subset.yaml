@@ -46,11 +46,12 @@ attributeMapping:
 # Per-kind blocks below may add further attributes; they may not redeclare
 # these.
 #
-# Provenance (which producer declared an element) is NOT a field on the
-# element. The collector synthesises an Association relation per declared
-# element from the producer's «Producer» Artifact to the element, using the
-# artifact's top-level `producer:` envelope key — producers don't have to
-# emit those relations explicitly. See tooling/collect.py.
+# Provenance (which producer declared an element) is NOT producer-authored.
+# The collector synthesises a `producer: <producer-id>` attribute on every
+# merged element from the artifact's top-level `producer:` envelope key.
+# Producers must not emit a `producer:` field on individual elements; the
+# per-kind schemas reject it via additionalProperties: false. See
+# tooling/collect.py.
 #
 # Lifecycle successor (`replacedBy`) is intentionally absent in v0.1.
 commonAttributes:
@@ -103,37 +104,12 @@ stereotypes:
         required: false
         description: Filename under viewer/public/logos/.
       sourceRepository:
-        type: idRef
-        refKind: Artifact
-        refStereotype: Repository
-        required: false
-        description: Source repository for in-house products.
-
-  Repository:
-    appliesTo: [Artifact]
-    addedAttributes:
-      url:
-        type: uri
-        required: true
-        description: Repository URL (e.g. GitHub HTTPS URL).
-      role:
-        type: enum
-        enumValues: [source, spec, config]
-        required: true
-        description: What this repository holds.
-      languageMix:
-        type: stringMap
-        required: false
-        description: Language → percentage. Informational.
-      owner:
         type: string
-        required: true
-        description: Human or team responsible.
-
-  Producer:
-    appliesTo: [Artifact]
-    requires: [Repository]
-    addedAttributes: {}
+        required: false
+        description: >
+          Free-form source-repository identifier for in-house products,
+          e.g. `git:pvginkel/Ansible`. Informational only — no graph
+          edge is derived from this field.
 
 # Element kinds included in the v0.1 subset. Each archimateType must match
 # an ElementType enumeration value in archimate3_Model.xsd. The generator
@@ -227,20 +203,6 @@ kinds:
     idPrefix: "if:"
     idRegex: '^if:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
     description: Addressable point on a TechnologyService. Queue, topic, OpenBao path, DB name, subvolume.
-
-  Artifact:
-    layer: technology
-    archimateType: Artifact
-    idPrefix: "art:"
-    idRegex: '^art:[a-z][a-z0-9-]*(,[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})?$'
-    description: Deployable bundle or repository content. Helm chart, Ansible role, TF module, source repo, Jenkinsfile.
-    applicableStereotypes: [Repository, Producer]
-    attributesAddition:
-      environment:
-        type: enum
-        enumRef: ./enums/environments.yaml
-        required: false
-        description: DTAP stage this Artifact targets. Custom attribute, not Plateau.
 
   Capability:
     layer: strategy

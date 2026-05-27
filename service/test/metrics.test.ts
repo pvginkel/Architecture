@@ -37,7 +37,7 @@ describe("GET /metrics", () => {
     await request(app)
       .post("/api/validate")
       .set("Content-Type", "application/json")
-      .send(JSON.stringify({ schemaVersion: "0.1", producer: "art:x" }));
+      .send(JSON.stringify({ schemaVersion: "0.1", producer: "x" }));
     const m = await request(app).get("/metrics");
     expect(m.text).toMatch(/arch_validate_requests_total\{outcome="valid"\}\s+1/);
   });
@@ -67,7 +67,7 @@ describe("GET /metrics", () => {
     await request(app)
       .post("/api/validate")
       .set("Content-Type", "application/json")
-      .send(JSON.stringify({ schemaVersion: "0.1", producer: "art:x" }));
+      .send(JSON.stringify({ schemaVersion: "0.1", producer: "x" }));
     const m = await request(app).get("/metrics");
     expect(m.text).toMatch(/arch_validate_body_bytes_sum\s+\d+/);
     expect(m.text).toMatch(/arch_validate_body_bytes_count\s+1/);

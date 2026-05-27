@@ -84,11 +84,13 @@ Combine all element-kind arrays across artifacts. Detect two producers emitting 
 
 - [x] Merged dataset is the union of valid producers' arrays.
 - [x] Duplicate id across producers fails the run.
-- [x] *(Implementation deviation)* The `producer` attribute on individual
-      elements was removed. Provenance is now expressed as a synthesised
-      Association relation per declared element from the artifact's
-      «Producer» Artifact (top-level `producer:`); see `05` § Producer-
-      relation synthesis.
+- [x] *(v0.1.1)* The `producer` attribute on individual elements is
+      collector-synthesised, not producer-emitted. The collector stamps
+      `producer: <bare-id>` onto every merged element from the envelope
+      `producer:` key (which is now a bare kebab token matching the
+      `pipeline-producers.yaml` entry). The earlier «Producer» Artifact
+      + synthesised Association edge model was dropped; see
+      `../architecture-rebuild/00-roadmap.md` § v0.1.1.
 
 ### 6. Cross-producer reference resolution
 

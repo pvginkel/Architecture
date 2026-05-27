@@ -5,34 +5,8 @@
 # a shared platform service, plus an external API endpoint.
 
 schemaVersion: "0.1"
-producer: art:helmcharts
+producer: helmcharts
 generatedAt: 2026-05-27T12:00:00Z
-
-artifacts:
-  - id: art:helmcharts
-    label: HelmCharts repo
-    summary: Pieter's HelmCharts repository; produces architecture for cluster services.
-    introduced: 2024-07-12
-    lifecycle: active
-    environment: prd
-    stereotype: Producer
-    url: https://github.com/pvginkel/HelmCharts
-    role: source
-    owner: Pieter van Ginkel
-
-  - id: art:ei-prd-chart,11111111-1111-4111-8111-111111111121
-    label: EI chart (prd)
-    summary: Helm chart deploying EI to prd.
-    introduced: 2025-08-27
-    lifecycle: active
-    environment: prd
-
-  - id: art:keycloak-prd-chart,11111111-1111-4111-8111-111111111122
-    label: Keycloak chart (prd)
-    summary: Helm chart deploying Keycloak to prd.
-    introduced: 2024-09-04
-    lifecycle: active
-    environment: prd
 
 devices:
   - id: device:proxmox-pve1,22222222-2222-4222-8222-222222222221
@@ -242,13 +216,3 @@ relations:
     source: grp:ei-prd,88888888-8888-4888-8888-888888888881
     target: app:ei-backend-prd,55555555-5555-4555-8555-555555555552
     type: Aggregation
-
-  - id: rel:chart-deploys-frontend
-    source: art:ei-prd-chart,11111111-1111-4111-8111-111111111121
-    target: app:ei-frontend-prd,55555555-5555-4555-8555-555555555551
-    type: Realization
-
-  - id: rel:chart-deploys-backend
-    source: art:ei-prd-chart,11111111-1111-4111-8111-111111111121
-    target: app:ei-backend-prd,55555555-5555-4555-8555-555555555552
-    type: Realization

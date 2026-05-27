@@ -33,9 +33,7 @@ The matrix is, however, machine-readable from another source: the Archi modellin
 - **Relationships:** the full ArchiMate relationship vocabulary is in scope. `subset.yaml` does not enumerate relationships; the generator extracts the relationship-type enumeration from the XSD and the (source, relation, target) triple matrix from the vendored Archi `relationships.xml`, and emits a `relations.schema.yaml` that accepts exactly the triples permitted by ArchiMate 3.2 between subset-included element kinds.
 - **DTAP and lifecycle:** custom attributes layered on top of ArchiMate. ArchiMate's `Plateau` exists for time-state architecture snapshots and is **not** reused for per-element environment tagging — distinct concept.
 - **Stereotypes (custom profile on ArchiMate):**
-  - `«SoftwareProduct»` on `ApplicationComponent` and `SystemSoftware` — marks product identity (`prod:keycloak`) as distinct from a running instance.
-  - `«Repository»` on `Artifact` — source / spec / config repositories.
-  - `«Producer»` marker on a `«Repository»` Artifact — the repo emits artifacts into the federation pipeline.
+  - `«SoftwareProduct»` on `ApplicationComponent` and `SystemSoftware` — marks product identity (`prod:keycloak`) as distinct from a running instance. (Only stereotype as of v0.1.1.)
 - **Naming:** vocabulary names are not abbreviated. ArchiMate names retained verbatim (`ApplicationComponent`, not `AppComp`).
 - **Importability:** v0.1 artifacts are structurally compatible with ArchiMate Exchange XML by construction. A formal YAML↔XML exporter is v0.2; the path is open.
 - **Deferred to v0.2:** image identity, build provenance, variant matrices, certificate / rotation tracking, multi-environment rendering.
@@ -45,18 +43,44 @@ The matrix is, however, machine-readable from another source: the Archi modellin
 Two changes from the producer-protocol discussion landed during v3 — but
 not exactly as originally framed.
 
-1. **Composite ids for instance kinds.** `Node`, `Device`, `SystemSoftware` (instance), `ApplicationComponent` (instance), `Artifact` (non-stereotyped), `ApplicationService`, `TechnologyService`, `ApplicationInterface`, `TechnologyInterface`, `Grouping` require the composite form `<kind>:<hint>,<uuid4>` at the declaration site. References on relation source/target may use any of three forms: composite, uuid-only, or hint-only (internal-only). Curated kinds (`Capability`, `BusinessService`) and `«SoftwareProduct»` / `«Repository»` / `«Producer»` catalog entries keep bare kebab-case ids.
+1. **Composite ids for instance kinds.** `Node`, `Device`, `SystemSoftware` (instance), `ApplicationComponent` (instance), `ApplicationService`, `TechnologyService`, `ApplicationInterface`, `TechnologyInterface`, `Grouping` require the composite form `<kind>:<hint>,<uuid4>` at the declaration site. References on relation source/target may use any of three forms: composite, uuid-only, or hint-only (internal-only). Curated kinds (`Capability`, `BusinessService`) and `«SoftwareProduct»` catalog entries keep bare kebab-case ids.
 
 2. **Hint baked into the id, not a separate `aliasHint` attribute.** The hint portion of the composite id is the diagnostic alias; there is no `aliasHint` field on element schemas. The collector compares the hint portion of every composite reference against the owner's declared hint and warns on divergence.
 
 Two additional cleanups also landed:
 
-3. **`producer:` attribute removed.** Provenance is now expressed as an Association relation synthesised by the collector from the artifact's «Producer» Artifact to each declared element. Producers don't emit those relations explicitly.
+3. **`producer:` attribute removed from producer-emitted artifacts.** Producers do not emit `producer:` on elements; the collector stamps it back on at merge time (see v0.1.1 below).
 4. **`replacedBy:` and lifecycle conditional rules removed.** No more "`deprecated` requires `replacedBy` or `retirementBy`" / "`removed` forbids both". `retirementBy` stays as plain optional informational metadata.
+
+## v0.1.1 — repos and producer artifacts dropped as elements (2026-05-27)
+
+A repo / build artifact is a source of statements about the
+architecture, not an element of it. Modelling it as one created
+structurally legal but architecturally meaningless edges (e.g. "does
+`art:ansible` realise `cap:configuration-management`?"). v0.1.1 drops:
+
+- The `Artifact` element kind.
+- The `«Repository»` and `«Producer»` stereotypes.
+- The collector's synthesised producer→element Association edges.
+
+Replaced by:
+
+- Envelope `producer:` is now a bare kebab token (e.g. `ansible`)
+  matching this producer's `pipeline-producers.yaml` entry. Pattern
+  `^[a-z][a-z0-9-]*$`. The collector post-validation stamps a matching
+  `producer:` attribute onto every merged element so the merged
+  dataset answers "who declared this?" as a filter rather than a graph
+  edge.
+- `«SoftwareProduct».sourceRepository` becomes a free-form string
+  (convention: `git:<owner>/<repo>`) instead of an `idRef` to an
+  Artifact.
+
+Schema directory stays `schema/v0.1/`; envelope `schemaVersion` stays
+`"0.1"`. No producer has onboarded yet.
 
 ## ArchiMate subset for v0.1
 
-Eleven element kinds across four ArchiMate layers. Renderer colors follow ArchiMate convention (green / blue / pink / yellow).
+Ten element kinds across four ArchiMate layers. Renderer colors follow ArchiMate convention (green / blue / pink / yellow).
 
 | Layer | Element kind | Purpose | Concrete examples |
 |---|---|---|---|
@@ -65,7 +89,6 @@ Eleven element kinds across four ArchiMate layers. Renderer colors follow ArchiM
 | Technology (green) | `SystemSoftware` | Infra/middleware runtime | A running Keycloak, Postgres, nginx, OpenBao daemon, dnsmasq |
 | Technology (green) | `TechnologyService` | Infra consumption surface | Postgres on 5432, OIDC issuer, ZFS volume allocator API, GitHub API |
 | Technology (green) | `TechnologyInterface` | Addressable point on a TechnologyService | A queue, topic, OpenBao path, database, CephFS subvolume, hostPath mount |
-| Technology (green) | `Artifact` | Deployable bundle / repository content | Helm chart, Ansible role, TF module, source repo, Jenkinsfile |
 | Application (blue) | `ApplicationComponent` | User-facing app workload | EI backend pod, EI frontend pod, DA portal, DA Celery worker |
 | Application (blue) | `ApplicationService` | App-layer consumption surface | Internal HTTP API between app workloads |
 | Application (blue) | `ApplicationInterface` | Addressable point on an ApplicationService | A specific endpoint path |
@@ -73,13 +96,13 @@ Eleven element kinds across four ArchiMate layers. Renderer colors follow ArchiM
 | Business (yellow, optional) | `BusinessService` | What the system delivers to humans | SSO (realized by IAM), self-service tooling |
 | Cross-cutting | `Grouping` | Cosmetic clustering; no semantics | Producer-declared logical clusters |
 
+Container images, source repos, Helm charts, and Ansible roles are deliberately not first-class elements — see v0.1.1 above. Their identity, when needed, lives as metadata on the elements they realise.
+
 ## Stereotypes (v0.1 profile)
 
-ArchiMate supports custom stereotypes natively. v0.1 defines three:
+ArchiMate supports custom stereotypes natively. v0.1 defines one:
 
-- **`«SoftwareProduct»`** — applicable to `ApplicationComponent` and `SystemSoftware`. Marks an element as a product identity (`Keycloak`, `Postgres`, `EI`) rather than a running instance. Instances reach the product via ArchiMate's `Specialization` relation. Carries `homepage`, `logo`, `sourceRepository`.
-- **`«Repository»`** — applicable to `Artifact`. The Artifact is a source / spec / config repository. Carries `url`, `role` (`source` | `spec` | `config`), `languageMix`, `owner`.
-- **`«Producer»`** — marker on a `«Repository»` Artifact. The repo emits architecture artifacts into the federation pipeline. Used by the collector to dispatch and authorize.
+- **`«SoftwareProduct»`** — applicable to `ApplicationComponent` and `SystemSoftware`. Marks an element as a product identity (`Keycloak`, `Postgres`, `EI`) rather than a running instance. Instances reach the product via ArchiMate's `Specialization` relation. Carries `homepage`, `logo`, `sourceRepository` (free-form string for in-house products, convention `git:<owner>/<repo>`).
 
 ## Custom attributes (v0.1 profile)
 
@@ -93,16 +116,15 @@ Layered on every element kind via `subset.yaml`. ArchiMate's exchange format all
 | `introduced` | ISO-8601 date | yes | all | First declared in the architecture. |
 | `lifecycle` | enum | yes | all | `active` \| `deprecated` \| `removed`. |
 | `retirementBy` | ISO-8601 date | optional | all | Informational target retirement date. No conditional rule. |
-| `environment` | enum | conditional | Node, Artifact, ApplicationComponent, SystemSoftware | `dev` \| `tst` \| `uat` \| `prd`. **Custom attribute, not Plateau.** |
+| `environment` | enum | conditional | Node, ApplicationComponent, SystemSoftware | `dev` \| `tst` \| `uat` \| `prd`. **Custom attribute, not Plateau.** |
 | `cluster` | string | optional | elements scoped to a Kubernetes cluster | Cluster identifier. |
 | `stats` | free-form string→string map | optional | all | Non-load-bearing facts: versions, URLs, image tags. Render hints. |
 
-Provenance is no longer a per-element attribute. The artifact's
-top-level `producer:` field still names the «Producer» Artifact that
-emitted the file; the collector synthesises one Association relation
-per declared element from that Artifact to the element, so the
-federation graph carries producer back-pointers as real ArchiMate
-edges.
+Producers must not emit a `producer:` field on individual elements
+(rejected by `additionalProperties: false`). The collector stamps a
+`producer: <bare-id>` attribute onto every merged element at merge
+time, using the envelope `producer:` key as the source. Provenance
+shows up as a filter on the merged dataset rather than a graph edge.
 
 Stereotype-specific attributes are carried only when the stereotype applies. The generator validates that no custom attribute name collides with a name reserved by the XSD.
 
@@ -120,13 +142,11 @@ Three id forms exist in v0.1; per-kind regex selects the one(s) acceptable at th
 | `ApplicationComponent` («SoftwareProduct») | `app:` | bare kebab | `app:electronics-inventory` |
 | `ApplicationService` / `TechnologyService` | `svc:` | composite | `svc:oidc-issuer,…` |
 | `ApplicationInterface` / `TechnologyInterface` | `if:` | composite | `if:postgres-5432,…` |
-| `Artifact` (non-stereotyped) | `art:` | composite | `art:ei-prd-chart,…` |
-| `Artifact` («Repository» / «Producer») | `art:` | bare kebab | `art:helmcharts` |
 | `Capability` | `cap:` | bare kebab | `cap:iam`, `cap:observability` |
 | `BusinessService` | `bsvc:` | bare kebab | `bsvc:single-sign-on` |
 | `Grouping` | `grp:` | composite | `grp:identity,…` |
 
-Composite is `<kind>:<hint>,<uuid4>`. On *references* (relation source/target), three forms are accepted: composite, uuid-only (`<kind>:<uuid4>`), or hint-only (`<kind>:<hint>` — internal-only; cross-producer hint-only refs fail at merge time). Bare kebab is used for curated and catalog identities — capabilities, business services, SoftwareProduct/Repository/Producer entries — where the id IS the canonical name.
+Composite is `<kind>:<hint>,<uuid4>`. On *references* (relation source/target), three forms are accepted: composite, uuid-only (`<kind>:<uuid4>`), or hint-only (`<kind>:<hint>` — internal-only; cross-producer hint-only refs fail at merge time). Bare kebab is used for curated and catalog identities — capabilities, business services, SoftwareProduct entries — where the id IS the canonical name.
 
 ## Relationships
 
@@ -141,7 +161,6 @@ Relationship usage mapping for common architectural facts:
 | `routes-to` (frontend routes to backend) | `Serving` | ApplicationComponent → ApplicationComponent (via Service) |
 | `stores-in` (a pod stores data in Postgres) | `Access` | ApplicationComponent → TechnologyService |
 | `publishes-to` / `subscribes-to` | `Triggering` + `Flow` | ApplicationComponent ↔ TechnologyInterface |
-| `composed-of` (chart contains pods) | `Composition` | Artifact → ApplicationComponent / SystemSoftware |
 | `specializes` (an instance specializes a «SoftwareProduct») | `Specialization` | instance → product |
 | `delivered-by` (BusinessService is delivered by IAM Capability) | `Realization` | BusinessService ← Capability |
 | `aggregated-in` (a Grouping aggregates members) | `Aggregation` | Grouping → any |
@@ -171,7 +190,6 @@ schema/v0.1/
     applicationinterface.schema.yaml
     technologyservice.schema.yaml
     technologyinterface.schema.yaml
-    artifact.schema.yaml
     capability.schema.yaml
     businessservice.schema.yaml
     grouping.schema.yaml
@@ -200,7 +218,7 @@ Every artifact submitted to the validator is one document with this shape:
 
 ```yaml
 schemaVersion: "0.1"
-producer: art:helmcharts-repo            # a «Producer» «Repository» Artifact id
+producer: helmcharts                     # bare kebab; matches this producer's entry in pipeline-producers.yaml
 generatedAt: 2026-05-27T14:00:00Z        # ISO-8601, optional; informational
 nodes: []                                # arrays per element kind (all optional)
 devices: []
@@ -210,7 +228,6 @@ applicationServices: []
 applicationInterfaces: []
 technologyServices: []
 technologyInterfaces: []
-artifacts: []
 capabilities: []
 businessServices: []
 groupings: []
@@ -218,7 +235,7 @@ relations: []                            # {id, source, target, type}
 ```
 
 - `schemaVersion` is required and must equal `"0.1"` for v0.1 artifacts.
-- `producer` is required and matches an Artifact id stereotyped as «Producer».
+- `producer` is required, matches `^[a-z][a-z0-9-]*$`, and must equal this producer's `id` in `pipeline-producers.yaml`.
 - All element-kind arrays default to empty.
 - `relations` carries the relationship documents. The `type` field is validated against the XSD's relationship-type enumeration.
 
@@ -243,7 +260,7 @@ These are catchable at single-artifact JSON Schema time:
 
 - Any document with a render-only field (`additionalProperties: false`).
 - ID that fails its kind's regex (composite form mandatory at instance-kind declarations).
-- A stereotype-bearing element missing its stereotype-specific required attributes (e.g., a «Repository» Artifact without `url`/`role`/`owner`).
+- A stereotype-bearing element missing its stereotype-specific required attributes.
 - An element carrying stereotype-specific attributes without setting the stereotype.
 - A `relation` entry whose `type` is not a known ArchiMate relationship type.
 

@@ -10,6 +10,34 @@ This document is the index. Each phase has a dedicated plan.
 - Hand-maintenance does not scale past ~150 nodes, and the diagram is meant to be the portfolio surface (CLAUDE.md: feature 25, "load-bearing").
 - Different repos own fundamentally different node types (VMs, Helm releases, images, app pods). The architecture data should be sourced from the repo that owns it.
 
+## v0.1.1 — drop repos and producer artifacts as elements (2026-05-27)
+
+A repo isn't an architectural element; it's a source of statements about
+elements. Modelling it as one made onboarding confusing (an Ansible
+agent asked "does `art:ansible` realise `cap:configuration-management`?",
+a structurally legal but architecturally meaningless question). v0.1.1
+removes:
+
+- The `Artifact` kind.
+- The `«Repository»` and `«Producer»` stereotypes.
+- The collector's synthesised producer→element Association edges.
+
+Replaced by:
+
+- Envelope `producer:` becomes a bare kebab token (e.g. `ansible`)
+  matching this producer's `pipeline-producers.yaml` entry, not an
+  `art:` id.
+- The collector stamps a `producer: <bare-id>` attribute onto every
+  merged element (post-validation). Provenance becomes a filter, not a
+  graph topology.
+- `«SoftwareProduct».sourceRepository` becomes a free-form string
+  (convention: `git:<owner>/<repo>`) instead of an `idRef` to an
+  Artifact.
+
+Schema directory stays `schema/v0.1/`; the envelope `schemaVersion`
+constant stays `"0.1"`. No producer has onboarded yet, so the change
+is non-disruptive.
+
 ## Direction shift (2026-05-27)
 
 After the v0.1 schema landed and we walked through the real inventory, two macro decisions changed:

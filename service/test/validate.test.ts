@@ -160,21 +160,7 @@ describe("POST /api/validate — relations triple matrix", () => {
   it("rejects a local relation whose triple is not in the allowed matrix", async () => {
     const artifact = {
       schemaVersion: "0.1",
-      producer: "art:helmcharts",
-      artifacts: [
-        {
-          id: "art:helmcharts",
-          label: "HelmCharts repo",
-          summary: "Producer artifact.",
-          introduced: "2024-07-12",
-          lifecycle: "active",
-          producer: "art:helmcharts",
-          stereotype: "Producer",
-          url: "https://github.com/pvginkel/HelmCharts",
-          role: "source",
-          owner: "Pieter van Ginkel",
-        },
-      ],
+      producer: "helmcharts",
       capabilities: [
         {
           id: "cap:test-only",
@@ -182,15 +168,23 @@ describe("POST /api/validate — relations triple matrix", () => {
           summary: "Only used in this unit test.",
           introduced: "2026-05-27",
           lifecycle: "active",
-          producer: "art:helmcharts",
+        },
+      ],
+      nodes: [
+        {
+          id: "node:test,11111111-1111-4111-8111-111111111111",
+          label: "Test node",
+          summary: "Only used in this unit test.",
+          introduced: "2026-05-27",
+          lifecycle: "active",
         },
       ],
       relations: [
         {
-          // Capability → Artifact via Composition is *not* in the matrix.
+          // Capability → Node via Composition is *not* in the matrix.
           id: "rel:bad-triple",
           source: "cap:test-only",
-          target: "art:helmcharts",
+          target: "node:test,11111111-1111-4111-8111-111111111111",
           type: "Composition",
         },
       ],
@@ -205,32 +199,27 @@ describe("POST /api/validate — relations triple matrix", () => {
     const tripleErr = errs.find((e) => e.keyword === "x-allowedTriples");
     expect(tripleErr).toBeDefined();
     expect(tripleErr!.path).toBe("/relations/0");
-    expect(tripleErr!.message).toMatch(/not allowed between Capability .* Artifact/);
+    expect(tripleErr!.message).toMatch(/not allowed between Capability .* Node/);
   });
 
   it("skips triple-matrix checks for cross-producer references", async () => {
     const artifact = {
       schemaVersion: "0.1",
-      producer: "art:helmcharts",
-      artifacts: [
+      producer: "helmcharts",
+      nodes: [
         {
-          id: "art:helmcharts",
-          label: "HelmCharts repo",
-          summary: "Producer artifact.",
-          introduced: "2024-07-12",
+          id: "node:local,11111111-1111-4111-8111-111111111111",
+          label: "Local node",
+          summary: "Resolves locally.",
+          introduced: "2026-05-27",
           lifecycle: "active",
-          producer: "art:helmcharts",
-          stereotype: "Producer",
-          url: "https://github.com/pvginkel/HelmCharts",
-          role: "source",
-          owner: "Pieter van Ginkel",
         },
       ],
       relations: [
         {
           id: "rel:cross-prod",
-          source: "node:from-other-producer",
-          target: "art:helmcharts",
+          source: "ss:from-other-producer,22222222-2222-4222-8222-222222222222",
+          target: "node:local,11111111-1111-4111-8111-111111111111",
           type: "Realization",
         },
       ],

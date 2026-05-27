@@ -25,7 +25,6 @@ const KIND_BY_TOP_PROPERTY: Record<string, string> = {
   applicationInterfaces: "ApplicationInterface",
   technologyServices: "TechnologyService",
   technologyInterfaces: "TechnologyInterface",
-  artifacts: "Artifact",
   capabilities: "Capability",
   businessServices: "BusinessService",
   groupings: "Grouping",

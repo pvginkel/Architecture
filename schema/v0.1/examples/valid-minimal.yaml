@@ -1,20 +1,8 @@
-# Minimal artifact: one Node, one SystemSoftware, one TechnologyService,
-# one «Producer» Repository Artifact. No relations. Demonstrates the
-# smallest dataset the validator accepts.
+# Minimal artifact: one Node, one SystemSoftware, one TechnologyService.
+# Demonstrates the smallest dataset the validator accepts.
 
 schemaVersion: "0.1"
-producer: art:helmcharts
-
-artifacts:
-  - id: art:helmcharts
-    label: HelmCharts repo
-    summary: Pieter's HelmCharts repository; produces architecture data for cluster services.
-    introduced: 2024-07-12
-    lifecycle: active
-    stereotype: Producer
-    url: https://github.com/pvginkel/HelmCharts
-    role: source
-    owner: Pieter van Ginkel
+producer: helmcharts
 
 nodes:
   - id: node:prd-cluster,33333333-3333-4333-8333-333333333331

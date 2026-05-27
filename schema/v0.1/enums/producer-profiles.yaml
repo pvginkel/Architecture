@@ -1,12 +1,9 @@
 # Producer profiles.
 #
-# Each artifact submitted to the validator declares which profile produced
-# it. The collector applies a per-profile authority matrix (which element
-# kinds the producer is allowed to emit) at merge time.
-#
-# A producer is realised concretely by a «Producer»-stereotyped Artifact
-# (a Repository). Multiple Artifact instances can share a profile (e.g.,
-# different app repos all declaring profile=application).
+# Each producer entry in pipeline-producers.yaml declares a profile.
+# The profile is descriptive metadata only — the collector does not
+# enforce a per-kind allow-list. Multiple producers can share a profile
+# (e.g., different app repos all declaring profile=application).
 
 $id: https://architecture.webathome.org/schema/v0.1/enums/producer-profiles.yaml
 entries:
