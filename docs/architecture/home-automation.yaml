@@ -1,0 +1,169 @@
+# Architecture repo as self-producer — IoT/RF devices and Home Assistant.
+#
+# Owns the home-automation slice: the SlimmeLezer P1 reader, the Ecowitt
+# weather station, both SLZB ZigBee bridges, the SURE Petcare hub and
+# the downstream catflap, plus the srvhomeassistant VM, the Home
+# Assistant instance, its API surface, and the cap:home-automation
+# realisation. Cross-file references into infrastructure.yaml (the rack
+# switch the IoT bridges PoE off) carry the UUID portion so the merge
+# resolves cleanly.
+#
+# Ansible does NOT manage srvhomeassistant; the VM is operator-owned at
+# the hypervisor layer, so the Node lives here rather than in Ansible's
+# artifact.
+
+schemaVersion: "0.1"
+producer: architecture
+
+devices:
+  - id: device:zigbee-slzb-06m,9665cdf2-5852-4856-9c76-c8396febcd03
+    label: ZigBee bridge (SLZB-06M)
+    summary: SMLight SLZB-06M ZigBee-to-Ethernet bridge. Network-attached, PoE-powered via the rack switch. Visible at 10.1.0.30.
+    introduced: 2026-05-28
+    lifecycle: active
+    stats:
+      model: SLZB-06M
+
+  - id: device:zigbee-slzb-06m-2,1f1d0595-325a-4e73-948f-c264867c92b7
+    label: ZigBee bridge (SLZB-06M, 2nd floor)
+    summary: Second SMLight SLZB-06M ZigBee-to-Ethernet bridge placed on the 2nd floor to overcome 1st-to-2nd-floor coverage gaps. Network-attached, PoE-powered via the rack switch.
+    introduced: 2026-05-28
+    lifecycle: active
+    stats:
+      model: SLZB-06M
+
+  - id: device:slimmelezer,c79eaa71-6cb1-4b52-92b7-937195c82f5a
+    label: SlimmeLezer (P1 reader)
+    summary: TrueNAS-branded ESP-based reader of the Dutch smart-meter P1 port. Wi-Fi-connected at 10.1.0.31.
+    introduced: 2026-05-28
+    lifecycle: active
+
+  - id: device:ecowitt-gw1200a,10dcad0c-c4a3-485b-b107-bc3c7b24fc8b
+    label: Ecowitt GW1200A
+    summary: Ecowitt GW1200A weather-station gateway. Wi-Fi-connected; relays data from the outdoor WN32 sensor over 868 MHz radio.
+    introduced: 2026-05-28
+    lifecycle: active
+    stats:
+      model: GW1200A
+
+  - id: device:ecowitt-wn32,117cb247-a113-48de-847b-92c43c20d96b
+    label: Ecowitt WN32 (outdoor sensor)
+    summary: Outdoor temperature + humidity sensor paired with the GW1200A gateway via 868 MHz radio. No IP.
+    introduced: 2026-05-28
+    lifecycle: active
+    stats:
+      model: WN32
+
+  - id: device:sure-petcare-hub,4d4b7243-61b3-4c67-9bcb-91e79e742a2d
+    label: SURE Petcare Hub Connect
+    summary: SURE Petcare Hub Connect, wired into the rack switch via PoE. Bridges proprietary RF to the SURE Petcare cloud.
+    introduced: 2026-05-28
+    lifecycle: active
+
+  - id: device:microchip-pet-door,29a65540-b55e-4908-94b8-499b81b6e142
+    label: Microchip Pet Door Connect (catflap)
+    summary: Microchip Pet Door Connect — RF-paired catflap, downstream of the SURE Petcare Hub.
+    introduced: 2026-05-28
+    lifecycle: active
+
+nodes:
+  - id: node:srvhomeassistant,83b10106-99bb-405d-838a-42c96452ba18
+    label: srvhomeassistant
+    summary: VM hosting the production Home Assistant instance. Operator-owned at the hypervisor layer; not managed by Ansible.
+    introduced: 2026-05-28
+    lifecycle: active
+    environment: prd
+
+systemSoftware:
+  - id: ss:home-assistant
+    label: Home Assistant
+    summary: Open-source home-automation platform.
+    introduced: 2026-05-28
+    lifecycle: active
+    stereotype: SoftwareProduct
+    homepage: https://www.home-assistant.io/
+
+  - id: ss:home-assistant-prd,398e32ec-cbe7-40e4-8a66-094029653650
+    label: Home Assistant (prd)
+    summary: Production Home Assistant instance on srvhomeassistant. Integrates with ZigBee (via MQTT), the SlimmeLezer P1 reader, the Ecowitt weather gateway, and the SURE Petcare hub. Surfaces its API externally via the nginxmanager external-services entry at homeassistant.webathome.org.
+    introduced: 2026-05-28
+    lifecycle: active
+    environment: prd
+
+technologyServices:
+  - id: svc:home-assistant-api,001f7df8-de45-471c-9307-13466784ea1d
+    label: Home Assistant API
+    summary: Home Assistant's HTTP + WebSocket API. Surfaced externally via the cluster's nginxmanager.
+    introduced: 2026-05-28
+    lifecycle: active
+    environment: prd
+
+technologyInterfaces:
+  - id: if:home-assistant-api,e1606bc9-faf0-4723-b616-63d7c8f9ec6d
+    label: Home Assistant external API endpoint
+    summary: External HTTPS endpoint at homeassistant.webathome.org. Registered as a manual entry in HelmCharts/charts/nginx/files/nginxmanager/external-services.yaml.
+    introduced: 2026-05-28
+    lifecycle: active
+    environment: prd
+    stats:
+      url: https://homeassistant.webathome.org
+
+capabilities:
+  - id: cap:home-automation
+    label: Home automation
+    summary: Sensor/actuator orchestration over Zigbee/MQTT.
+    introduced: 2026-05-28
+    lifecycle: active
+
+relations:
+  # ─── PoE wiring of home-automation devices off the rack switch ──────
+  # device:switch-rack lives in infrastructure.yaml; the relations live
+  # here because the home-automation device is the more-specific end.
+  - id: rel:switch-rack-link-zigbee-slzb-06m
+    source: device:switch-rack,a5466336-3d04-43f8-b4b5-f37e41cefa26
+    target: device:zigbee-slzb-06m,9665cdf2-5852-4856-9c76-c8396febcd03
+    type: Association
+  - id: rel:switch-rack-link-zigbee-slzb-06m-2
+    source: device:switch-rack,a5466336-3d04-43f8-b4b5-f37e41cefa26
+    target: device:zigbee-slzb-06m-2,1f1d0595-325a-4e73-948f-c264867c92b7
+    type: Association
+  - id: rel:switch-rack-link-sure-petcare-hub
+    source: device:switch-rack,a5466336-3d04-43f8-b4b5-f37e41cefa26
+    target: device:sure-petcare-hub,4d4b7243-61b3-4c67-9bcb-91e79e742a2d
+    type: Association
+
+  # ─── Downstream RF pairings ─────────────────────────────────────────
+  - id: rel:microchip-pet-door-link-sure-hub
+    source: device:microchip-pet-door,29a65540-b55e-4908-94b8-499b81b6e142
+    target: device:sure-petcare-hub,4d4b7243-61b3-4c67-9bcb-91e79e742a2d
+    type: Association
+  - id: rel:ecowitt-wn32-link-gw1200a
+    source: device:ecowitt-wn32,117cb247-a113-48de-847b-92c43c20d96b
+    target: device:ecowitt-gw1200a,10dcad0c-c4a3-485b-b107-bc3c7b24fc8b
+    type: Association
+
+  # ─── Home Assistant bundle ──────────────────────────────────────────
+  - id: rel:srvhomeassistant-runs-home-assistant-prd
+    source: node:srvhomeassistant,83b10106-99bb-405d-838a-42c96452ba18
+    target: ss:home-assistant-prd,398e32ec-cbe7-40e4-8a66-094029653650
+    type: Assignment
+  - id: rel:home-assistant-prd-spec
+    source: ss:home-assistant-prd,398e32ec-cbe7-40e4-8a66-094029653650
+    target: ss:home-assistant
+    type: Specialization
+  # ArchiMate 3.2: a SystemSoftware realises a TechnologyService it
+  # exposes (the service is the abstract behaviour) and composes the
+  # Interface (the structural endpoint). Same pattern as the Postgres
+  # bundle in schema/v0.1/examples/valid-full.yaml.
+  - id: rel:home-assistant-prd-realizes-api
+    source: ss:home-assistant-prd,398e32ec-cbe7-40e4-8a66-094029653650
+    target: svc:home-assistant-api,001f7df8-de45-471c-9307-13466784ea1d
+    type: Realization
+  - id: rel:home-assistant-prd-composes-api-if
+    source: ss:home-assistant-prd,398e32ec-cbe7-40e4-8a66-094029653650
+    target: if:home-assistant-api,e1606bc9-faf0-4723-b616-63d7c8f9ec6d
+    type: Composition
+  - id: rel:home-assistant-prd-realizes-home-automation
+    source: ss:home-assistant-prd,398e32ec-cbe7-40e4-8a66-094029653650
+    target: cap:home-automation
+    type: Realization

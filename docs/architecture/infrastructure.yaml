@@ -1,0 +1,126 @@
+# Architecture repo as self-producer — physical network and server hardware.
+#
+# Owns the homeless hardware elements: the three Proxmox chassis, the
+# UDM Pro, both rack switches, and the four Unifi APs, plus the LAN
+# topology Associations between them. Producer-specific IoT/RF devices
+# and the Home Assistant bundle live in home-automation.yaml; this file
+# is just the rack + network plumbing.
+
+schemaVersion: "0.1"
+producer: architecture
+
+devices:
+  - id: device:pve-hw,0b33b76b-7aca-4a84-bcc4-f08ef0bc3df0
+    label: pve chassis
+    summary: Physical server chassis hosting Proxmox VE node "pve". Operator-owned hardware.
+    introduced: 2026-05-28
+    lifecycle: active
+
+  - id: device:pve1-hw,66fdb2b8-8b7d-42b2-acf6-c23bb7683eab
+    label: pve1 chassis
+    summary: Physical server chassis hosting Proxmox VE node "pve1".
+    introduced: 2026-05-28
+    lifecycle: active
+
+  - id: device:pve2-hw,64bc1c28-d388-4c85-b5b2-5852a4f72bb6
+    label: pve2 chassis
+    summary: Physical server chassis hosting Proxmox VE node "pve2".
+    introduced: 2026-05-28
+    lifecycle: active
+
+  - id: device:udm-pro,feef6808-3014-4de8-bd3e-afd68a427912
+    label: UDM Pro
+    summary: Ubiquiti Unifi Dream Machine Pro — router, firewall, and topology root. WAN-side connects to Freedom Internet upstream.
+    introduced: 2026-05-28
+    lifecycle: active
+
+  - id: device:switch-rack,a5466336-3d04-43f8-b4b5-f37e41cefa26
+    label: Rack switch (1 Gb managed, PoE)
+    summary: Rack-mounted 1 Gb managed switch. PoE-powers the APs, ZigBee dongles, and the SURE Petcare hub. Uplinks to the UDM Pro.
+    introduced: 2026-05-28
+    lifecycle: active
+
+  - id: device:switch-rack-backplane,930abcf1-842a-42cc-84d1-7a4cbbda4f91
+    label: Rack backplane switch (10 Gb)
+    summary: Closed 10 Gb switch connecting only the three PVE chassis. Used for Ceph replication and intended for Kubernetes CNI. Not bridged to the LAN.
+    introduced: 2026-05-28
+    lifecycle: active
+
+  - id: device:ap-mesh,4065e65b-e711-4fb9-9201-a9526c9a715c
+    label: U6 Mesh AP
+    summary: Ubiquiti U6 Mesh access point. Wired to the rack switch via PoE.
+    introduced: 2026-05-28
+    lifecycle: active
+    stats:
+      model: U6 Mesh
+
+  - id: device:ap-begane-grond,dbd39b01-554a-4162-9290-06c2d8c1ca64
+    label: U6 Pro AP (begane grond)
+    summary: Ubiquiti U6 Pro access point covering the ground floor. Wired to the rack switch via PoE.
+    introduced: 2026-05-28
+    lifecycle: active
+    stats:
+      model: U6 Pro
+
+  - id: device:ap-1e,79a3d5c0-aa50-4561-8ddb-453e66ea0414
+    label: U6 Pro AP (1st floor)
+    summary: Ubiquiti U6 Pro access point covering the first floor.
+    introduced: 2026-05-28
+    lifecycle: active
+    stats:
+      model: U6 Pro
+
+  - id: device:ap-2e,3d63c880-ec73-4c3e-a764-1660b4deff63
+    label: U6 Pro AP (2nd floor)
+    summary: Ubiquiti U6 Pro access point covering the second floor.
+    introduced: 2026-05-28
+    lifecycle: active
+    stats:
+      model: U6 Pro
+
+relations:
+  # ─── LAN topology — Device → Device Association ─────────────────────
+  - id: rel:udm-pro-link-switch-rack
+    source: device:udm-pro
+    target: device:switch-rack
+    type: Association
+  - id: rel:switch-rack-link-ap-mesh
+    source: device:switch-rack
+    target: device:ap-mesh
+    type: Association
+  - id: rel:switch-rack-link-ap-begane-grond
+    source: device:switch-rack
+    target: device:ap-begane-grond
+    type: Association
+  - id: rel:switch-rack-link-ap-1e
+    source: device:switch-rack
+    target: device:ap-1e
+    type: Association
+  - id: rel:switch-rack-link-ap-2e
+    source: device:switch-rack
+    target: device:ap-2e
+    type: Association
+  - id: rel:switch-rack-link-pve-hw
+    source: device:switch-rack
+    target: device:pve-hw
+    type: Association
+  - id: rel:switch-rack-link-pve1-hw
+    source: device:switch-rack
+    target: device:pve1-hw
+    type: Association
+  - id: rel:switch-rack-link-pve2-hw
+    source: device:switch-rack
+    target: device:pve2-hw
+    type: Association
+  - id: rel:switch-rack-backplane-link-pve-hw
+    source: device:switch-rack-backplane
+    target: device:pve-hw
+    type: Association
+  - id: rel:switch-rack-backplane-link-pve1-hw
+    source: device:switch-rack-backplane
+    target: device:pve1-hw
+    type: Association
+  - id: rel:switch-rack-backplane-link-pve2-hw
+    source: device:switch-rack-backplane
+    target: device:pve2-hw
+    type: Association

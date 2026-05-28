@@ -8,3 +8,4 @@
 producers:
   - id: ansible
     jenkinsJob: Ansible
+  - id: architecture        # self-producer: source in docs/architecture/, no upstream Jenkins job
