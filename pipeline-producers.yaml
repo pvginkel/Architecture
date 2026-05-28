@@ -5,4 +5,7 @@
 #
 # v3 ships empty — producers come online in v4 (Ansible first).
 
-producers: []
+producers:
+  - id: ansible
+    profile: infra-physical
+    jenkinsJob: Ansible
