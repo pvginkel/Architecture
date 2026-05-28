@@ -2,8 +2,12 @@
 //
 // 1. Checkout the Architecture repo.
 // 2. Read pipeline-producers.yaml — the registered producer list.
-// 3. For each registered producer: copyArtifacts from <jenkinsJob>
-//    lastSuccessful into producer-artifacts/<producer-id>/.
+// 3. For each registered producer:
+//    - if `jenkinsJob` is set: copyArtifacts from <jenkinsJob>
+//      lastSuccessful into producer-artifacts/<producer-id>/;
+//    - if `jenkinsJob` is absent: this is a self-producer whose
+//      source lives in docs/architecture/ of this very repo; copy
+//      those files into producer-artifacts/<producer-id>/.
 // 4. Run the collector (`tooling/collect.py`) in a Python sidecar to
 //    archive validation-report.json as a Jenkins build artifact.
 // 5. Clear the `producer-artifacts/` line in .dockerignore so kaniko
@@ -52,13 +56,26 @@ podTemplate(inheritFrom: 'jenkins-agent kaniko', containers: [
         stage('Copy producer artifacts') {
             sh 'mkdir -p producer-artifacts'
             producers.each { p ->
-                copyArtifacts(
-                    projectName: p.jenkinsJob,
-                    selector: lastSuccessful(),
-                    filter: '**/architecture/**/*.yaml',
-                    target: "producer-artifacts/${p.id}",
-                    fingerprintArtifacts: true
-                )
+                if (p.jenkinsJob) {
+                    copyArtifacts(
+                        projectName: p.jenkinsJob,
+                        selector: lastSuccessful(),
+                        filter: '**/architecture/**/*.yaml',
+                        target: "producer-artifacts/${p.id}",
+                        fingerprintArtifacts: true
+                    )
+                } else {
+                    // Self-producer: source lives in this repo under
+                    // docs/architecture/. Mirror the directory into
+                    // producer-artifacts/<id>/ so the collector's
+                    // rglob walk picks the files up the same way it
+                    // does for upstream producers.
+                    sh """
+                        set -eu
+                        mkdir -p producer-artifacts/${p.id}/docs/architecture
+                        cp docs/architecture/*.yaml producer-artifacts/${p.id}/docs/architecture/
+                    """
+                }
             }
         }
 
