@@ -1,4 +1,3 @@
 producers:
-  - id: ansible
-    profile: infra-physical
-    jenkinsJob: ansible/master
+- id: ansible
+  jenkinsJob: ansible/master

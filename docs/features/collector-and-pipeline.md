@@ -14,7 +14,7 @@ This doc is the **execution plan**: ordered work items with exit criteria, in th
 - **Jenkins owns fetching.** The Groovy Jenkinsfile uses `copyArtifacts` (with `flatten: true`) against each registered producer's last-successful build, populating `producer-artifacts/<producer-id>/*.yaml` in the workspace. Each producer may publish one or more YAML files. No HTTP client, no auth handling, no cache layer on the Python side.
 - **Jenkins's last-successful-build is the cache.** No staleness window, no fallback file system, no 7-day rule. If a producer's build is months stale, that's what gets merged.
 - **Fail fast, fail loud.** Any per-artifact schema error, dangling reference, unknown capability id, duplicate id, removed-element reference, cross-producer triple violation, missing-grouping-member, or cross-producer grouping fails the entire pipeline. No drop-and-continue paths. A partial merged dataset never ships.
-- **No machine-enforced profile constraints.** The producer-profile field is descriptive metadata for diagnostics and reporting; the collector does not reject artifacts on a per-kind allow-list. Ownership patterns live in `04-producer-protocol.md` as guidance for review-time judgment.
+- **No machine-enforced per-producer constraints.** The collector does not reject artifacts on a per-kind allow-list. Ownership patterns live in `04-producer-protocol.md` as guidance for review-time judgment.
 - **SoftwareProduct catalog entries are owner-emitted.** No central catalog file in this repo. The producer that publishes the upstream product publishes its `«SoftwareProduct»` entry alongside its instances; ownership tracks where the upstream lives. Cross-producer references resolve through the same dangling-reference machinery as UUIDs.
 - **Collector runs as a Dockerfile stage.** No separate `architecture-tooling:<tag>` registry image. The existing multi-stage build gains a `run-collector` stage between `check-schemas` and the final runtime; the final stage `COPY --from=run-collector`s the merged `dist/data/`.
 - **Shared validator module.** The schema-load / registry-build / per-artifact validate machinery is extracted from `tooling/validate.py` into a small internal module that both `validate.py` and `collect.py` import.
@@ -41,11 +41,10 @@ Entry shape (proposed):
 ```yaml
 producers:
   - id: ansible
-    profile: infra-physical
     jenkinsJob: ansible/master
   - id: helmcharts
-    profile: cluster-services
     jenkinsJob: HelmCharts/master
+  - id: architecture        # self-producer: jenkinsJob omitted
 ```
 
 JSON-schema-validated at collector startup; the schema lives next to the file.

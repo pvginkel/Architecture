@@ -155,7 +155,7 @@ def load_pipeline_producers(
     schema_path: Path = PIPELINE_PRODUCERS_SCHEMA,
 ) -> list[dict]:
     """Load and validate the producer registry. Returns the list of entries
-    (each a dict with `id`, `profile`, `jenkinsJob`). Raises ValueError on
+    (each a dict with `id` and optional `jenkinsJob`). Raises ValueError on
     schema violation or duplicate id — fail fast at collector startup, no
     partial recovery.
     """

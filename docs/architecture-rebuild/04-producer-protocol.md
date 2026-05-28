@@ -1,6 +1,6 @@
 # 04 — Producer protocol
 
-How a repo becomes a producer of architecture data. Defines the artifact shape, the publication mechanism (Jenkins archived artifacts), cross-producer reference rules (UUIDs canonical, alias hints optional), and the ownership conventions for each producer profile.
+How a repo becomes a producer of architecture data. Defines the artifact shape, the publication mechanism (Jenkins archived artifacts), cross-producer reference rules (UUIDs canonical, alias hints optional), and the ownership conventions per producer.
 
 The assembly-side counterpart is [`05-collector-and-pipeline.md`](./05-collector-and-pipeline.md). The schema this protocol produces against is [`../features/metaschema-design.md`](../features/metaschema-design.md). The validation service the producer's CI calls is [`../features/validation-service.md`](../features/validation-service.md). The v3 work-item index is [`../features/collector-and-pipeline.md`](../features/collector-and-pipeline.md).
 
@@ -9,8 +9,6 @@ The assembly-side counterpart is [`05-collector-and-pipeline.md`](./05-collector
 A **producer** is a Jenkins job that, on every successful build, emits one or more architecture YAML files conforming to `schema/v0.1/architecture.schema.yaml`. Every file declares the same `producer:` envelope key (the producer id); the Architecture pipeline picks them all up, validates each, and merges them as one logical producer. A small repo may publish a single `architecture.yaml`; a larger repo may split by scope (e.g. `infrastructure.yaml`, `home-automation.yaml`) — the collector treats both shapes identically.
 
 Producers do not coordinate with each other. They emit only what they own. Cross-producer references go through UUIDs.
-
-The producer-profile enum (`schema/v0.1/enums/producer-profiles.yaml`) currently lists four: `infra-physical` (Ansible), `cluster-services` (HelmCharts), `images` (DockerImages, mostly v0.2), `application` (per-app repos). Adding a profile requires a PR to the enum. The profile is metadata for diagnostics and reporting; the collector does not enforce per-profile allow-lists on element kinds (see § Profile conventions).
 
 ## Artifact shape
 
@@ -103,11 +101,11 @@ Concretely:
 
 This is "looking up UUIDs from the data plane" but the lookup is a one-time copy by a human; the producer's source is the canonical record after that. The system tolerates Ansible republishing — UUIDs are stable by construction, so the lookup doesn't drift.
 
-## Profile conventions
+## Ownership conventions
 
-The producer profile is a label, not an enforcement boundary. The collector does not reject artifacts on a per-kind allow-list. The conventions below describe the **expected** ownership patterns so producer authors know where to declare what; review-time judgment, not machine-enforced.
+The conventions below describe the **expected** ownership patterns per producer so authors know where to declare what. They're review-time judgment, not machine-enforced — the collector accepts any element kind from any producer.
 
-### `infra-physical` — Ansible
+### Ansible
 
 Typically owns:
 
@@ -119,7 +117,7 @@ Typically owns:
 
 Edges typically declared: `Assignment` (a daemon assigned to a VM), `Composition` (cluster aggregates its VMs), `Realization` (Service realises a Capability), `Specialization` (instance specialises a «SoftwareProduct» entry).
 
-### `cluster-services` — HelmCharts
+### HelmCharts
 
 Typically owns:
 
@@ -128,25 +126,29 @@ Typically owns:
 - `ApplicationService`, `TechnologyService`, `ApplicationInterface`, `TechnologyInterface` — every consumption surface those services provide.
 - `Grouping` — visual clusters (observability stack, media stack, etc.).
 
-References (by UUID) elements owned by `infra-physical` — typically the cluster Node, occasionally specific VMs or VIPs.
+References (by UUID) elements owned by Ansible — typically the cluster Node, occasionally specific VMs or VIPs.
 
 Edges typically declared: `Assignment` (running service → cluster Node), `Composition` (chart → contained services), `Realization` (Service → Capability), `Aggregation` (Grouping → members), `Specialization` (instance → «SoftwareProduct»).
 
-### `application` — EI, IoT, Design Assistant, webathome-org, etc.
+### Application repos (EI, IoT, Design Assistant, webathome-org, etc.)
 
-Typically owns:
+Typically own:
 
 - `ApplicationComponent` — application pods (frontend, backend, worker, job, cronjob — one per distinct runtime identity, not per replica).
 - `ApplicationComponent` («SoftwareProduct») — the application's own product identity (`app:electronics-inventory`, etc.) when the app is a discrete product rather than a generic service.
 - `ApplicationService`, `ApplicationInterface` — internal HTTP APIs, queue names, topic names, bucket names the app owns.
 
-References (by UUID): cluster Services from `cluster-services` (shared Postgres, OIDC issuer, secrets store, queues, etc.), occasionally Nodes from `infra-physical`.
+References (by UUID): cluster Services from HelmCharts (shared Postgres, OIDC issuer, secrets store, queues, etc.), occasionally Nodes from Ansible.
 
 Edges typically declared: `Serving` (frontend served by backend), `Access` (backend → shared Postgres), `Triggering`/`Flow` (publishes/subscribes to a broker), `Specialization` (the app component specialises its `«SoftwareProduct»` catalog entry).
 
-### `images` — DockerImages
+### DockerImages
 
-Mostly v0.2 work (image identity, build provenance, parent-image graph). For v0.1, the profile exists in the enum; if DockerImages onboards now, it does so under the `application` profile for any apps it bundles. Container images are not a v0.1 element kind — they live as metadata on the running element (e.g. `stats.image: registry/foo:sha256:…`).
+Mostly v0.2 work (image identity, build provenance, parent-image graph). For v0.1, container images are not a v0.1 element kind — they live as metadata on the running element (e.g. `stats.image: registry/foo:sha256:…`).
+
+### The Architecture repo (self-producer)
+
+Owns the homeless elements that no other producer would have a clean home for: physical network and rack hardware (switches, APs, server chassis), IoT/RF devices (catflap, weather sensor, ZigBee bridges), and the Home Assistant VM + bundle. Files live under `docs/architecture/` in this repo and are picked up by the local-copy branch of the Jenkinsfile rather than `copyArtifacts`.
 
 ## How a producer integrates (the recipe)
 

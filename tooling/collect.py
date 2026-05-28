@@ -636,7 +636,7 @@ def assemble_merged_dataset(
 
     Top-level shape:
       schemaVersion: "0.1"
-      producers: [{id, profile}, ...]    # the registered producer list
+      producers: [<id>, ...]              # registered producer ids
       <every element-kind array>
       relations: [...]
       derived: {groupings, capabilityRealizations}
@@ -647,9 +647,7 @@ def assemble_merged_dataset(
     """
     doc: dict[str, Any] = {
         "schemaVersion": "0.1",
-        "producers": [
-            {"id": p["id"], "profile": p["profile"]} for p in producers
-        ],
+        "producers": [p["id"] for p in producers],
     }
     for kind in ELEMENT_KIND_ARRAYS:
         doc[kind] = merged[kind]
@@ -749,7 +747,8 @@ def main(producers_path: Path, input_dir: Path, output_dir: Path) -> None:
 
     click.echo(f"Loaded {len(producers)} registered producer(s) from {producers_path}.")
     for p in producers:
-        click.echo(f"  - {p['id']} (profile={p['profile']}, jenkinsJob={p['jenkinsJob']})")
+        job = p.get("jenkinsJob", "<self>")
+        click.echo(f"  - {p['id']} (jenkinsJob={job})")
 
     try:
         artifact_paths = discover_artifacts(producers, input_dir)

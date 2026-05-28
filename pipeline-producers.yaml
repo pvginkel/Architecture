@@ -7,5 +7,4 @@
 
 producers:
   - id: ansible
-    profile: infra-physical
     jenkinsJob: Ansible

@@ -1,10 +1,7 @@
 {
   "schemaVersion": "0.1",
   "producers": [
-    {
-      "id": "ansible",
-      "profile": "infra-physical"
-    }
+    "ansible"
   ],
   "nodes": [
     {

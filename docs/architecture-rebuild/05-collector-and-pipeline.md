@@ -14,7 +14,7 @@ There is no separate `architecture-tooling:<tag>` registry image. The collector 
 
 ## Inputs
 
-- `pipeline-producers.yaml` in this repo: the registered producer list. Each entry: `id`, `profile`, the Jenkins job to copy from. Adding a producer is a PR. The Jenkinsfile reads this file (Groovy) to know which `copyArtifacts` calls to issue. The collector reads the same file to know which directories to expect.
+- `pipeline-producers.yaml` in this repo: the registered producer list. Each entry: `id` and optional `jenkinsJob`. Adding a producer is a PR. The Jenkinsfile reads this file (Groovy) to know which `copyArtifacts` calls to issue; entries with no `jenkinsJob` are self-producers whose source lives in this repo and are populated by local copy instead. The collector reads the same file to know which directories to expect.
 - `producer-artifacts/<producer-id>/*.yaml` — populated by the Jenkinsfile via `copyArtifacts` (with `flatten: true`) from each registered producer's last-successful build. Lives in the workspace; included in the kaniko build context. A producer may publish one or more YAML files; filenames within a single producer must be distinct.
 - The vendored ArchiMate XSD + Archi matrix + `subset.yaml` + generated schemas (already present in this repo) — for re-validation inside the build.
 

@@ -134,7 +134,6 @@ https://architecture.webathome.org/schema/v0.1/generated/relations.schema.json
 https://architecture.webathome.org/schema/v0.1/enums/capabilities.json
 https://architecture.webathome.org/schema/v0.1/enums/lifecycle-states.json
 https://architecture.webathome.org/schema/v0.1/enums/environments.json
-https://architecture.webathome.org/schema/v0.1/enums/producer-profiles.json
 https://architecture.webathome.org/schema/v0.1/archimate/archimate3_Model.xsd
 https://architecture.webathome.org/schema/v0.1/archimate/relationships.xml
 https://architecture.webathome.org/schema/v0.1/archimate/relationships-keys.xml

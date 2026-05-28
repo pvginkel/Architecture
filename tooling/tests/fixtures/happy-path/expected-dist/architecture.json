@@ -1,14 +1,8 @@
 {
   "schemaVersion": "0.1",
   "producers": [
-    {
-      "id": "ansible",
-      "profile": "infra-physical"
-    },
-    {
-      "id": "helm",
-      "profile": "cluster-services"
-    }
+    "ansible",
+    "helm"
   ],
   "nodes": [
     {

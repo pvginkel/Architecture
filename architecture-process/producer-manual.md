@@ -384,8 +384,7 @@ adds this repo as a registered producer:
 ```yaml
 producers:
   # … other entries …
-  - id: <kebab-id>                  # matches the bare kebab in this repo's architecture.yaml producer: key
-    profile: <profile-id>           # infra-physical | cluster-services | application | images
+  - id: <kebab-id>                  # matches the bare kebab in this repo's architecture YAML producer: key
     jenkinsJob: <Jenkins job path>  # e.g. ansible/master, HelmCharts/master
 ```
 
@@ -394,18 +393,17 @@ the upstream-success trigger automatically. From then on, every
 successful build of this repo dispatches the Architecture pipeline
 downstream.
 
-## Profiles
+## Ownership conventions
 
-| Profile | Used by | Typically owns |
-|---|---|---|
-| `infra-physical` | Ansible | Devices, Nodes (hypervisors/VMs/clusters), VM-level daemons, OS-layer services |
-| `cluster-services` | HelmCharts | Cluster-deployed SystemSoftware, ApplicationServices/Interfaces, SoftwareProduct entries for cluster-published software |
-| `application` | per-app repos | ApplicationComponents (pods), ApplicationServices/Interfaces, app-specific SoftwareProduct entries |
-| `images` | DockerImages | Image identity, build provenance (v0.2 territory — no v0.1 element kind for container images) |
+The conventions below describe the **expected** ownership patterns per producer — review-time judgment, not machine-enforced. The collector accepts any element kind from any producer.
 
-The profile is **descriptive metadata only** — the collector does not
-enforce a per-kind allow-list. Conventions above are guidance for
-review-time judgment.
+| Producer | Typically owns |
+|---|---|
+| Ansible | Devices, Nodes (hypervisors/VMs/clusters), VM-level daemons, OS-layer services |
+| HelmCharts | Cluster-deployed SystemSoftware, ApplicationServices/Interfaces, SoftwareProduct entries for cluster-published software |
+| Per-app repos (EI, IoT, …) | ApplicationComponents (pods), ApplicationServices/Interfaces, app-specific SoftwareProduct entries |
+| DockerImages | Image identity, build provenance (v0.2 territory — no v0.1 element kind for container images) |
+| Architecture (self-producer) | Homeless elements: physical network/rack hardware, IoT/RF devices, Home Assistant. Files live under `docs/architecture/` in the Architecture repo itself. |
 
 ## Worked example
 

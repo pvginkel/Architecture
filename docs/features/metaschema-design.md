@@ -198,7 +198,6 @@ schema/v0.1/
     capabilities.yaml
     lifecycle-states.yaml
     environments.yaml
-    producer-profiles.yaml
   examples/
     valid-minimal.yaml
     valid-full.yaml
@@ -353,7 +352,6 @@ Under `schema/v0.1/enums/`:
 - `capabilities.yaml` — coarse business-arch level: `cap:iam`, `cap:observability`, `cap:secrets-management`, `cap:messaging`, `cap:data-store`, `cap:ingress`, `cap:dns`, `cap:pki`, `cap:object-storage`, `cap:shared-filesystem`, `cap:block-storage`, `cap:metrics`, `cap:logging`. Each entry: `id`, `label`, `summary`, `lifecycle`, `introduced`.
 - `lifecycle-states.yaml` — `active`, `deprecated`, `removed`.
 - `environments.yaml` — `dev`, `tst`, `uat`, `prd`.
-- `producer-profiles.yaml` — initial set: `ansible`, `helmcharts`, `dockerimages`, plus an `application` slot for individual app repos.
 
 **Exit criteria:**
 
