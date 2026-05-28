@@ -82,15 +82,17 @@ class CollectorError(Exception):
         super().__init__(f"{phase}: {len(messages)} error(s)")
 
 
-def discover_artifacts(producers: list[dict], input_dir: Path) -> dict[str, list[Path]]:
+def discover_artifacts(
+    producers: list[dict], input_dir: Path
+) -> dict[str, list[tuple[Path, str]]]:
     """Reconcile the registered producer list against the contents of
     `input_dir`. Returns a {producer-id: sorted-list-of-yaml-paths} map.
-    A producer may publish one or more YAML files; each ends up directly
-    under `<input_dir>/<producer-id>/` (the Jenkinsfile flattens the
-    copyArtifacts result).
+    A producer may publish one or more YAML files; the Jenkinsfile
+    `copyArtifacts` step preserves the producer's repo-relative layout
+    under `<input_dir>/<producer-id>/`, so the walk is recursive.
 
     Raises CollectorError on:
-    - registered producer with no `<id>/*.yaml` (the Jenkinsfile should
+    - registered producer with no `<id>/**/*.yaml` (the Jenkinsfile should
       have copied at least one in via copyArtifacts);
     - directory under `input_dir` that is not registered ("stowaway"
       producer — refused so that local mistakes don't sneak into a
@@ -114,16 +116,19 @@ def discover_artifacts(producers: list[dict], input_dir: Path) -> dict[str, list
             f"(not registered in pipeline-producers.yaml — register it or remove it)"
         )
 
-    artifact_paths: dict[str, list[Path]] = {}
+    artifact_paths: dict[str, list[tuple[Path, str]]] = {}
     for pid in sorted(expected_ids & found_dirs):
-        paths = sorted((input_dir / pid).glob("*.yaml"))
+        producer_dir = input_dir / pid
+        paths = sorted(producer_dir.rglob("*.yaml"))
         if not paths:
             messages.append(
-                f"missing producer artifact: {input_dir}/{pid}/*.yaml "
+                f"missing producer artifact: {input_dir}/{pid}/**/*.yaml "
                 f"(directory present but contains no YAML files)"
             )
         else:
-            artifact_paths[pid] = paths
+            artifact_paths[pid] = [
+                (p, p.relative_to(producer_dir).as_posix()) for p in paths
+            ]
 
     if messages:
         raise CollectorError("discovery", messages)
@@ -131,7 +136,7 @@ def discover_artifacts(producers: list[dict], input_dir: Path) -> dict[str, list
 
 
 def load_and_validate_artifacts(
-    artifact_paths: dict[str, list[Path]],
+    artifact_paths: dict[str, list[tuple[Path, str]]],
 ) -> dict[str, Any]:
     """Load + per-file validate every YAML across registered producers,
     then merge each producer's files into one virtual doc. Returns
@@ -153,37 +158,37 @@ def load_and_validate_artifacts(
     messages: list[str] = []
 
     for pid in sorted(artifact_paths):
-        per_file_docs: list[tuple[Path, Any]] = []
+        per_file_docs: list[tuple[str, Any]] = []
         producer_failed = False
-        for path in artifact_paths[pid]:
+        for path, rel in artifact_paths[pid]:
             doc = normalize(load_yaml(path))
             errors = validate_doc(doc)
             if errors:
                 for e in errors:
                     pointer = "/" + "/".join(str(p) for p in e.absolute_path)
-                    messages.append(f"{pid}/{path.name}: at {pointer}: {e.message}")
+                    messages.append(f"{pid}/{rel}: at {pointer}: {e.message}")
                 producer_failed = True
                 continue
             if doc.get("producer") != pid:
                 messages.append(
-                    f"{pid}/{path.name}: at /producer: declared producer "
+                    f"{pid}/{rel}: at /producer: declared producer "
                     f"{doc.get('producer')!r} does not match directory name {pid!r}"
                 )
                 producer_failed = True
                 continue
-            per_file_docs.append((path, doc))
+            per_file_docs.append((rel, doc))
 
         if producer_failed or not per_file_docs:
             continue
 
-        first_path, first_doc = per_file_docs[0]
+        first_rel, first_doc = per_file_docs[0]
         schema_version = first_doc["schemaVersion"]
-        for path, doc in per_file_docs[1:]:
+        for rel, doc in per_file_docs[1:]:
             if doc["schemaVersion"] != schema_version:
                 messages.append(
-                    f"{pid}/{path.name}: at /schemaVersion: "
+                    f"{pid}/{rel}: at /schemaVersion: "
                     f"{doc['schemaVersion']!r} differs from "
-                    f"{pid}/{first_path.name}'s {schema_version!r}"
+                    f"{pid}/{first_rel}'s {schema_version!r}"
                 )
                 producer_failed = True
 
@@ -191,21 +196,21 @@ def load_and_validate_artifacts(
             "schemaVersion": schema_version,
             "producer": pid,
         }
-        seen: dict[str, str] = {}  # id -> source filename
+        seen: dict[str, str] = {}  # id -> source producer-relative path
         for kind in (*ELEMENT_KIND_ARRAYS, "relations"):
             merged[kind] = []
-        for path, doc in per_file_docs:
+        for rel, doc in per_file_docs:
             for kind in (*ELEMENT_KIND_ARRAYS, "relations"):
                 for elem in doc.get(kind) or []:
                     eid = elem["id"]
                     if eid in seen:
                         messages.append(
-                            f"{pid}/{path.name}: at /{kind}: id {eid!r} "
+                            f"{pid}/{rel}: at /{kind}: id {eid!r} "
                             f"already declared in {pid}/{seen[eid]}"
                         )
                         producer_failed = True
                         continue
-                    seen[eid] = path.name
+                    seen[eid] = rel
                     merged[kind].append(elem)
 
         if not producer_failed:

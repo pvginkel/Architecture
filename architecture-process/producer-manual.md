@@ -366,10 +366,12 @@ they work whether this repo emits one YAML or several:
    }
    ```
 
-The Architecture pipeline calls `copyArtifacts` with `flatten: true`,
-so subdirectory structure is dropped — every archived `*.yaml` lands
-directly under `producer-artifacts/<producer-id>/`. Filenames across a
-single producer's YAMLs must therefore be distinct.
+The Architecture pipeline calls `copyArtifacts` with
+`filter: '**/architecture/**/*.yaml'` and no `flatten`, so the YAMLs
+land under `producer-artifacts/<producer-id>/` with their original
+repo-relative paths preserved. The collector walks the producer
+directory recursively, so subdirectory layout (and any same-basename
+files in different subdirs) is fine.
 
 The Jenkins agent must have outbound HTTPS to
 `architecture.webathome.org` so the validator can reach the service.

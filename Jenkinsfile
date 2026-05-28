@@ -55,8 +55,8 @@ podTemplate(inheritFrom: 'jenkins-agent kaniko', containers: [
                 copyArtifacts(
                     projectName: p.jenkinsJob,
                     selector: lastSuccessful(),
+                    filter: '**/architecture/**/*.yaml',
                     target: "producer-artifacts/${p.id}",
-                    flatten: true,
                     fingerprintArtifacts: true
                 )
             }
