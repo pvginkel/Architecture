@@ -11,7 +11,7 @@ This doc is the **execution plan**: ordered work items with exit criteria, in th
 
 ## Decisions locked
 
-- **Jenkins owns fetching.** The Groovy Jenkinsfile uses `copyArtifacts` against each registered producer's last-successful build, populating `producer-artifacts/<producer-id>/architecture.yaml` in the workspace. No HTTP client, no auth handling, no cache layer on the Python side.
+- **Jenkins owns fetching.** The Groovy Jenkinsfile uses `copyArtifacts` (with `flatten: true`) against each registered producer's last-successful build, populating `producer-artifacts/<producer-id>/*.yaml` in the workspace. Each producer may publish one or more YAML files. No HTTP client, no auth handling, no cache layer on the Python side.
 - **Jenkins's last-successful-build is the cache.** No staleness window, no fallback file system, no 7-day rule. If a producer's build is months stale, that's what gets merged.
 - **Fail fast, fail loud.** Any per-artifact schema error, dangling reference, unknown capability id, duplicate id, removed-element reference, cross-producer triple violation, missing-grouping-member, or cross-producer grouping fails the entire pipeline. No drop-and-continue paths. A partial merged dataset never ships.
 - **No machine-enforced profile constraints.** The producer-profile field is descriptive metadata for diagnostics and reporting; the collector does not reject artifacts on a per-kind allow-list. Ownership patterns live in `04-producer-protocol.md` as guidance for review-time judgment.
@@ -58,7 +58,7 @@ JSON-schema-validated at collector startup; the schema lives next to the file.
 
 ### 3. Per-artifact validation pass
 
-`collect.py` walks `producer-artifacts/` and runs the shared validator on each `<producer-id>/architecture.yaml`. Any error fails the entire run. A producer listed in `pipeline-producers.yaml` but absent from `producer-artifacts/` is itself a fatal error (the Jenkinsfile was supposed to copy them in).
+`collect.py` walks `producer-artifacts/` and runs the shared validator on every `<producer-id>/*.yaml` (one or more per producer). Cross-file checks within a producer then verify the envelope `producer:` matches the directory name, all files agree on `schemaVersion`, and no id is declared in two files of the same producer. The files of one producer are merged into a single virtual doc at that point. Any error fails the entire run. A producer listed in `pipeline-producers.yaml` but absent (or empty of YAML) is itself a fatal error.
 
 **Exit criteria:**
 

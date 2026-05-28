@@ -1,0 +1,42 @@
+schemaVersion: '0.1'
+producers:
+- id: ansible
+  profile: infra-physical
+nodes:
+- id: node:prd-cluster,33333333-3333-4333-8333-333333333331
+  label: Production cluster
+  summary: Production Kubernetes cluster.
+  introduced: '2024-07-12'
+  lifecycle: active
+  cluster: prd
+  producer: ansible
+devices:
+- id: device:catflap,29a65540-b55e-4908-94b8-499b81b6e142
+  label: Catflap
+  summary: RF-paired pet door.
+  introduced: '2026-05-28'
+  lifecycle: active
+  producer: ansible
+- id: device:switch-rack,a5466336-3d04-43f8-b4b5-f37e41cefa26
+  label: Rack switch
+  summary: Managed L2 switch.
+  introduced: '2026-05-28'
+  lifecycle: active
+  producer: ansible
+systemSoftware: []
+applicationComponents: []
+applicationServices: []
+applicationInterfaces: []
+technologyServices: []
+technologyInterfaces: []
+capabilities: []
+businessServices: []
+groupings: []
+relations:
+- id: rel:catflap-link-switch
+  source: device:catflap,29a65540-b55e-4908-94b8-499b81b6e142
+  target: device:switch-rack,a5466336-3d04-43f8-b4b5-f37e41cefa26
+  type: Association
+derived:
+  groupings: {}
+  capabilityRealizations: {}

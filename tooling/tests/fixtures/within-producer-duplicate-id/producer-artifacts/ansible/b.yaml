@@ -1,0 +1,8 @@
+schemaVersion: "0.1"
+producer: ansible
+nodes:
+  - id: node:shared,33333333-3333-4333-8333-333333333331
+    label: B
+    summary: declared again — same producer, same id, different file.
+    introduced: 2026-05-28
+    lifecycle: active

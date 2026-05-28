@@ -1,0 +1,13 @@
+schemaVersion: "0.1"
+producer: ansible
+devices:
+  - id: device:catflap,29a65540-b55e-4908-94b8-499b81b6e142
+    label: Catflap
+    summary: RF-paired pet door.
+    introduced: 2026-05-28
+    lifecycle: active
+relations:
+  - id: rel:catflap-link-switch
+    source: device:catflap,29a65540-b55e-4908-94b8-499b81b6e142
+    target: device:switch-rack,a5466336-3d04-43f8-b4b5-f37e41cefa26
+    type: Association

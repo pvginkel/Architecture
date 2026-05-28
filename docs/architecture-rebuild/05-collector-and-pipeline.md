@@ -1,6 +1,6 @@
 # 05 — Collector and pipeline
 
-The collector is a Python script that runs as a Docker build stage in the Architecture image. It reads each registered producer's `architecture.yaml` from a build-context directory populated by the Jenkinsfile (via Jenkins's native `copyArtifacts` step), validates each artifact against the v0.1 schema, merges them, runs cross-producer checks, and writes the consolidated dataset that the validation service serves at a static URL.
+The collector is a Python script that runs as a Docker build stage in the Architecture image. It reads each registered producer's YAML files (one or more per producer) from a build-context directory populated by the Jenkinsfile (via Jenkins's native `copyArtifacts` step with `flatten: true`), validates each file against the v0.1 schema, merges per producer, then merges across producers, runs cross-producer checks, and writes the consolidated dataset that the validation service serves at a static URL.
 
 The collector is **not** part of the validation service. The service validates (POST /api/validate) and publishes (static HTTP). Assembly happens inside the image build, where rebuild semantics, retry policy, and failure handling are easy to reason about and the input set is captured in the build context.
 
@@ -15,7 +15,7 @@ There is no separate `architecture-tooling:<tag>` registry image. The collector 
 ## Inputs
 
 - `pipeline-producers.yaml` in this repo: the registered producer list. Each entry: `id`, `profile`, the Jenkins job to copy from. Adding a producer is a PR. The Jenkinsfile reads this file (Groovy) to know which `copyArtifacts` calls to issue. The collector reads the same file to know which directories to expect.
-- `producer-artifacts/<producer-id>/architecture.yaml` — populated by the Jenkinsfile via `copyArtifacts` from each registered producer's last-successful build. Lives in the workspace; included in the kaniko build context.
+- `producer-artifacts/<producer-id>/*.yaml` — populated by the Jenkinsfile via `copyArtifacts` (with `flatten: true`) from each registered producer's last-successful build. Lives in the workspace; included in the kaniko build context. A producer may publish one or more YAML files; filenames within a single producer must be distinct.
 - The vendored ArchiMate XSD + Archi matrix + `subset.yaml` + generated schemas (already present in this repo) — for re-validation inside the build.
 
 Jenkins's "last successful build" *is* the cache. No collector-side cache layer, no staleness window, no HTTP retry handling — Jenkins owns fetching.
@@ -63,8 +63,8 @@ Concurrent producer completions are coalesced by Jenkins's pending-build merging
 
 ## Collector responsibilities (in order)
 
-1. **Discover.** Walk `producer-artifacts/`. Each `<producer-id>/architecture.yaml` is a candidate input. Producers listed in `pipeline-producers.yaml` but missing from `producer-artifacts/` fail the build (the Jenkinsfile should have copied them in; the collector refuses to silently merge a partial set). Stowaway directories (present in `producer-artifacts/`, not registered) also fail the build.
-2. **Per-artifact validate** against `schema/v0.1/architecture.schema.yaml` (using the shared validator module). Any per-artifact error fails the entire build. No drop-and-continue, no warn-and-merge — a single invalid artifact is enough to refuse the rollout.
+1. **Discover.** Walk `producer-artifacts/`. Every `<producer-id>/*.yaml` (one or more) is a candidate input. Producers listed in `pipeline-producers.yaml` whose directory is missing or empty of YAML files fail the build (the Jenkinsfile should have copied at least one in; the collector refuses to silently merge a partial set). Stowaway directories (present in `producer-artifacts/`, not registered) also fail the build.
+2. **Per-file validate** against `schema/v0.1/architecture.schema.yaml` (using the shared validator module). Cross-file producer-level checks then verify each file's envelope `producer:` matches the directory name, every file in a producer agrees on `schemaVersion`, and no id is declared in two files of the same producer. Per-producer files are merged into one virtual doc at this step. Any error fails the entire build.
 3. **Reconcile the capability enum.** Every `Capability` id referenced from any artifact must exist in `schema/v0.1/enums/capabilities.yaml`. Unknown reference = build failure (a producer must PR the enum first).
 4. **Synthesise provenance attribute.** For every declared element, stamp `producer: <bare-id>` onto the element using the envelope `producer:` key as the source. Producers must not emit `producer:` themselves (rejected by `additionalProperties: false` at per-artifact validation). Provenance lives as a filter on the merged dataset, not a graph edge — see v0.1.1 in `../features/metaschema-design.md`.
 5. **Merge.** Combine all element-kind arrays across artifacts. Detect duplicate ids (composite or bare kebab) — a real ownership conflict, fail the build with both producers reported.

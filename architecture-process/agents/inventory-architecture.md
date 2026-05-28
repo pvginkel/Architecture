@@ -6,9 +6,9 @@ tools: Read, Glob, Grep, Bash, Write
 
 # inventory-architecture
 
-Your job is to walk this repo and produce **one tagged inventory document** of everything that could plausibly become an element in the producer's `architecture.yaml`. The operator (Pieter) takes it from there: he'll triage your tags with you in an interactive session, you'll mint UUIDs, draft the YAML(s), and validate.
+Your job is to walk this repo and produce **one tagged inventory document** of everything that could plausibly become an element in this producer's architecture YAML(s) under `docs/architecture/`. A producer may emit one file or several (split by scope, e.g. `infrastructure.yaml` + `home-automation.yaml`); the inventory doesn't have to decide that — the operator does, during triage. The operator (Pieter) takes it from there: he'll triage your tags with you in an interactive session, you'll mint UUIDs, draft the YAML(s), and validate.
 
-You are **not** drafting `architecture.yaml`. You are **not** minting UUIDs. You are **not** running the validator. Inventory only.
+You are **not** drafting architecture YAMLs. You are **not** minting UUIDs. You are **not** running the validator. Inventory only.
 
 ## Inputs you need
 
@@ -61,7 +61,7 @@ Tag every candidate with exactly one of:
 
 | Bucket | Meaning |
 |---|---|
-| `producer-now` | Belongs in this producer's `architecture.yaml`. The repo introduces this node/edge. |
+| `producer-now` | Belongs in this producer's architecture YAML(s). The repo introduces this node/edge. |
 | `base-now` | Belongs in the Architecture repo's base YAML for now. The producer needs to reference it, but the thing has no producer that owns it today (typically hardware, or services published by a producer that doesn't exist yet). |
 | `defer-to-<producer>` | Belongs in another producer's artifact (e.g. `defer-to-helmcharts`, `defer-to-dockerimages`). Don't emit anywhere yet; revisit when that producer comes online. |
 | `out` | Fails the inclusion rule (no stable external identity another component can reach by name). Internal class, file, screen, function. |
@@ -150,7 +150,7 @@ Use file/line refs (`path/to/file:NNN`) in evidence wherever you can — they sp
 
 ## Constraints
 
-- **Inventory only.** No `architecture.yaml`. No UUID minting. No `arch-validate`. No edits outside `tmp/architecture-inventory/`.
+- **Inventory only.** No architecture YAML edits. No UUID minting. No `arch-validate`. No edits outside `tmp/architecture-inventory/`.
 - **Don't ask one-off questions per row.** Tag your best guess and list the genuinely-ambiguous ones under "Open questions". The operator triages in batch.
 - **Inclusion rule wins.** A thing without a stable external identity another component can reach by name is `out`, even if it feels architecturally significant.
 - **Don't read OpenBao secrets or shell history.** Per `CLAUDE.md`. Listing/metadata reads in OpenBao are fine if you need them; values are not.

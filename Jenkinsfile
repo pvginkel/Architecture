@@ -56,7 +56,7 @@ podTemplate(inheritFrom: 'jenkins-agent kaniko', containers: [
                     projectName: p.jenkinsJob,
                     selector: lastSuccessful(),
                     target: "producer-artifacts/${p.id}",
-                    flatten: false,
+                    flatten: true,
                     fingerprintArtifacts: true
                 )
             }

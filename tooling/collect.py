@@ -82,13 +82,16 @@ class CollectorError(Exception):
         super().__init__(f"{phase}: {len(messages)} error(s)")
 
 
-def discover_artifacts(producers: list[dict], input_dir: Path) -> dict[str, Path]:
+def discover_artifacts(producers: list[dict], input_dir: Path) -> dict[str, list[Path]]:
     """Reconcile the registered producer list against the contents of
-    `input_dir`. Returns a {producer-id: artifact-path} map for the
-    registered producers. Raises CollectorError on:
+    `input_dir`. Returns a {producer-id: sorted-list-of-yaml-paths} map.
+    A producer may publish one or more YAML files; each ends up directly
+    under `<input_dir>/<producer-id>/` (the Jenkinsfile flattens the
+    copyArtifacts result).
 
-    - registered producer with no corresponding `<id>/architecture.yaml`
-      (the Jenkinsfile should have copied it in via copyArtifacts);
+    Raises CollectorError on:
+    - registered producer with no `<id>/*.yaml` (the Jenkinsfile should
+      have copied at least one in via copyArtifacts);
     - directory under `input_dir` that is not registered ("stowaway"
       producer — refused so that local mistakes don't sneak into a
       pipeline build).
@@ -101,7 +104,7 @@ def discover_artifacts(producers: list[dict], input_dir: Path) -> dict[str, Path
     messages: list[str] = []
     for pid in sorted(expected_ids - found_dirs):
         messages.append(
-            f"missing producer artifact: {input_dir}/{pid}/architecture.yaml "
+            f"missing producer directory: {input_dir}/{pid}/ "
             f"(producer {pid!r} registered in pipeline-producers.yaml but no "
             f"directory present — Jenkins copyArtifacts step did not run or failed)"
         )
@@ -111,45 +114,102 @@ def discover_artifacts(producers: list[dict], input_dir: Path) -> dict[str, Path
             f"(not registered in pipeline-producers.yaml — register it or remove it)"
         )
 
-    # Even when the directory exists, the artifact file inside it must exist too.
-    artifact_paths: dict[str, Path] = {}
+    artifact_paths: dict[str, list[Path]] = {}
     for pid in sorted(expected_ids & found_dirs):
-        path = input_dir / pid / "architecture.yaml"
-        if not path.exists():
+        paths = sorted((input_dir / pid).glob("*.yaml"))
+        if not paths:
             messages.append(
-                f"missing producer artifact: {path} "
-                f"(directory present but architecture.yaml absent)"
+                f"missing producer artifact: {input_dir}/{pid}/*.yaml "
+                f"(directory present but contains no YAML files)"
             )
         else:
-            artifact_paths[pid] = path
+            artifact_paths[pid] = paths
 
     if messages:
         raise CollectorError("discovery", messages)
     return artifact_paths
 
 
-def load_and_validate_artifacts(artifact_paths: dict[str, Path]) -> dict[str, Any]:
-    """Load + per-artifact validate each registered producer's artifact.
-    Returns {producer-id: parsed-and-normalized-doc} on success. Raises
-    CollectorError with one entry per (producer, JSON pointer, message)
-    on any schema violation.
+def load_and_validate_artifacts(
+    artifact_paths: dict[str, list[Path]],
+) -> dict[str, Any]:
+    """Load + per-file validate every YAML across registered producers,
+    then merge each producer's files into one virtual doc. Returns
+    {producer-id: merged-doc} on success.
 
-    Validation runs through the shared `_arch.validate_doc`, which is the
-    same code the v2 `arch-validate` HTTP endpoint and the `validate.py`
-    CLI use, so producer CI and the pipeline see identical errors.
+    Per-file checks (schema-conformance via the shared `_arch.validate_doc`
+    used by v2 `arch-validate` and `validate.py`, so producer CI and the
+    pipeline see identical errors).
+
+    Producer-level cross-file checks:
+    - every file's envelope `producer:` must equal the directory name;
+    - every file must declare the same `schemaVersion`;
+    - no id may be declared in two files of the same producer (real
+      within-producer ownership conflict).
+
+    Cross-producer duplicate ids are caught later in the merge phase.
     """
     docs: dict[str, Any] = {}
     messages: list[str] = []
+
     for pid in sorted(artifact_paths):
-        path = artifact_paths[pid]
-        doc = normalize(load_yaml(path))
-        errors = validate_doc(doc)
-        if errors:
-            for e in errors:
-                pointer = "/" + "/".join(str(p) for p in e.absolute_path)
-                messages.append(f"{pid}: at {pointer}: {e.message}")
-        else:
-            docs[pid] = doc
+        per_file_docs: list[tuple[Path, Any]] = []
+        producer_failed = False
+        for path in artifact_paths[pid]:
+            doc = normalize(load_yaml(path))
+            errors = validate_doc(doc)
+            if errors:
+                for e in errors:
+                    pointer = "/" + "/".join(str(p) for p in e.absolute_path)
+                    messages.append(f"{pid}/{path.name}: at {pointer}: {e.message}")
+                producer_failed = True
+                continue
+            if doc.get("producer") != pid:
+                messages.append(
+                    f"{pid}/{path.name}: at /producer: declared producer "
+                    f"{doc.get('producer')!r} does not match directory name {pid!r}"
+                )
+                producer_failed = True
+                continue
+            per_file_docs.append((path, doc))
+
+        if producer_failed or not per_file_docs:
+            continue
+
+        first_path, first_doc = per_file_docs[0]
+        schema_version = first_doc["schemaVersion"]
+        for path, doc in per_file_docs[1:]:
+            if doc["schemaVersion"] != schema_version:
+                messages.append(
+                    f"{pid}/{path.name}: at /schemaVersion: "
+                    f"{doc['schemaVersion']!r} differs from "
+                    f"{pid}/{first_path.name}'s {schema_version!r}"
+                )
+                producer_failed = True
+
+        merged: dict[str, Any] = {
+            "schemaVersion": schema_version,
+            "producer": pid,
+        }
+        seen: dict[str, str] = {}  # id -> source filename
+        for kind in (*ELEMENT_KIND_ARRAYS, "relations"):
+            merged[kind] = []
+        for path, doc in per_file_docs:
+            for kind in (*ELEMENT_KIND_ARRAYS, "relations"):
+                for elem in doc.get(kind) or []:
+                    eid = elem["id"]
+                    if eid in seen:
+                        messages.append(
+                            f"{pid}/{path.name}: at /{kind}: id {eid!r} "
+                            f"already declared in {pid}/{seen[eid]}"
+                        )
+                        producer_failed = True
+                        continue
+                    seen[eid] = path.name
+                    merged[kind].append(elem)
+
+        if not producer_failed:
+            docs[pid] = merged
 
     if messages:
         raise CollectorError("per-artifact-validation", messages)
@@ -696,7 +756,11 @@ def main(producers_path: Path, input_dir: Path, output_dir: Path) -> None:
     except CollectorError as e:
         _fail(e)
 
-    click.echo(f"Per-artifact validation: {len(docs)} producer artifact(s) clean.")
+    file_total = sum(len(paths) for paths in artifact_paths.values())
+    click.echo(
+        f"Per-artifact validation: {file_total} file(s) across "
+        f"{len(docs)} producer(s) clean."
+    )
 
     try:
         reconcile_capability_enum(docs)

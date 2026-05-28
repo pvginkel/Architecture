@@ -10,15 +10,18 @@ is operator-side.
 
 ## What you're producing and why
 
-Your repo emits **one architecture artifact per build**: a YAML file
-named `architecture.yaml` (or a clearly-named per-environment variant)
-describing the elements this repo owns — VMs, clusters, daemons,
-services, repos, etc. — and the relationships between them.
+Your repo emits **one or more architecture YAML files per build**.
+A small repo may publish a single `architecture.yaml`; a larger repo
+may split by scope — e.g. `infrastructure.yaml`, `home-automation.yaml`
+— with each file describing one slice of what this repo owns. Every
+file declares the same `producer:` (this repo's id); the collector
+treats them as one logical producer at merge time. Within a single
+producer, an id may be declared in only one file.
 
-The federation pipeline picks up your last-successful build's archived
-`architecture.yaml`, merges it with every other registered producer's
-artifact, cross-checks references, and publishes the consolidated
-dataset at:
+The federation pipeline picks up every `*.yaml` archived from your
+last-successful build, validates each, merges them with every other
+registered producer's files, cross-checks references, and publishes
+the consolidated dataset at:
 
   https://architecture.webathome.org/data/v0.1/architecture.yaml
   https://architecture.webathome.org/data/v0.1/architecture.json
@@ -343,24 +346,30 @@ merge time in the Architecture pipeline.
 
 ## Jenkins integration
 
-Two steps in this repo's `Jenkinsfile`:
+Two steps in this repo's `Jenkinsfile`. Both use a directory glob so
+they work whether this repo emits one YAML or several:
 
 1. **Validate** as a build step. Fail the build on non-zero exit:
 
    ```groovy
-   stage('Validate architecture artifact') {
-       sh './scripts/arch-validate architecture.yaml'
+   stage('Validate architecture artifacts') {
+       sh './scripts/arch-validate docs/architecture/*.yaml'
    }
    ```
 
-2. **Archive** the artifact so the Architecture pipeline can pull it
-   via `copyArtifacts`:
+2. **Archive** so the Architecture pipeline can pull every YAML via
+   `copyArtifacts`:
 
    ```groovy
-   stage('Archive architecture artifact') {
-       archiveArtifacts artifacts: 'architecture.yaml', fingerprint: true
+   stage('Archive architecture artifacts') {
+       archiveArtifacts artifacts: 'docs/architecture/*.yaml', fingerprint: true
    }
    ```
+
+The Architecture pipeline calls `copyArtifacts` with `flatten: true`,
+so subdirectory structure is dropped — every archived `*.yaml` lands
+directly under `producer-artifacts/<producer-id>/`. Filenames across a
+single producer's YAMLs must therefore be distinct.
 
 The Jenkins agent must have outbound HTTPS to
 `architecture.webathome.org` so the validator can reach the service.
@@ -441,7 +450,11 @@ relations:
 ```
 
 The starter file `architecture.yaml` shipped alongside this manual is
-a skeleton with placeholders and comments — start from it.
+a skeleton with placeholders and comments — start from it. When the
+repo grows, split into multiple files under `docs/architecture/` by
+scope (e.g. `docs/architecture/infrastructure.yaml`,
+`docs/architecture/home-automation.yaml`); the CI globs pick them all
+up.
 
 ## Onboarding sequence (high-level)
 
@@ -450,15 +463,16 @@ a skeleton with placeholders and comments — start from it.
    have to be exhaustive — the goal is to prove the pipeline end-to-end
    on real data and expand incrementally.
 2. **Mint ids**: for each instance in scope, pick a kebab hint and
-   generate a UUID. The composite IDs in `architecture.yaml` are the
-   single source of truth; no separate id table.
-3. **Author** `architecture.yaml`. Iterate against
-   `./scripts/arch-validate architecture.yaml` until clean.
+   generate a UUID. The composite IDs in the architecture YAML(s) are
+   the single source of truth; no separate id table.
+3. **Author** the architecture YAML(s) under `docs/architecture/`.
+   Iterate against `./scripts/arch-validate docs/architecture/*.yaml`
+   until clean.
 4. **Wire CI**: add the validate + archive steps to this repo's
    Jenkinsfile.
-5. **Verify**: trigger one build. Confirm the artifact archives and
+5. **Verify**: trigger one build. Confirm every file archives and
    the validation step passes.
 6. **Register**: PR `pipeline-producers.yaml` in pvginkel/Architecture
    adding this producer. After it lands, the next Architecture
-   pipeline run picks the artifact up and emits the merged dataset
-   with this repo's elements included.
+   pipeline run picks the files up and emits the merged dataset with
+   this repo's elements included.

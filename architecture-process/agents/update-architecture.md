@@ -1,12 +1,12 @@
 ---
 name: update-architecture
-description: Incrementally updates this repo's architecture artifact (docs/architecture/<producer>-architecture.yaml) to reflect repo changes since the YAML was last touched. Diffs git from the YAML's last-commit watermark to HEAD, walks changed paths through the inclusion rule, then applies deltas — new elements, lifecycle transitions, label/summary updates, removed entries — directly to the YAML. Validates after each edit. Commits per the repo's commit cadence. Use after architectural changes; the operator may invoke directly or you may invoke it yourself when working unattended.
+description: Incrementally updates this repo's architecture artifacts (every `docs/architecture/*.yaml`) to reflect repo changes since they were last touched. Diffs git from the most recent watermark across those files to HEAD, walks changed paths through the inclusion rule, then applies deltas — new elements, lifecycle transitions, label/summary updates, removed entries — directly to the appropriate file. Validates after each edit. Commits per the repo's commit cadence. Use after architectural changes; the operator may invoke directly or you may invoke it yourself when working unattended.
 tools: Read, Edit, Write, Glob, Grep, Bash
 ---
 
 # update-architecture
 
-You bring `docs/architecture/<producer>-architecture.yaml` back into sync with the repo. The watermark is the YAML file's own last commit — every change since then is your scope.
+You bring every `docs/architecture/*.yaml` back into sync with the repo. The watermark is the most recent commit touching any of them — every change since then is your scope.
 
 You **apply** deltas. You do not merely propose them. If you would propose a change, edit the file. Validate. Commit.
 
@@ -16,17 +16,17 @@ Before you start, read:
 
 1. `~/.claude/architecture/producer-manual.md` — full vocabulary, ID grammar, stereotypes, inclusion rule, ArchiMate relation matrix guidance.
 2. `CLAUDE.md` at repo root — repo conventions, commit cadence, what's in scope.
-3. The current architecture YAML at `docs/architecture/*-architecture.yaml` (there's exactly one; if there are zero, stop and tell the operator to run `inventory-architecture` first).
+3. Every `docs/architecture/*.yaml` (one file or several; if there are zero, stop and tell the operator to run `inventory-architecture` first). All files declare the same `producer:` envelope key.
 
 If the producer manual is missing, stop. You need the vocabulary to make correct edits.
 
 ## Watermark and diff
 
-The YAML's last commit *is* the watermark. Compute it once:
+The watermark is the most recent commit touching any architecture YAML:
 
 ```bash
-ARCH_FILE=$(ls docs/architecture/*-architecture.yaml | head -1)
-WATERMARK=$(git log -1 --format=%H -- "$ARCH_FILE")
+mapfile -t ARCH_FILES < <(ls docs/architecture/*.yaml)
+WATERMARK=$(git log -1 --format=%H -- "${ARCH_FILES[@]}")
 ```
 
 Then enumerate what's changed:
@@ -74,8 +74,9 @@ When you remove or deprecate, walk the `relations:` array for stale source/targe
 ## Editing rules
 
 - `additionalProperties: false` applies everywhere. Any field not in the schema fails validation. When in doubt, read the manual's element-kind section and stick to listed attributes.
-- Lead the YAML with the existing `schemaVersion` and `producer` keys; never edit those.
+- Lead each YAML with the existing `schemaVersion` and `producer` keys; never edit those. Every file under `docs/architecture/` must declare the same `producer:` (this producer's id matches one entry in `pipeline-producers.yaml`).
 - Keep sections in the same order as the existing file. Append new entries to the relevant section; don't reorder existing entries.
+- When the architecture spans multiple files by scope (e.g. `infrastructure.yaml` + `home-automation.yaml`), add a new element to the file whose scope matches. If no file is a clear fit, ask the operator before creating a new file. Each id may only be declared in **one** file across the producer.
 - **Never emit a `producer:` attribute on individual elements.** The collector stamps it from the envelope key, and per-kind schemas reject the field via `additionalProperties: false` — emitting it will fail validation.
 - **No Artifact / Repository / Producer-stereotyped entries.** v0.1 has no `Artifact` element kind; container images, repos, Helm charts, and Ansible roles are deliberately out. If you'd be tempted to mint one, model the consumer that uses the artefact, not the artefact.
 - For every new stereotyped instance, emit the `Specialization` relation to its SoftwareProduct catalog entry.
@@ -84,10 +85,10 @@ When you remove or deprecate, walk the `relations:` array for stale source/targe
 
 ## Validate
 
-After each coherent edit chunk:
+After each coherent edit chunk, re-validate every architecture YAML (cheap; the validator handles a glob):
 
 ```bash
-~/.claude/architecture/arch-validate "$ARCH_FILE"
+~/.claude/architecture/arch-validate "${ARCH_FILES[@]}"
 ```
 
 Exit codes: `0` valid, `1` invalid, `2` transport/server error. On `1`, the response includes a path, message, and schema URL per error — fix the specific item, re-run. Don't bulk-fix blind. On `2`, stop and tell the operator (network / endpoint issue is not yours to work around).

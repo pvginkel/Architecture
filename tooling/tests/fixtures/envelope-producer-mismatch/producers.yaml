@@ -1,0 +1,4 @@
+producers:
+  - id: ansible
+    profile: infra-physical
+    jenkinsJob: ansible/master

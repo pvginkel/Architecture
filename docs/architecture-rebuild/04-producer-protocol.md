@@ -6,7 +6,7 @@ The assembly-side counterpart is [`05-collector-and-pipeline.md`](./05-collector
 
 ## Producer model
 
-A **producer** is a Jenkins job that, on every successful build, emits one architecture artifact: a YAML file conforming to `schema/v0.1/architecture.schema.yaml`, archived as a Jenkins build artifact at a stable path (`architecture.yaml` at the artifact root). The Architecture repo's pipeline picks up the latest successful build's artifact from each registered producer, merges them, and publishes the consolidated dataset.
+A **producer** is a Jenkins job that, on every successful build, emits one or more architecture YAML files conforming to `schema/v0.1/architecture.schema.yaml`. Every file declares the same `producer:` envelope key (the producer id); the Architecture pipeline picks them all up, validates each, and merges them as one logical producer. A small repo may publish a single `architecture.yaml`; a larger repo may split by scope (e.g. `infrastructure.yaml`, `home-automation.yaml`) — the collector treats both shapes identically.
 
 Producers do not coordinate with each other. They emit only what they own. Cross-producer references go through UUIDs.
 
@@ -20,7 +20,7 @@ The full envelope is documented in [`../features/metaschema-design.md`](../featu
 
 ## Publication
 
-**Where the artifact lives**: a Jenkins build artifact at `architecture.yaml` (root of the archived artifacts).
+**Where the artifacts live**: Jenkins build artifacts archived from `docs/architecture/*.yaml` (or wherever the producer keeps them). The Architecture pipeline's `copyArtifacts` call uses `flatten: true`, so the archived directory structure is dropped — every `*.yaml` lands directly under `producer-artifacts/<producer-id>/` in the Architecture workspace. Filenames within one producer must therefore be distinct.
 
 **Why Jenkins artifacts** rather than committing to a branch or pushing to a registry:
 
@@ -28,7 +28,7 @@ The full envelope is documented in [`../features/metaschema-design.md`](../featu
 - Producers don't need write access to a separate data store.
 - "Latest successful build" is a built-in Jenkins concept; the Architecture pipeline relies on it.
 
-**Collector access**: the Architecture repo's Jenkinsfile uses Jenkins's native `copyArtifacts` step (Copy Artifact plugin) to pull each registered producer's `architecture.yaml` from that producer's last-successful build into the Architecture workspace. No HTTP, no auth handling, no in-pipeline retry logic on the Python side — Jenkins owns fetching; the collector owns merging. Producer Jenkins job names are enumerated in `pipeline-producers.yaml` in this repo; new producers are added by PR. See `05`.
+**Collector access**: the Architecture repo's Jenkinsfile uses Jenkins's native `copyArtifacts` step (Copy Artifact plugin) to pull every archived YAML from each registered producer's last-successful build into the Architecture workspace. No HTTP, no auth handling, no in-pipeline retry logic on the Python side — Jenkins owns fetching; the collector owns merging. Producer Jenkins job names are enumerated in `pipeline-producers.yaml` in this repo; new producers are added by PR. See `05`.
 
 **Cache semantics**: Jenkins's "last successful build" *is* the cache. If a producer's CI has been broken for a week, the collector will merge that producer's week-old artifact without complaint. The Architecture pipeline does not implement an additional staleness window or fallback layer.
 
@@ -38,7 +38,7 @@ The full envelope is documented in [`../features/metaschema-design.md`](../featu
 
 Implementation:
 
-1. Producer's build script runs `arch-validate architecture.yaml`.
+1. Producer's build script runs `arch-validate docs/architecture/*.yaml` (the script accepts a glob).
 2. `arch-validate` POSTs to `https://architecture.webathome.org/api/validate`.
 3. Exit code is the build step's exit code: `0` valid, `1` invalid, `2` transport / server error.
 
@@ -150,12 +150,12 @@ Mostly v0.2 work (image identity, build provenance, parent-image graph). For v0.
 
 ## How a producer integrates (the recipe)
 
-1. **Decide where the source lives.** Hand-maintained YAML in the producer repo (`architecture/architecture.yaml` checked in) is the default. Generated-at-build-time from existing manifests (e.g., Helm `values.yaml` parsed into architecture YAML) is fine where it pays off.
+1. **Decide where the source lives.** Hand-maintained YAML in the producer repo under `docs/architecture/` is the default. Start with a single `docs/architecture/architecture.yaml`; split by scope (e.g. `infrastructure.yaml` + `home-automation.yaml`) once the file is large enough to make sub-area edits painful. Generated-at-build-time from existing manifests (e.g., Helm `values.yaml` parsed into architecture YAML) is fine where it pays off. Every file declares the same `producer:` envelope key.
 2. **Mint composite ids.** First integration: pick a kebab-case hint and generate a UUIDv4 for each instance the producer owns; the declared id is `<kind>:<hint>,<uuid4>`. Subsequent: reuse the existing composite id; never re-mint the UUID. The hint can drift; the UUID can't.
 3. **Author SoftwareProduct entries for products this repo publishes.** Bare kebab-case ids, `«SoftwareProduct»` stereotype, `homepage`/`logo`/`sourceRepository` attributes. These live in the same artifact as the instances that specialize them, until ownership of the upstream product moves to another repo.
 4. **Look up cross-producer ids.** Pull the current merged artifact (`https://architecture.webathome.org/data/v0.1/architecture.yaml`) once; copy the composite ids you need into your own source. Cross-producer references must carry the UUID portion; using the composite form is recommended so log lines stay readable.
-5. **Add the validator step to the Jenkinsfile.** `arch-validate architecture.yaml`, fail the build on non-zero exit.
-6. **Archive the artifact.** Jenkins `archiveArtifacts artifacts: 'architecture.yaml', fingerprint: true`.
+5. **Add the validator step to the Jenkinsfile.** `arch-validate docs/architecture/*.yaml`, fail the build on non-zero exit.
+6. **Archive the artifacts.** Jenkins `archiveArtifacts artifacts: 'docs/architecture/*.yaml', fingerprint: true`.
 7. **Register with the Architecture pipeline.** PR against `pipeline-producers.yaml` in this repo. Add an upstream-build trigger so the Architecture job re-runs when this producer's build succeeds.
 
 Subsequent merges are automatic.

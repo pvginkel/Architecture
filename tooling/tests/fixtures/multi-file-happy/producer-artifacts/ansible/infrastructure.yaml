@@ -1,0 +1,15 @@
+schemaVersion: "0.1"
+producer: ansible
+devices:
+  - id: device:switch-rack,a5466336-3d04-43f8-b4b5-f37e41cefa26
+    label: Rack switch
+    summary: Managed L2 switch.
+    introduced: 2026-05-28
+    lifecycle: active
+nodes:
+  - id: node:prd-cluster,33333333-3333-4333-8333-333333333331
+    label: Production cluster
+    summary: Production Kubernetes cluster.
+    introduced: 2024-07-12
+    lifecycle: active
+    cluster: prd
