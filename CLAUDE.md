@@ -10,6 +10,36 @@ React + ReactFlow + ELK viewer for [webathome.org](https://webathome.org), built
 
 Pieter van Ginkel — Domain Architect at IVO Rechtspraak (Dutch judiciary IT), developer since 2001. Skip beginner framing. Discuss tradeoffs directly.
 
+## `architecture-process/` ↔ `~/.claude/` sync
+
+`architecture-process/` is a snapshot of the operator-side files that
+drive the producer-onboarding workflow. The live copies are in
+`~/.claude/architecture/` (producer manual, starter `architecture.yaml`,
+`arch-validate`, `claude-md-snippet.md`) and `~/.claude/agents/`
+(`inventory-architecture.md`, `update-architecture.md`).
+
+Treat this as a **two-way merge**. Either side can move first:
+
+- When the user edits a file in `~/.claude/...`, mirror it into the
+  matching path under `architecture-process/` (and commit there).
+- When something in `architecture-process/` is edited here (review
+  fixes, doc updates that came up in conversation), mirror it back to
+  the corresponding `~/.claude/...` path.
+
+Filename map:
+
+| `~/.claude/...` | `architecture-process/...` |
+|---|---|
+| `architecture/producer-manual.md` | `producer-manual.md` |
+| `architecture/architecture.yaml` | `architecture.yaml` |
+| `architecture/arch-validate` | `arch-validate` |
+| `architecture/claude-md-snippet.md` | `claude-md-snippet.md` |
+| `agents/inventory-architecture.md` | `agents/inventory-architecture.md` |
+| `agents/update-architecture.md` | `agents/update-architecture.md` |
+
+Diff both sides before editing — if they've drifted, surface the drift
+to the user rather than silently picking a side.
+
 ## Deployment context
 
 Self-hosted stack: Kubernetes, Jenkins, Kaniko, Ansible. Don't propose hosting alternatives or redesign CI/CD. Focus on the container artifact; K8s/Jenkins glue is the user's.
