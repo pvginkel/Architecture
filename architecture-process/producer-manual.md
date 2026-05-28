@@ -4,8 +4,8 @@ This is the operator-side reference for becoming a producer in the
 webathome.org federated architecture system. It lives at
 `~/.claude/architecture/producer-manual.md` and the
 `inventory-architecture` and `update-architecture` agents read it from
-there on startup. Producer repos copy `arch-validate` into
-`scripts/arch-validate` for their Jenkinsfile to call; everything else
+there on startup. Producer repos copy `arch-validate.py` into
+`scripts/arch-validate.py` for their Jenkinsfile to call; everything else
 is operator-side.
 
 ## What you're producing and why
@@ -316,26 +316,27 @@ No conditional rules between lifecycle and other fields. No
 
 ## Validation
 
-Use the `arch-validate` script shipped alongside this manual. Copy it
-to `scripts/arch-validate` in this repo and `chmod +x` it.
+Use the `arch-validate.py` script shipped alongside this manual. Copy it
+to `scripts/arch-validate.py` in this repo and `chmod +x` it.
 
 ```bash
-./scripts/arch-validate architecture.yaml
-./scripts/arch-validate architecture/prd.yaml architecture/dev.yaml
-cat architecture.yaml | ./scripts/arch-validate -
-./scripts/arch-validate --json architecture.yaml      # raw response on stdout
-./scripts/arch-validate --quiet architecture.yaml     # suppress OK lines
+./scripts/arch-validate.py architecture.yaml
+./scripts/arch-validate.py architecture/prd.yaml architecture/dev.yaml
+cat architecture.yaml | ./scripts/arch-validate.py -
+./scripts/arch-validate.py --json architecture.yaml      # raw response on stdout
+./scripts/arch-validate.py --quiet architecture.yaml     # suppress OK lines
 ```
 
 The script POSTs to `https://architecture.webathome.org/api/validate`
-and exits `0` valid, `1` invalid, `2` transport/server error.
-Dependencies: `bash`, `curl`, `jq` — no language runtime needed.
+and exits `0` valid, `1` invalid, `2` transport/server error. It's a
+single-file Python script that uses only the standard library, so any
+`python:slim` (or system `python3`) is enough — no `pip install` step.
 
 Override the endpoint for local testing:
 
 ```bash
 ARCHITECTURE_VALIDATE_URL=http://localhost:8080/api/validate \
-  ./scripts/arch-validate architecture.yaml
+  ./scripts/arch-validate.py architecture.yaml
 ```
 
 The validation service checks: schema conformance, id format,
@@ -353,7 +354,7 @@ they work whether this repo emits one YAML or several:
 
    ```groovy
    stage('Validate architecture artifacts') {
-       sh './scripts/arch-validate docs/architecture/*.yaml'
+       sh './scripts/arch-validate.py docs/architecture/*.yaml'
    }
    ```
 
@@ -466,7 +467,7 @@ up.
    generate a UUID. The composite IDs in the architecture YAML(s) are
    the single source of truth; no separate id table.
 3. **Author** the architecture YAML(s) under `docs/architecture/`.
-   Iterate against `./scripts/arch-validate docs/architecture/*.yaml`
+   Iterate against `./scripts/arch-validate.py docs/architecture/*.yaml`
    until clean.
 4. **Wire CI**: add the validate + archive steps to this repo's
    Jenkinsfile.

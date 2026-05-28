@@ -223,7 +223,7 @@ version is its own immutable URL space.
 
 Validation is **hosted**, not distributed as a standalone binary. The
 architecture container exposes `POST /api/validate` (accepting JSON and YAML);
-producer repos drop a small bash script (`scripts/arch-validate`) into their
+producer repos drop a small Python script (`scripts/arch-validate.py`) into their
 own tree which POSTs the artifact, prints LLM-friendly errors, and sets exit
 0 / 1 / 2 (valid / invalid / transport-error). Same exit-code contract as the
 original brainstorm; different distribution mechanism.
@@ -232,7 +232,7 @@ The full contract — endpoint shape, error response format, CLI behaviour,
 `/healthz` and `/metrics`, `$schema` pragma, schema-change PR flow — is in
 [`../features/validation-service.md`](../features/validation-service.md).
 
-Producer CI still calls `arch-validate`; failure still fails the producer's
+Producer CI still calls `arch-validate.py`; failure still fails the producer's
 Jenkins build. See [`04-producer-protocol.md`](./04-producer-protocol.md).
 
 ## Anti-patterns the schema explicitly rejects

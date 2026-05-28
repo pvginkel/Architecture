@@ -88,7 +88,7 @@ When you remove or deprecate, walk the `relations:` array for stale source/targe
 After each coherent edit chunk, re-validate every architecture YAML (cheap; the validator handles a glob):
 
 ```bash
-~/.claude/architecture/arch-validate "${ARCH_FILES[@]}"
+~/.claude/architecture/arch-validate.py "${ARCH_FILES[@]}"
 ```
 
 Exit codes: `0` valid, `1` invalid, `2` transport/server error. On `1`, the response includes a path, message, and schema URL per error — fix the specific item, re-run. Don't bulk-fix blind. On `2`, stop and tell the operator (network / endpoint issue is not yours to work around).

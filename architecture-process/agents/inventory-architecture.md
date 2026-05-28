@@ -150,7 +150,7 @@ Use file/line refs (`path/to/file:NNN`) in evidence wherever you can — they sp
 
 ## Constraints
 
-- **Inventory only.** No architecture YAML edits. No UUID minting. No `arch-validate`. No edits outside `tmp/architecture-inventory/`.
+- **Inventory only.** No architecture YAML edits. No UUID minting. No `arch-validate.py`. No edits outside `tmp/architecture-inventory/`.
 - **Don't ask one-off questions per row.** Tag your best guess and list the genuinely-ambiguous ones under "Open questions". The operator triages in batch.
 - **Inclusion rule wins.** A thing without a stable external identity another component can reach by name is `out`, even if it feels architecturally significant.
 - **Don't read OpenBao secrets or shell history.** Per `CLAUDE.md`. Listing/metadata reads in OpenBao are fine if you need them; values are not.

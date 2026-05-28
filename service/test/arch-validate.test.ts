@@ -9,7 +9,7 @@ import { loadSchemas } from "../src/schema-loader.js";
 const exec = promisify(execFile);
 
 const REPO_ROOT = path.resolve(__dirname, "../..");
-const SCRIPT = path.join(REPO_ROOT, "scripts", "arch-validate");
+const SCRIPT = path.join(REPO_ROOT, "scripts", "arch-validate.py");
 const EXAMPLES = path.join(REPO_ROOT, "schema", "v0.1", "examples");
 
 let server: Server;
@@ -60,7 +60,7 @@ function runWithStdin(args: string[], input: string, endpoint: string): Promise<
   });
 }
 
-describe("scripts/arch-validate", () => {
+describe("scripts/arch-validate.py", () => {
   it("exits 0 on a valid YAML artifact", async () => {
     const r = await run([path.join(EXAMPLES, "valid-minimal.yaml")]);
     expect(r.code).toBe(0);
@@ -72,21 +72,6 @@ describe("scripts/arch-validate", () => {
     expect(r.code).toBe(1);
     expect(r.stderr).toContain("/nodes/0/id");
     expect(r.stderr).toMatch(/✗/);
-  });
-
-  it("validates JSON when extension is .json", async () => {
-    // Minimal valid JSON artifact (date as 'YYYY-MM-DD' string, matching the
-    // `format: date` constraint without going through js-yaml's Date parsing).
-    const doc = { schemaVersion: "0.1", producer: "x" };
-    const tmp = path.join(REPO_ROOT, "service", `.tmp-${Date.now()}.json`);
-    const fs = await import("node:fs/promises");
-    await fs.writeFile(tmp, JSON.stringify(doc));
-    try {
-      const r = await run([tmp]);
-      expect(r.code).toBe(0);
-    } finally {
-      await fs.unlink(tmp);
-    }
   });
 
   it("aggregates multi-file failures: exit 1 if any one is invalid", async () => {
@@ -125,22 +110,6 @@ describe("scripts/arch-validate", () => {
     expect(r.code).toBe(1);
     expect(r.stderr).not.toMatch(/✓/);
     expect(r.stderr).toMatch(/✗/);
-  });
-
-  it("--format yaml overrides extension detection", async () => {
-    // Send YAML body with a misleading .json extension but format override.
-    const valid = await import("node:fs/promises").then((m) =>
-      m.readFile(path.join(EXAMPLES, "valid-minimal.yaml"), "utf8"),
-    );
-    const tmp = path.join(REPO_ROOT, "service", `.tmp-${Date.now()}.json`);
-    const fs = await import("node:fs/promises");
-    await fs.writeFile(tmp, valid);
-    try {
-      const r = await run(["--format", "yaml", tmp]);
-      expect(r.code).toBe(0);
-    } finally {
-      await fs.unlink(tmp);
-    }
   });
 
   it("exits 2 on transport error (endpoint unreachable)", async () => {

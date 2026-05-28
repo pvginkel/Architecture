@@ -36,8 +36,8 @@ The full envelope is documented in [`../features/metaschema-design.md`](../featu
 
 Implementation:
 
-1. Producer's build script runs `arch-validate docs/architecture/*.yaml` (the script accepts a glob).
-2. `arch-validate` POSTs to `https://architecture.webathome.org/api/validate`.
+1. Producer's build script runs `arch-validate.py docs/architecture/*.yaml` (the script accepts a glob).
+2. `arch-validate.py` POSTs to `https://architecture.webathome.org/api/validate`.
 3. Exit code is the build step's exit code: `0` valid, `1` invalid, `2` transport / server error.
 
 The hosted validator (the v2 service) does **per-artifact** validation: schema conformance, the ArchiMate relationship-type enumeration, the relationship triple matrix narrowed to the v0.1 subset. It does **not** check cross-producer references — that's the collector's job because only the collector sees the full merged dataset.
@@ -156,7 +156,7 @@ Owns the homeless elements that no other producer would have a clean home for: p
 2. **Mint composite ids.** First integration: pick a kebab-case hint and generate a UUIDv4 for each instance the producer owns; the declared id is `<kind>:<hint>,<uuid4>`. Subsequent: reuse the existing composite id; never re-mint the UUID. The hint can drift; the UUID can't.
 3. **Author SoftwareProduct entries for products this repo publishes.** Bare kebab-case ids, `«SoftwareProduct»` stereotype, `homepage`/`logo`/`sourceRepository` attributes. These live in the same artifact as the instances that specialize them, until ownership of the upstream product moves to another repo.
 4. **Look up cross-producer ids.** Pull the current merged artifact (`https://architecture.webathome.org/data/v0.1/architecture.yaml`) once; copy the composite ids you need into your own source. Cross-producer references must carry the UUID portion; using the composite form is recommended so log lines stay readable.
-5. **Add the validator step to the Jenkinsfile.** `arch-validate docs/architecture/*.yaml`, fail the build on non-zero exit.
+5. **Add the validator step to the Jenkinsfile.** `arch-validate.py docs/architecture/*.yaml`, fail the build on non-zero exit.
 6. **Archive the artifacts.** Jenkins `archiveArtifacts artifacts: 'docs/architecture/*.yaml', fingerprint: true`.
 7. **Register with the Architecture pipeline.** PR against `pipeline-producers.yaml` in this repo. Add an upstream-build trigger so the Architecture job re-runs when this producer's build succeeds.
 
@@ -176,5 +176,5 @@ When a new schema major lands, each producer updates its pin at its own pace wit
 
 ## Open questions
 
-- **Should `arch-validate` also fetch the current merged artifact and check cross-producer references locally?** Likely yes as an opt-in flag (`--check-cross-refs`); the per-artifact validator stays cheap. Implementation deferred until at least two producers are emitting.
+- **Should `arch-validate.py` also fetch the current merged artifact and check cross-producer references locally?** Likely yes as an opt-in flag (`--check-cross-refs`); the per-artifact validator stays cheap. Implementation deferred until at least two producers are emitting.
 - **Multiple artifacts per producer?** A repo with multiple deliverables (e.g., separate Helm chart builds) could emit one artifact per chart. The protocol allows it (each is an independent file at a different Jenkins path). The Architecture pipeline treats them as a producer-group. Decide on naming convention if it comes up.

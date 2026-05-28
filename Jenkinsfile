@@ -29,12 +29,7 @@
 library('JenkinsPipelineUtils') _
 
 podTemplate(inheritFrom: 'jenkins-agent kaniko', containers: [
-    containerTemplate(
-        name: 'python',
-        image: 'python:3.13-slim',
-        command: 'cat',
-        ttyEnabled: true
-    )
+    containerTemplates.python('python')
 ]) {
     node(POD_LABEL) {
         stage('Checkout') {

@@ -16,7 +16,7 @@ service/     # Node + Express validation service (TypeScript)
 schema/v0.1/ # JSON Schema metaschema + vendored ArchiMate sources
 tooling/     # Python (Poetry): generate.py, validate.py, [collect.py — v3]
 scripts/
-  arch-validate  bash CLI producer repos copy into their own scripts/
+  arch-validate.py  Python CLI producer repos copy into their own scripts/
   dev.sh         wrapper for `npm run dev` from the repo root
 docs/
   architecture-rebuild/  multi-phase rebuild plan
@@ -56,7 +56,7 @@ Origin is locked to `https://webathome.org`. No consumers yet.
 ## Validation service
 
 Producer-facing integration documentation lives in [`USAGE.md`](./USAGE.md): the
-`POST /api/validate` contract, schema URLs, the `arch-validate` CLI, and how to
+`POST /api/validate` contract, schema URLs, the `arch-validate.py` CLI, and how to
 file schema-change requests. It is also rendered at the deployed container root
 (`architecture.webathome.org/`).
 

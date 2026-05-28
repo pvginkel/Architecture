@@ -371,7 +371,7 @@ Under `schema/v0.1/examples/`:
 (Cross-cutting failure modes like dangling references, capability-enum
 violations, duplicate ids, cross-producer Groupings, etc. are exercised
 at merge time by the collector fixture set under
-`tooling/tests/fixtures/`, not by per-artifact `arch-validate`.)
+`tooling/tests/fixtures/`, not by per-artifact `arch-validate.py`.)
 
 **Exit criteria:**
 

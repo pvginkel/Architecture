@@ -15,7 +15,7 @@ Pieter van Ginkel — Domain Architect at IVO Rechtspraak (Dutch judiciary IT), 
 `architecture-process/` is a snapshot of the operator-side files that
 drive the producer-onboarding workflow. The live copies are in
 `~/.claude/architecture/` (producer manual, starter `architecture.yaml`,
-`arch-validate`, `claude-md-snippet.md`) and `~/.claude/agents/`
+`arch-validate.py`, `claude-md-snippet.md`) and `~/.claude/agents/`
 (`inventory-architecture.md`, `update-architecture.md`).
 
 Treat this as a **two-way merge**. Either side can move first:
@@ -32,7 +32,7 @@ Filename map:
 |---|---|
 | `architecture/producer-manual.md` | `producer-manual.md` |
 | `architecture/architecture.yaml` | `architecture.yaml` |
-| `architecture/arch-validate` | `arch-validate` |
+| `architecture/arch-validate.py` | `arch-validate.py` |
 | `architecture/claude-md-snippet.md` | `claude-md-snippet.md` |
 | `agents/inventory-architecture.md` | `agents/inventory-architecture.md` |
 | `agents/update-architecture.md` | `agents/update-architecture.md` |

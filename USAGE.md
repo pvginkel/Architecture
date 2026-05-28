@@ -5,7 +5,7 @@ metaschema. It hosts the v0.1 JSON Schemas, validates submitted architecture
 artifacts via `POST /api/validate`, and serves the diagram viewer at `/viewer/`.
 
 Producers (Ansible, HelmCharts, EI, IoT, …) emit one `architecture.yaml` per
-build. Each producer's CI runs `arch-validate` against this service, fails the
+build. Each producer's CI runs `arch-validate.py` against this service, fails the
 build on non-zero exit, and archives the artifact for the Architecture
 pipeline's collector to pick up.
 
@@ -137,18 +137,18 @@ curl -sS \
   | jq .
 ```
 
-## `arch-validate` CLI
+## `arch-validate.py` CLI
 
 The dev-facing artifact. A producer repo drops the file into its own
 `scripts/` directory and runs it in CI.
 
 ```bash
 # from a producer repo
-./scripts/arch-validate architecture.yaml
-./scripts/arch-validate dev.architecture.yaml prd.architecture.yaml
-cat architecture.yaml | ./scripts/arch-validate -      # stdin
-./scripts/arch-validate --json architecture.yaml       # raw endpoint JSON
-./scripts/arch-validate --quiet architecture.yaml      # suppress OK lines
+./scripts/arch-validate.py architecture.yaml
+./scripts/arch-validate.py dev.architecture.yaml prd.architecture.yaml
+cat architecture.yaml | ./scripts/arch-validate.py -      # stdin
+./scripts/arch-validate.py --json architecture.yaml       # raw endpoint JSON
+./scripts/arch-validate.py --quiet architecture.yaml      # suppress OK lines
 ```
 
 Exit codes: `0` valid, `1` invalid, `2` transport/server error.
@@ -157,11 +157,13 @@ Override the endpoint for local testing:
 
 ```bash
 ARCHITECTURE_VALIDATE_URL=http://localhost:8080/api/validate \
-  ./scripts/arch-validate artifact.yaml
+  ./scripts/arch-validate.py artifact.yaml
 ```
 
-The script depends only on `bash`, `curl`, and `jq` — no language runtime.
-Updates are coordinated by re-copying from this repo (`scripts/arch-validate`).
+The script is a single-file Python 3 program that uses only the standard
+library — runs on any `python:slim` image or system `python3`, no `pip
+install` step. Updates are coordinated by re-copying from this repo
+(`scripts/arch-validate.py`).
 
 ## `$schema` pragma
 

@@ -68,11 +68,11 @@ There is **no v1 data migration** (the original `03-data-migration.md` plan is s
 
 ### v2 — Validation service
 
-Build the runtime container that hosts the schemas, validates artifacts via `POST /api/validate`, serves the rendered USAGE.md at the container root, and ships the `arch-validate` dev CLI. Replaces the current nginx-only container.
+Build the runtime container that hosts the schemas, validates artifacts via `POST /api/validate`, serves the rendered USAGE.md at the container root, and ships the `arch-validate.py` dev CLI. Replaces the current nginx-only container.
 
 The service is **publish-only** for architecture data. It does not collect, merge, or assemble producer artifacts — that happens in v3's Architecture pipeline.
 
-Status: **done.** Service code under `service/`; container builds and serves `/`, `/viewer/`, `/schema/v0.1/*`, `/api/validate`, `/healthz`, `/metrics`. `USAGE.md` at the repo root is rendered at `/`. `arch-validate` CLI at `scripts/arch-validate`. Helm chart updated in `pvginkel/HelmCharts` (port/probes/scrape annotations). Homelab deploy is the operator step left to verify.
+Status: **done.** Service code under `service/`; container builds and serves `/`, `/viewer/`, `/schema/v0.1/*`, `/api/validate`, `/healthz`, `/metrics`. `USAGE.md` at the repo root is rendered at `/`. `arch-validate.py` CLI at `scripts/arch-validate.py`. Helm chart updated in `pvginkel/HelmCharts` (port/probes/scrape annotations). Homelab deploy is the operator step left to verify.
 
 Plan: [`../features/validation-service.md`](../features/validation-service.md).
 
@@ -82,7 +82,7 @@ Define how a repo becomes a producer of architecture data; build the Architectur
 
 Two pieces, one phase:
 
-- **Producer protocol** (this repo's contract with producer repos): Jenkins archives `architecture.yaml` as a build artifact per build; producers reference cross-producer elements by UUID (with an optional in-id friendly hint, divergence warned); each producer's CI runs `arch-validate` and fails the build on non-zero exit; `«SoftwareProduct»` catalog entries are owner-emitted, not centrally curated.
+- **Producer protocol** (this repo's contract with producer repos): Jenkins archives `architecture.yaml` as a build artifact per build; producers reference cross-producer elements by UUID (with an optional in-id friendly hint, divergence warned); each producer's CI runs `arch-validate.py` and fails the build on non-zero exit; `«SoftwareProduct»` catalog entries are owner-emitted, not centrally curated.
 - **Collector** (this repo's Jenkinsfile + `tooling/collect.py` running as a Docker build stage): the Jenkinsfile uses native `copyArtifacts` to pull each registered producer's last-successful `architecture.yaml` into the build context; the collector validates, merges, cross-checks, synthesises one Association relation per element from the «Producer» Artifact, and emits `dist/data/v0.1/*` which the final image stage copies in. Fail-fast at every step — no drop-and-continue, no machine-enforced profile constraints.
 
 Status: **done.** Collector under `tooling/collect.py`, shared validator extracted to `tooling/_arch.py`, eleven end-to-end fixtures with a single driver under `tooling/tests/`. Dockerfile gained a `run-collector` stage between `check-schemas` and the final runtime; `.dockerignore` keeps developer `docker build` runs from bundling local fixtures. Jenkinsfile drives the full pipeline (read registry → copyArtifacts per producer → collector → archive validation-report → kaniko → Helm-side redeploy). `pipeline-producers.yaml` ships with `producers: []` — first real producer onboards in v4.
