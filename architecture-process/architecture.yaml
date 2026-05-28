@@ -19,7 +19,7 @@
 # `producer:` on individual elements — per-kind schemas reject it via
 # additionalProperties: false.
 #
-# See MANUAL.md for the full vocabulary, allowed relation triples,
+# See producer-manual.md for the full vocabulary, allowed relation triples,
 # stereotype rules, and inclusion criteria.
 
 schemaVersion: "0.1"
@@ -84,7 +84,7 @@ producer: <PRODUCER-ID>          # bare kebab; must match this repo's entry in p
 
 # capabilities:
 #   # Reference any capabilities you realise. The id MUST exist in the
-#   # central enum (see MANUAL.md § Capability enum). Producers cannot
+#   # central enum (see producer-manual.md § Capability enum). Producers cannot
 #   # mint new capabilities; a PR against the Architecture repo's enum
 #   # is needed first.
 #   - id: cap:secrets-management
@@ -105,4 +105,4 @@ producer: <PRODUCER-ID>          # bare kebab; must match this repo's entry in p
 #   - id: rel:<kebab-or-uuid>
 #     source: <element-id>
 #     target: <element-id>
-#     type: <ArchiMate type — see MANUAL.md § Relations>
+#     type: <ArchiMate type — see producer-manual.md § Relations>

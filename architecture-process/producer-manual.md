@@ -1,9 +1,12 @@
 # Architecture producer manual
 
-This is the standalone reference for becoming a producer in the
-webathome.org federated architecture system. Drop this file and the
-two siblings (`arch-validate`, `architecture.yaml`) into the producer
-repo. Nothing else from the Architecture repo is needed.
+This is the operator-side reference for becoming a producer in the
+webathome.org federated architecture system. It lives at
+`~/.claude/architecture/producer-manual.md` and the
+`inventory-architecture` and `update-architecture` agents read it from
+there on startup. Producer repos copy `arch-validate` into
+`scripts/arch-validate` for their Jenkinsfile to call; everything else
+is operator-side.
 
 ## What you're producing and why
 
@@ -131,8 +134,10 @@ forms:
   fail at merge time with a message pointing you at the UUID)
 
 Mint UUIDs with `python -c 'import uuid; print(uuid.uuid4())'` or
-`uuidgen`. Commit them next to the architecture source so they're
-stable across builds. Never re-mint.
+`uuidgen`. The composite IDs inside the architecture YAML are the
+single source of truth — once minted and committed there, an ID is
+permanent. Don't maintain a parallel id table; it drifts and there's
+nothing it tells you that grepping the YAML doesn't. Never re-mint.
 
 ## Common attributes
 
@@ -151,8 +156,10 @@ missing ones.
 
 Per-kind additions:
 
-- `environment` (optional, on Node, SystemSoftware, ApplicationComponent, ApplicationService, ApplicationInterface, TechnologyService, TechnologyInterface): `dev` \| `tst` \| `uat` \| `prd`. Omit for surfaces that span environments (e.g. external APIs like the GitHub API).
-- `cluster` (optional, on the same kinds): cluster identifier. Omit for elements not bound to a single cluster.
+- `environment` (optional, on Node, ApplicationComponent, SystemSoftware, ApplicationService, ApplicationInterface, TechnologyService, TechnologyInterface): `dev` \| `tst` \| `uat` \| `prd`
+- `cluster` (optional, on Node, SystemSoftware, ApplicationComponent, ApplicationService, ApplicationInterface, TechnologyService, TechnologyInterface): cluster identifier
+
+Set `environment` (and `cluster`, where applicable) on every element where the answer isn't "all of them" — externally-shared elements like `svc:github-api` legitimately span environments and stay unset.
 
 **Do not emit a `producer:` attribute on elements.** The collector
 stamps it onto every merged element from the envelope `producer:` key.
@@ -263,6 +270,7 @@ cap:secrets-management        Secrets storage / rotation / lease management
 cap:pki                       Certificate issuance / renewal / trust chain
 cap:ingress                   External-facing HTTP/TCP entry into the cluster
 cap:load-balancing            L2/L4 traffic distribution
+cap:high-availability         VIP failover / single-active-node redundancy for an addressable surface
 cap:dns                       Authoritative or recursive DNS resolution
 cap:dhcp                      IP address allocation for a LAN segment
 cap:relational-database       SQL-tabular persistence
@@ -365,7 +373,7 @@ adds this repo as a registered producer:
 ```yaml
 producers:
   # … other entries …
-  - id: <kebab-id>                  # matches the bare kebab in your art: Producer id
+  - id: <kebab-id>                  # matches the bare kebab in this repo's architecture.yaml producer: key
     profile: <profile-id>           # infra-physical | cluster-services | application | images
     jenkinsJob: <Jenkins job path>  # e.g. ansible/master, HelmCharts/master
 ```
@@ -442,8 +450,8 @@ a skeleton with placeholders and comments — start from it.
    have to be exhaustive — the goal is to prove the pipeline end-to-end
    on real data and expand incrementally.
 2. **Mint ids**: for each instance in scope, pick a kebab hint and
-   generate a UUID. Commit the id table next to the architecture
-   source.
+   generate a UUID. The composite IDs in `architecture.yaml` are the
+   single source of truth; no separate id table.
 3. **Author** `architecture.yaml`. Iterate against
    `./scripts/arch-validate architecture.yaml` until clean.
 4. **Wire CI**: add the validate + archive steps to this repo's
