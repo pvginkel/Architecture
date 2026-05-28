@@ -219,7 +219,6 @@ Every artifact submitted to the validator is one document with this shape:
 ```yaml
 schemaVersion: "0.1"
 producer: helmcharts                     # bare kebab; matches this producer's entry in pipeline-producers.yaml
-generatedAt: 2026-05-27T14:00:00Z        # ISO-8601, optional; informational
 nodes: []                                # arrays per element kind (all optional)
 devices: []
 systemSoftware: []
@@ -340,7 +339,7 @@ Python (Poetry-managed). Reads the XSD via `xmlschema`. Loads `subset.yaml`. Val
 
 ### 4. Author `schema/v0.1/architecture.schema.yaml`
 
-The artifact-envelope wrapper. `$ref`s into the generated per-kind schemas via `items` constraints on each array. Required top-level fields: `schemaVersion`, `producer`. Optional: `generatedAt`, all twelve element-kind arrays, the `relations` array.
+The artifact-envelope wrapper. `$ref`s into the generated per-kind schemas via `items` constraints on each array. Required top-level fields: `schemaVersion`, `producer`. Optional: all element-kind arrays and the `relations` array.
 
 **Exit criteria:**
 

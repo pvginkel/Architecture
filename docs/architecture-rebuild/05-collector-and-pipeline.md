@@ -73,7 +73,7 @@ Concurrent producer completions are coalesced by Jenkins's pending-build merging
 8. **Triple-matrix check.** Every relation's `(source-kind, type, target-kind)` triple must be in the allowed-triples enumeration (already encoded as `x-allowedTriples` in `generated/relations.schema.yaml`). JSON Schema doesn't enforce the matrix on its own — the collector enforces it for both in-artifact and cross-artifact relations.
 9. **Grouping checks.** Groupings are producer-local. A Grouping that aggregates members from a different producer fails the build. A Grouping with zero Aggregation relations sourced from it (empty Grouping) also fails the build — dead data.
 10. **Rollup.** Compute Grouping memberships and Capability-realisation maps; sort and de-duplicate so reruns are byte-identical.
-11. **Emit.** Write `dist/data/v0.1/architecture.yaml`, `architecture.json`, and `validation-report.json` with deterministic key ordering so the image build is reproducible. No `generatedAt` field at the top level (would defeat byte-identical reruns and isn't load-bearing).
+11. **Emit.** Write `dist/data/v0.1/architecture.yaml`, `architecture.json`, and `validation-report.json` with deterministic key ordering so the image build is reproducible.
 
 ## Failure modes summary
 

@@ -6,7 +6,6 @@
 
 schemaVersion: "0.1"
 producer: helmcharts
-generatedAt: 2026-05-27T12:00:00Z
 
 devices:
   - id: device:proxmox-pve1,22222222-2222-4222-8222-222222222221

@@ -576,11 +576,9 @@ def assemble_merged_dataset(
       relations: [...]
       derived: {groupings, capabilityRealizations}
 
-    No `generatedAt` — it would defeat the byte-identical-reruns guarantee
-    and isn't load-bearing. `producer:` top-level (single-producer
-    artifact-envelope convention) is absent because the merged set has
-    no single producer; the registered-producer list captures who
-    contributed.
+    Top-level `producer:` (single-producer artifact-envelope convention)
+    is absent because the merged set has no single producer; the
+    registered-producer list captures who contributed.
     """
     doc: dict[str, Any] = {
         "schemaVersion": "0.1",

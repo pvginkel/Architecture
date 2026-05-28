@@ -57,7 +57,6 @@ published merged dataset into your repo's source.
 ```yaml
 schemaVersion: "0.1"
 producer: <this-producer-id>           # bare kebab; matches this repo's entry in pipeline-producers.yaml
-generatedAt: 2026-05-27T12:00:00Z      # optional, informational
 
 # all of the following arrays are optional; emit what this repo owns:
 nodes: [...]

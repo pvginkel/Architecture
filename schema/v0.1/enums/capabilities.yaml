@@ -39,6 +39,12 @@ entries:
     lifecycle: active
     introduced: 2026-05-27
 
+  - id: cap:high-availability
+    label: High availability
+    summary: VIP failover / single-active-node redundancy for an addressable surface.
+    lifecycle: active
+    introduced: 2026-05-28
+
   - id: cap:dns
     label: DNS
     summary: Authoritative or recursive DNS resolution for a domain set.

@@ -37,11 +37,6 @@ properties:
       declares (post-validation), so producers do not — and may not —
       emit a `producer:` field on individual elements.
 
-  generatedAt:
-    type: string
-    format: date-time
-    description: ISO-8601 timestamp; informational.
-
   nodes:
     type: array
     description: Node elements (execution hosts).
