@@ -42,14 +42,12 @@ podTemplate(inheritFrom: 'jenkins-agent kaniko', containers: [
         def producers = producersDoc.producers ?: []
         def upstreamJobs = producers.collect { it.jenkinsJob }.join(', ')
 
+        def triggers = [githubPush()]
         if (upstreamJobs) {
-            properties([pipelineTriggers([
-                upstream(threshold: hudson.model.Result.SUCCESS,
-                         upstreamProjects: upstreamJobs)
-            ])])
-        } else {
-            properties([pipelineTriggers([])])
+            triggers << upstream(threshold: hudson.model.Result.SUCCESS,
+                                 upstreamProjects: upstreamJobs)
         }
+        properties([pipelineTriggers(triggers)])
 
         stage('Copy producer artifacts') {
             sh 'mkdir -p producer-artifacts'
