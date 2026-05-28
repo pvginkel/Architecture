@@ -182,6 +182,16 @@ kinds:
     idPrefix: "svc:"
     idRegex: '^svc:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
     description: App-layer consumption surface (an internal HTTP API).
+    attributesAddition:
+      environment:
+        type: enum
+        enumRef: ./enums/environments.yaml
+        required: false
+        description: DTAP stage. Omit for surfaces that span environments (e.g. external APIs).
+      cluster:
+        type: string
+        required: false
+        description: Cluster identifier when the service is cluster-scoped.
 
   ApplicationInterface:
     layer: application
@@ -189,6 +199,16 @@ kinds:
     idPrefix: "if:"
     idRegex: '^if:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
     description: Addressable point on an ApplicationService.
+    attributesAddition:
+      environment:
+        type: enum
+        enumRef: ./enums/environments.yaml
+        required: false
+        description: DTAP stage. Omit for surfaces that span environments (e.g. external APIs).
+      cluster:
+        type: string
+        required: false
+        description: Cluster identifier when the interface is cluster-scoped.
 
   TechnologyService:
     layer: technology
@@ -196,6 +216,16 @@ kinds:
     idPrefix: "svc:"
     idRegex: '^svc:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
     description: Infra consumption surface. Postgres-on-5432, OIDC issuer, ZFS volume API, GitHub API.
+    attributesAddition:
+      environment:
+        type: enum
+        enumRef: ./enums/environments.yaml
+        required: false
+        description: DTAP stage. Omit for surfaces that span environments (e.g. external APIs).
+      cluster:
+        type: string
+        required: false
+        description: Cluster identifier when the service is cluster-scoped.
 
   TechnologyInterface:
     layer: technology
@@ -203,6 +233,16 @@ kinds:
     idPrefix: "if:"
     idRegex: '^if:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
     description: Addressable point on a TechnologyService. Queue, topic, OpenBao path, DB name, subvolume.
+    attributesAddition:
+      environment:
+        type: enum
+        enumRef: ./enums/environments.yaml
+        required: false
+        description: DTAP stage. Omit for surfaces that span environments (e.g. external APIs).
+      cluster:
+        type: string
+        required: false
+        description: Cluster identifier when the interface is cluster-scoped.
 
   Capability:
     layer: strategy

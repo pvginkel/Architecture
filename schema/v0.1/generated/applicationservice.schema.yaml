@@ -43,3 +43,15 @@ properties:
     type: object
     additionalProperties:
       type: string
+  environment:
+    description: DTAP stage. Omit for surfaces that span environments (e.g. external APIs).
+    type: string
+    enum:
+    - dev
+    - tst
+    - uat
+    - prd
+  cluster:
+    description: Cluster identifier when the service is cluster-scoped.
+    type: string
+    minLength: 1

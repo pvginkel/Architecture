@@ -101,10 +101,12 @@ technologyServices:
     summary: Cluster-shared Postgres at pg.cluster.svc:5432.
     introduced: 2026-05-01
     lifecycle: active
+    environment: prd
+    cluster: prd
 
   - id: svc:github-api,66666666-6666-4666-8666-666666666664
     label: GitHub API
-    summary: External GitHub REST API.
+    summary: External GitHub REST API. Spans environments — no `environment` field.
     introduced: 2024-07-12
     lifecycle: active
 

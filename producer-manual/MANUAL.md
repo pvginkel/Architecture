@@ -152,8 +152,8 @@ missing ones.
 
 Per-kind additions:
 
-- `environment` (optional, on Node/ApplicationComponent/SystemSoftware): `dev` \| `tst` \| `uat` \| `prd`
-- `cluster` (optional, on Node/SystemSoftware/ApplicationComponent): cluster identifier
+- `environment` (optional, on Node, SystemSoftware, ApplicationComponent, ApplicationService, ApplicationInterface, TechnologyService, TechnologyInterface): `dev` \| `tst` \| `uat` \| `prd`. Omit for surfaces that span environments (e.g. external APIs like the GitHub API).
+- `cluster` (optional, on the same kinds): cluster identifier. Omit for elements not bound to a single cluster.
 
 **Do not emit a `producer:` attribute on elements.** The collector
 stamps it onto every merged element from the envelope `producer:` key.
