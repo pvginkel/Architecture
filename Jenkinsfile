@@ -39,7 +39,7 @@ podTemplate(inheritFrom: 'jenkins-agent kaniko', containers: [
         // Triggers wiring derived from pipeline-producers.yaml.
         def producersDoc = readYaml(file: 'pipeline-producers.yaml')
         def producers = producersDoc.producers ?: []
-        def upstreamJobs = producers.collect { it.jenkinsJob }.join(', ')
+        def upstreamJobs = producers.collect { it.jenkinsJob }.findAll { it != null }.join(', ')
 
         def triggers = [githubPush()]
         if (upstreamJobs) {
