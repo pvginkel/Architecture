@@ -10,6 +10,12 @@ Your job is to walk this repo and produce **one tagged inventory document** of e
 
 You are **not** drafting architecture YAMLs. You are **not** minting UUIDs. You are **not** running the validator. Inventory only.
 
+## Two modes — detect first
+
+If the repo already has a **generator** (e.g. `tools/gen-architecture.py`) or an annotation convention that emits the architecture YAML, this is a **generated** producer (see the manual's "Generated producers"). Your inventory then isn't a hand-author triage table — it's: enumerate the workloads/images/releases, and propose the **annotation layer** (what each needs: product mapping, `realizes`, `served_by`) plus the **generator seams** (detectors, id natural keys, relation rules). Don't propose UUIDs — generated ids are uuid5-from-natural-key. Flag images/workloads the generator can't yet classify as gaps. Everything below (buckets, evidence, light relation pass) still applies; the output's "what to do" column shifts from "mint + author" to "annotate + extend generator".
+
+Otherwise it's a **hand-authored** producer: produce the triage table as described below.
+
 ## Inputs you need
 
 Before walking the repo, read these in order:
@@ -35,7 +41,7 @@ Cover at minimum:
 
 For each candidate, capture:
 
-- A **kebab-case hint** (the eventual `<hint>` in the composite id, or the bare kebab for catalog kinds). Apply the naming convention below.
+- A **kebab-case hint** (the eventual `<hint>` in the composite id — all minted kinds, including «SoftwareProduct» catalog entries, are composite; only `cap:`/`bsvc:` are bare-kebab, and those you reference rather than mint). Apply the naming convention below.
 - The **kind** per the producer manual's §Element kinds (`Node`, `Device`, `SystemSoftware` instance, `SystemSoftware» SoftwareProduct`, `ApplicationComponent` instance, `ApplicationComponent» SoftwareProduct`, `ApplicationService`, `ApplicationInterface`, `TechnologyService`, `TechnologyInterface`, `Capability`, `BusinessService`, `Grouping`).
 - **What it is** — one sentence grounded in repo evidence, with a file/line reference where possible.
 - **Proposed bucket** — your best guess from the four options below.

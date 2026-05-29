@@ -62,12 +62,14 @@ If **yes**, decide which element kind it maps to and what the delta is:
 
 When you mint a new id:
 
-- **Composite kinds** (Node, Device, instance-flavour SystemSoftware/ApplicationComponent, Services, Interfaces, Groupings): `<prefix>:<hint>,<uuid4>`. Generate the UUID with `python -c 'import uuid; print(uuid.uuid4())'`. **Never re-mint** an existing id. Apply the hint naming convention:
+- **Composite kinds** (Node, Device, SystemSoftware/ApplicationComponent — instances **and** «SoftwareProduct» catalog entries — Services, Interfaces, Groupings): `<prefix>:<hint>,<uuid>`. Generate the UUID with `python -c 'import uuid; print(uuid.uuid4())'`. **Never re-mint** an existing id. Apply the hint naming convention:
   - **Singleton per environment** → `<product>-<env>` (e.g. `ss:openbao-prd`, `ss:home-assistant-prd`).
   - **One instance per host, same product on multiple hosts** → `<product>-<host>` (e.g. `ss:haproxy-srvvault1`).
   - **One logical instance per cluster, multiple clusters in the env** → `<product>-<cluster>` (e.g. `ss:keepalived-openbao-prd`).
   - Singletons pinned to one host → still `<product>-<env>` (env is the durable axis). Don't double up when the host is named after the daemon.
-- **Bare-kebab kinds** (SoftwareProduct catalog on SystemSoftware/ApplicationComponent, Capability, BusinessService): `<prefix>:<kebab-name>`. Capability ids must already exist in the central enum — you cannot mint new ones; if you need a missing capability, raise it in the open-questions footer and stop short of editing.
+- **Bare-kebab kinds** (Capability, BusinessService — the curated vocabulary): `<prefix>:<kebab-name>`. Capability ids must already exist in the central enum — you cannot mint new ones; if you need a missing capability, raise it in the open-questions footer and stop short of editing.
+
+A «SoftwareProduct» catalog entry is composite (carries a UUID) and is declared **once** by its owner — the repo where an in-house app's source lives, or the deployer for a repackaged upstream. If this repo only *uses* a product another producer owns, reference it by that producer's UUID (resolved from the published dataset); don't redeclare it.
 
 When you remove or deprecate, walk the `relations:` array for stale source/target references. Edges to a removed element either move to its successor (rename case) or get deleted along with the element (genuine removal case).
 
