@@ -237,7 +237,8 @@ the manual doesn't enumerate it; common mappings:
 
 | Architectural fact | Relation | Source-kind → Target-kind |
 |---|---|---|
-| A node runs a daemon (cluster runs Keycloak) | `Assignment` | Node → SystemSoftware / ApplicationComponent |
+| A node runs a daemon (cluster runs Keycloak) | `Assignment` | Node → SystemSoftware |
+| Infra hosts / serves an application | `Serving` | Node / SystemSoftware / TechnologyService → ApplicationComponent |
 | A daemon realises a capability | `Realization` | SystemSoftware → Capability |
 | A service realises a capability | `Realization` | TechnologyService → Capability |
 | A daemon exposes a service | `Realization` | SystemSoftware → TechnologyService |
