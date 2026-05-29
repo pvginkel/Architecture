@@ -98,9 +98,9 @@ References between elements (in `relations`) use the same ids.
 | `Node` | `node:` | composite | Execution hosts: clusters, VMs, hypervisor clusters, physical compute |
 | `Device` | `device:` | composite | Physical hardware: switches, APs, server boxes, IoT |
 | `SystemSoftware` instance | `ss:` | composite | Running OS-level daemons (OpenBao on `bao-vm`, HAProxy on `haproxy-vm`, etc.) |
-| `SystemSoftware` («SoftwareProduct») | `ss:` | bare kebab | Software product identity (`ss:kubernetes`, `ss:openbao`, `ss:postgresql`) |
+| `SystemSoftware` («SoftwareProduct») | `ss:` | composite | Software product identity (`ss:kubernetes`, `ss:openbao`); `stereotype: SoftwareProduct` marks it |
 | `ApplicationComponent` instance | `app:` | composite | Running app workload (EI backend pod, DA worker, etc.) |
-| `ApplicationComponent` («SoftwareProduct») | `app:` | bare kebab | Application product identity (`app:electronics-inventory`) |
+| `ApplicationComponent` («SoftwareProduct») | `app:` | composite | Application product identity (`app:electronics-inventory`); `stereotype: SoftwareProduct` marks it |
 | `ApplicationService` | `svc:` | composite | App-layer consumption surface (internal HTTP API) |
 | `ApplicationInterface` | `if:` | composite | Addressable point on an ApplicationService (specific endpoint path) |
 | `TechnologyService` | `svc:` | composite | Infra consumption surface (Postgres-on-5432, OIDC issuer, Proxmox API) |
@@ -127,18 +127,27 @@ across edits; the UUID cannot — mint it once, commit it, never
 re-mint.
 
 **Bare kebab** is `<kind-prefix>:<kebab-name>` — for example
-`cap:iam`, `ss:keycloak`. Used by curated kinds (Capability,
-BusinessService) and stereotyped catalog identities («SoftwareProduct»
-on SystemSoftware / ApplicationComponent).
+`cap:iam`. Used **only** by the curated-vocabulary kinds (Capability,
+BusinessService): their stability comes from central curation / enum
+membership, not a UUID. Every other kind — including «SoftwareProduct»
+catalog entries — is composite and carries a UUID.
 
 **References** in `relations.source` / `relations.target` accept three
 forms:
 
 - **composite** — `node:prd-cluster,7f3a…` (canonical, readable)
-- **uuid-only** — `node:7f3a…` (terse; OK for cross-producer refs)
+- **uuid-only** — `node:7f3a…` (terse; the form for cross-producer refs)
 - **hint-only** — `node:prd-cluster` (OK **only when referencing an
   element this same producer declared**; cross-producer hint-only refs
   fail at merge time with a message pointing you at the UUID)
+
+**A cross-producer reference is the UUID — period.** The hint is
+informational; the UUID is the stable, normative identity. This holds
+for «SoftwareProduct» catalog entries too: referencing another
+producer's `ss:keycloak` by bare name resolves only inside the
+declaring producer, so cross-producer it dangles — use the UUID
+(`ss:<uuid>`), resolved from the published dataset. Only `cap:`/`bsvc:`
+are referenced by their bare name, because they're a curated vocabulary.
 
 Mint UUIDs with `python -c 'import uuid; print(uuid.uuid4())'` or
 `uuidgen`. The composite IDs inside the architecture YAML are the
@@ -192,7 +201,11 @@ Applies to: `SystemSoftware`, `ApplicationComponent`.
 
 Marks a product identity (the thing the upstream project is called)
 distinct from a running instance. Instances reach the product via
-ArchiMate's `Specialization` relation.
+ArchiMate's `Specialization` relation. Product and instance are both
+composite (UUID-bearing); the `stereotype: SoftwareProduct` field is
+what distinguishes the product. Convention: the product's hint is the
+bare product name (`ss:keycloak,<uuid>`), an instance's hint adds a
+distinguishing axis (`ss:keycloak-prd,<uuid>`).
 
 Added attributes:
 
@@ -206,7 +219,7 @@ Example:
 
 ```yaml
 systemSoftware:
-  - id: ss:openbao                      # bare kebab — catalog identity
+  - id: ss:openbao,3f1d9c2a-7b4e-4a1f-9c2d-5e6f7a8b9c0d   # composite — catalog identity
     label: OpenBao
     summary: Open-source fork of HashiCorp Vault for secret management.
     introduced: 2024-07-12
@@ -216,10 +229,11 @@ systemSoftware:
     logo: openbao.svg
 ```
 
-The producer that **publishes** a product (the upstream lives in this
-repo's domain) emits the catalog entry. Ansible owns
-`ss:kubernetes`, the ZFS allocator's product entry, etc. Other
-producers reference those entries by id; they don't redeclare them.
+The producer that **publishes** a product emits the catalog entry, and
+it's emitted **once** by a single owner (see Ownership conventions for
+who). Other producers reference it by **UUID** — resolved from the
+published dataset — and never redeclare it. A bare-name reference would
+dangle cross-producer.
 
 ## Relations
 
@@ -288,6 +302,39 @@ architecture.
 
 When unsure whether a particular thing belongs, ask Pieter rather
 than guessing.
+
+## Generated producers
+
+Two sanctioned authoring modes — pick by how structured the repo is:
+
+- **Hand-authored** — a human writes the YAML; it *is* the source of
+  truth. Everything above assumes this.
+- **Generated** — a generator walks the repo, fuses mechanically-derived
+  structure with a thin committed **annotation layer** for judgment, and
+  emits the YAML in CI. The repo + annotations are the source of truth;
+  the YAML is a build artifact you **don't commit** (regenerate it — see
+  Jenkins integration). Ids are uuid5-from-natural-key (see ID grammar);
+  the `update-architecture-generated` agent maintains it.
+
+**As-deployed granularity.** A generated producer may model running
+containers — an operational, more-than-textbook deployment view. This is
+legitimate *because* the model is derived from the source of truth (it
+can't drift) and the «SoftwareProduct» spine + `Specialization` keeps a
+clean logical type layer under the instance detail. Hand-authored
+producers stay at the coarser logical grain. The identity fence above
+still binds: named surfaces and edges, never runtime state.
+
+**Legibility.** One app × {dev,tst,uat,prd} × N containers explodes into
+near-identical instances. Use a `Grouping` per release and set
+`environment`/`cluster` consistently so instances collapse under their
+product/release. (The viewer-side collapse is pending viewer work; the
+convention is cheap and correct now.) That discipline is what keeps an
+as-deployed model an architecture, not an inventory.
+
+**Provenance.** A generator may want to record source template, generator
+version, render timestamp per element. There's no schema home today
+(`additionalProperties: false`); stash it in `stats` if you need it. A
+dedicated `provenance` slot is a v0.2 question.
 
 ## Capability enum (read-only reference)
 
@@ -405,6 +452,21 @@ files in different subdirs) is fine.
 The Jenkins agent must have outbound HTTPS to
 `architecture.webathome.org` so the validator can reach the service.
 
+**Generated producers** add a **generate** step first and do **not**
+commit the YAML — regenerate, validate, archive:
+
+```groovy
+stage('Generate') { sh 'python tools/gen-architecture.py' }   // may need helm/etc. on the agent
+stage('Validate') { sh './scripts/arch-validate.py docs/architecture/*.yaml' }
+stage('Archive')  { archiveArtifacts artifacts: 'docs/architecture/*.yaml', fingerprint: true }
+```
+
+No first-build bootstrap deadlock: `arch-validate` doesn't resolve
+cross-producer refs (that's merge-time), so build order only affects
+dangling refs in `validation-report.json` until the referenced producer
+has an archived build — reported, not build-breaking. Don't skip
+validation on the first build.
+
 ## Registration in the federation pipeline
 
 One PR against `pipeline-producers.yaml` in pvginkel/Architecture
@@ -431,8 +493,45 @@ The conventions below describe the **expected** ownership patterns per producer 
 | Ansible | Devices, Nodes (hypervisors/VMs/clusters), VM-level daemons, OS-layer services |
 | HelmCharts | Cluster-deployed SystemSoftware, ApplicationServices/Interfaces, SoftwareProduct entries for cluster-published software |
 | Per-app repos (EI, IoT, …) | ApplicationComponents (pods), ApplicationServices/Interfaces, app-specific SoftwareProduct entries |
-| DockerImages | Image identity, build provenance (v0.2 territory — no v0.1 element kind for container images) |
+| DockerImages | The «SoftwareProduct» product identity (`app:<name>,<uuid>`, via `sourceRepository`) for each in-house app whose source lives here — and there are many. Image identity / build provenance is a *separate* concern, still v0.2 (no v0.1 element kind for container images). |
 | Architecture (self-producer) | Homeless elements: physical network/rack hardware, IoT/RF devices, Home Assistant. Files live under `docs/architecture/` in the Architecture repo itself. |
+
+### Product vs instance, across producers
+
+The dividing line that decides who emits what — the most common
+merge-conflict point:
+
+- The repo where an in-house app's **source** lives owns the
+  «SoftwareProduct» catalog entry (DockerImages owns
+  `app:git-sync,<uuid>`).
+- The repo that **deploys** it owns the running **instance** and the
+  `Specialization` instance→product edge — referencing the product by
+  its UUID.
+- A **repackaged upstream** image emits no product of its own; the
+  **deployer** owns the upstream product entry (`ss:dnsmasq,<uuid>`,
+  `ss:keycloak,<uuid>`). When more than one producer deploys the same
+  upstream, one owns the single catalog entry and the others reference
+  its UUID.
+- A product is declared **once**; everyone else references the UUID,
+  resolved from the published dataset.
+
+### Consuming another producer's platform
+
+When your element "runs on" / "uses" another producer's platform,
+attach to its **running instance** — not the `Node` (that skips the
+platform layer; pods don't run on bare metal) and not the
+«SoftwareProduct» catalog entry (that's the type, not a running thing).
+The other producer owns
+node→instance and instance→product; you own only the consumption edge.
+Two shapes:
+
+- **Consume directly** — attach your workload straight to their running
+  service: a pod `Serving`-consumes `ss:microk8s-prd,<uuid>`.
+- **Re-provide via your own service layer** — deploy a driver that
+  consumes their backend and `Realization`-s a new cluster-local
+  `TechnologyService` **you** own, which your workloads then consume.
+  Ceph storage: `ceph-csi-rbd` realises `svc:cluster-ceph-rbd,<uuid>`
+  (yours), served by Ansible's `svc:ceph-vip-prd,<uuid>`.
 
 ## Worked example
 
@@ -451,14 +550,14 @@ nodes:
     cluster: prd
 
 systemSoftware:
-  - id: ss:openbao,8a4b3c2d-9e5f-4a6b-b7c8-2d3e4f5a6b7c
+  - id: ss:openbao-prd,8a4b3c2d-9e5f-4a6b-b7c8-2d3e4f5a6b7c
     label: OpenBao (prd)
     summary: Production OpenBao instance providing secrets management.
     introduced: 2026-05-27
     lifecycle: active
     environment: prd
 
-  - id: ss:openbao
+  - id: ss:openbao,9b2e7c4d-1a6f-4b3e-8d5c-2f7a9c0e1b3d
     label: OpenBao
     summary: Open-source HashiCorp Vault fork for secrets management.
     introduced: 2026-05-27
@@ -468,13 +567,13 @@ systemSoftware:
 
 relations:
   - id: rel:openbao-realises-secrets
-    source: ss:openbao,8a4b3c2d-9e5f-4a6b-b7c8-2d3e4f5a6b7c
+    source: ss:openbao-prd,8a4b3c2d-9e5f-4a6b-b7c8-2d3e4f5a6b7c
     target: cap:secrets-management
     type: Realization
 
   - id: rel:openbao-specialises-product
-    source: ss:openbao,8a4b3c2d-9e5f-4a6b-b7c8-2d3e4f5a6b7c
-    target: ss:openbao
+    source: ss:openbao-prd,8a4b3c2d-9e5f-4a6b-b7c8-2d3e4f5a6b7c
+    target: ss:openbao,9b2e7c4d-1a6f-4b3e-8d5c-2f7a9c0e1b3d
     type: Specialization
 ```
 
@@ -505,3 +604,8 @@ up.
    adding this producer. After it lands, the next Architecture
    pipeline run picks the files up and emits the merged dataset with
    this repo's elements included.
+
+A **generated** producer inverts steps 2–3: instead of minting ids and
+hand-authoring, design the annotation layer + generator (ids derive from
+natural keys) and run the generator to produce the YAML. See Generated
+producers.
