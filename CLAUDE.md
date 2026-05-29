@@ -36,6 +36,7 @@ Filename map:
 | `architecture/claude-md-snippet.md` | `claude-md-snippet.md` |
 | `agents/inventory-architecture.md` | `agents/inventory-architecture.md` |
 | `agents/update-architecture.md` | `agents/update-architecture.md` |
+| `agents/update-architecture-generated.md` | `agents/update-architecture-generated.md` |
 
 Diff both sides before editing — if they've drifted, surface the drift
 to the user rather than silently picking a side.
