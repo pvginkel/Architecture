@@ -19,3 +19,5 @@ services:
       - ${HOME}/.gitconfig:/home/ubuntu/.gitconfig:ro
       - ${HOME}/.cache:/home/ubuntu/.cache:rw
       - .:/work/Architecture:rw
+      - ../HelmCharts:/work/HelmCharts:rw
+      - ../Ansible-2:/work/Ansible:rw
