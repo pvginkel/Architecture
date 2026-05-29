@@ -34,8 +34,12 @@ The merged dataset eventually drives the rendered architecture
 diagram (viewer migration is later).
 
 You are **not** consuming any other producer's artifact directly.
-Cross-producer UUIDs you need are copied once, by hand, from the
-published merged dataset into your repo's source.
+Cross-producer UUIDs you need come from the published merged dataset
+above — it's fetchable and greppable, so a generated producer can
+resolve `hint`+kind → uuid at build time (read-only lookup) rather than
+hand-copying. Hand-copy is the fallback, and the only option for a
+producer that isn't published yet (chicken-and-egg): copy by hand until
+its first build registers.
 
 ## Working style
 
@@ -115,7 +119,7 @@ optional `sourceRepository:` string attribute on `«SoftwareProduct»`.
 
 ## ID grammar
 
-**Composite** is `<kind-prefix>:<hint>,<uuid4>` — for example
+**Composite** is `<kind-prefix>:<hint>,<uuid>` — for example
 `node:prd-cluster,7f3a2b1c-9d4a-4e8c-b2f1-1a2b3c4d5e6f`.
 The hint is a kebab-case nickname; the UUID is the load-bearing
 identity. Both required at the declaration site. The hint can drift
@@ -141,6 +145,15 @@ Mint UUIDs with `python -c 'import uuid; print(uuid.uuid4())'` or
 single source of truth — once minted and committed there, an ID is
 permanent. Don't maintain a parallel id table; it drifts and there's
 nothing it tells you that grepping the YAML doesn't. Never re-mint.
+
+That mint-once-uuid4 rule is for **hand-authored** producers. A
+**generated** producer should derive **uuid5 from a documented natural
+key** (e.g. `<namespace>.<workload>.<container>`) under a fixed
+per-system namespace UUID: the id is then a pure function of stable repo
+state, so "never re-mint" holds by construction — no stored ids, no id
+table. Trade-off: renaming the natural key reads as remove-old +
+add-new, dangling any cross-producer ref to the old id. The schema
+accepts any UUID version.
 
 ## Common attributes
 
@@ -251,6 +264,12 @@ expected on every stereotyped instance — e.g. a running Keycloak
 SystemSoftware specialises `ss:keycloak`. Ansible's running OpenBao
 specialises `ss:openbao`.
 
+**Generators: branch on the target kind.** A host→workload edge is not
+one relation type — Node→SystemSoftware is `Assignment`,
+Node→ApplicationComponent is `Serving`. The triple matrix differs by
+target kind, so a generator can't emit one type blindly; pick per
+target.
+
 ## Inclusion rule
 
 A thing belongs in the architecture data **if and only if it has a
@@ -258,6 +277,14 @@ stable external identity that another component can reach by name** —
 a DNS name, pod name, queue name, bucket name, domain name, API path,
 hardware identifier. Classes, screens, internal functions, individual
 files are out. Borderline cases default to **out**.
+
+**Identity fence (esp. IaC / generated producers).** The rule admits a
+thing by its *named surface or dependency edge*, never its runtime
+state. A container has identity (`namespace.workload.container`) so it's
+in; its replica count, env-var values, live config and current health
+are out. If an annotation describes behaviour-at-runtime rather than a
+named surface or a dependency edge, it's observability, not
+architecture.
 
 When unsure whether a particular thing belongs, ask Pieter rather
 than guessing.
