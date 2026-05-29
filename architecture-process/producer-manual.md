@@ -240,8 +240,8 @@ the manual doesn't enumerate it; common mappings:
 | A node runs a daemon (cluster runs Keycloak) | `Assignment` | Node → SystemSoftware / ApplicationComponent |
 | A daemon realises a capability | `Realization` | SystemSoftware → Capability |
 | A service realises a capability | `Realization` | TechnologyService → Capability |
-| A daemon exposes a service | `Composition` or `Realization` | SystemSoftware → TechnologyService |
-| A service exposes an interface | `Composition` | TechnologyService → TechnologyInterface |
+| A daemon exposes a service | `Realization` | SystemSoftware → TechnologyService |
+| An interface exposes a service | `Assignment` | TechnologyInterface → TechnologyService |
 | An instance is a particular SoftwareProduct | `Specialization` | instance → SoftwareProduct |
 | A grouping aggregates its members | `Aggregation` | Grouping → any |
 
