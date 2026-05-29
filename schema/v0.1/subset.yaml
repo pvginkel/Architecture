@@ -86,6 +86,26 @@ commonAttributes:
     description: Non-load-bearing facts (versions, URLs, image tags).
                  Render hints. Free-form string→string.
 
+# Custom profile attributes on relations (edges). ArchiMate relations carry
+# no attributes of their own; these are profile extensions, optional on every
+# relation. Which edges legitimately carry them is a producer concern,
+# documented in the producer manual — the schema does not constrain them
+# per-triple.
+relationAttributes:
+  boundBy:
+    type: string
+    required: false
+    pattern: '^env:[A-Za-z_][A-Za-z0-9_]*$'
+    description: >
+      Binding recipe for a runtime dependency edge: where the concrete
+      provider's identity is found at deploy time. `env:<VAR>` names a
+      container environment variable in the rendered deployment; the producer
+      that renders the deployment resolves the value to a provider element and
+      emits the concrete Serving edge. Rides on the provider-agnostic
+      consumption edge (e.g. an app to the capability it consumes) so the
+      recipe lives with the consumer, not its packaging. The `env:` prefix
+      leaves room for other value sources later.
+
 # Stereotype definitions.
 # A kind that lists a stereotype in `applicableStereotypes` allows artifact
 # authors to set `stereotype: <Name>` on an element; the additional

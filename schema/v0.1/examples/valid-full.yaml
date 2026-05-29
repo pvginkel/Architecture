@@ -184,6 +184,16 @@ relations:
     target: cap:iam
     type: Realization
 
+  # Provider-agnostic consumption edge: the backend consumes IAM. `boundBy`
+  # is the binding recipe — the producer that renders the deployment resolves
+  # env OIDC_ISSUER_URL to the concrete IAM provider and emits the Serving
+  # edge. The recipe lives on this edge (with the consumer), not in packaging.
+  - id: rel:ei-backend-consumes-iam
+    source: app:ei-backend-prd,55555555-5555-4555-8555-555555555552
+    target: cap:iam
+    type: Association
+    boundBy: "env:OIDC_ISSUER_URL"
+
   - id: rel:keycloak-instance-of-product
     source: ss:keycloak-prd,44444444-4444-4444-8444-444444444441
     target: ss:keycloak,2d45bc1f-81c0-4a98-8c00-5aad17e55214

@@ -171,6 +171,13 @@ def validate_subset_against_xsd(
                     f"with an XSD-reserved attribute name."
                 )
 
+    for attr_name in subset.get("relationAttributes", {}):
+        if attr_name in reserved:
+            errors.append(
+                f"relationAttributes.{attr_name} collides with an XSD-reserved "
+                f"attribute name."
+            )
+
     # 3. Stereotype appliesTo references kinds that exist.
     kind_names = set(subset["kinds"].keys())
     for stereo_name, stereo in subset.get("stereotypes", {}).items():
@@ -201,7 +208,10 @@ def attribute_to_json_schema(
 
     if t == "string":
         out["type"] = "string"
-        out["minLength"] = 1
+        if "pattern" in spec:
+            out["pattern"] = spec["pattern"]
+        else:
+            out["minLength"] = 1
     elif t == "date":
         out["type"] = "string"
         out["format"] = "date"
@@ -377,6 +387,7 @@ def emit_relations_schema(
     relationship_types: set[str],
     matrix: Mapping[tuple[str, str], set[str]],
     subset_kinds: Mapping[str, Any],
+    relation_attributes: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Build relations.schema.yaml: allowed (source-kind, type, target-kind) triples."""
     # Map our kind name → its ArchiMate concept name (same in v0.1 — kinds
@@ -408,6 +419,28 @@ def emit_relations_schema(
         "and structural shape."
     )
 
+    # Structural fields (ArchiMate essentials) plus the custom profile
+    # attributes layered on relations (subset.yaml relationAttributes). The
+    # profile attributes are optional on every relation; their semantics —
+    # which edges legitimately carry them — are a producer concern documented
+    # in the producer manual, not constrained per-triple here.
+    properties: dict[str, Any] = {
+        "id": {
+            "type": "string",
+            "pattern": "^rel:[a-z][a-z0-9-]*$|^rel:" + UUID_PATTERN + "$",
+            "description": "Stable identifier for this relation.",
+        },
+        "source": {"type": "string", "description": "Source element id."},
+        "target": {"type": "string", "description": "Target element id."},
+        "type": {
+            "type": "string",
+            "enum": sorted(relationship_types),
+            "description": "ArchiMate relationship type.",
+        },
+    }
+    for attr_name, spec in relation_attributes.items():
+        properties[attr_name] = attribute_to_json_schema(attr_name, spec, "")
+
     return {
         "$schema": JSON_SCHEMA_DRAFT,
         "$id": f"{SCHEMA_BASE_URL}/generated/relations.schema.yaml",
@@ -416,20 +449,7 @@ def emit_relations_schema(
         "type": "object",
         "additionalProperties": False,
         "required": ["id", "source", "target", "type"],
-        "properties": {
-            "id": {
-                "type": "string",
-                "pattern": "^rel:[a-z][a-z0-9-]*$|^rel:" + UUID_PATTERN + "$",
-                "description": "Stable identifier for this relation.",
-            },
-            "source": {"type": "string", "description": "Source element id."},
-            "target": {"type": "string", "description": "Target element id."},
-            "type": {
-                "type": "string",
-                "enum": sorted(relationship_types),
-                "description": "ArchiMate relationship type.",
-            },
-        },
+        "properties": properties,
         # The allowed-triples enumeration is a derived artifact; embed it
         # so the validation service can enforce it without re-deriving.
         "x-allowedTriples": [
@@ -488,7 +508,10 @@ def main(check: bool) -> None:
         new_files[path] = yaml.safe_dump(schema_doc, sort_keys=False, width=120)
 
     # Relations schema.
-    rel_doc = emit_relations_schema(xsd_relationship_types, triple_matrix, subset["kinds"])
+    rel_doc = emit_relations_schema(
+        xsd_relationship_types, triple_matrix, subset["kinds"],
+        subset.get("relationAttributes", {}),
+    )
     new_files[GENERATED_DIR / "relations.schema.yaml"] = yaml.safe_dump(
         rel_doc, sort_keys=False, width=120
     )

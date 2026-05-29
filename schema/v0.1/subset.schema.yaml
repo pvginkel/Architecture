@@ -54,6 +54,12 @@ properties:
     additionalProperties:
       $ref: "#/$defs/stereotypeSpec"
 
+  relationAttributes:
+    type: object
+    description: Custom profile attributes layered on relations (edges). Optional.
+    additionalProperties:
+      $ref: "#/$defs/attributeSpec"
+
   kinds:
     type: object
     minProperties: 1
@@ -71,6 +77,9 @@ $defs:
         enum: [string, date, uri, enum, idRef, stringMap]
       required: { type: boolean }
       description: { type: string }
+      pattern:
+        type: string
+        description: Optional regex constraint for `string`-typed attributes.
       enumRef: { type: string }
       enumValues:
         type: array

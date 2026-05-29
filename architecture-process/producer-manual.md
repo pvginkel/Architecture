@@ -284,6 +284,45 @@ Node→ApplicationComponent is `Serving`. The triple matrix differs by
 target kind, so a generator can't emit one type blindly; pick per
 target.
 
+### Relation attribute: `boundBy`
+
+Relations are otherwise attribute-free. The one profile attribute they
+may carry is `boundBy` — a **binding recipe** for a runtime dependency
+whose concrete provider is only known at deploy time. Its value is
+`env:<VAR_NAME>`: the named container environment variable in the
+rendered deployment holds the provider's address. (The `env:` prefix
+leaves room for other value sources later; only `env:` exists in v0.1.)
+
+```yaml
+relations:
+  - id: rel:design-assistant-consumes-iam
+    source: app:design-assistant      # the consumer
+    target: cap:iam                   # the capability it consumes
+    type: Association
+    boundBy: "env:OIDC_ISSUER_URL"
+```
+
+`boundBy` rides on the **provider-agnostic consumption edge** — the
+consumer to the capability it consumes — so the recipe lives with the
+consumer (its own producer authors it), never in whatever packages or
+deploys it. The edge says *what* is consumed and *how to locate the
+provider*; it deliberately does not name the provider.
+
+**Who resolves it.** The producer that *renders the deployment* (it is
+the only one that sees the env value, which is runtime state and stays
+unpublished). For each deployed instance that specialises the consumer
+product, that producer: reads the env var's rendered value, parses out
+the host, maps the host to a provider element (its own services, an
+exposed host, or a hand-mapped cross-producer host), and emits the
+concrete `provider —Serving→ instance` edge. The consumption edge's
+**target capability is a checked invariant** — the resolved provider
+must `Realize` it, else generation fails loudly. An unresolvable host
+also fails loudly; nothing is silently skipped.
+
+Until such a producer resolves it, a `boundBy` edge is just the recipe —
+no concrete `Serving` edge exists. The recipe can be authored before any
+deployer consumes it; resolution appears when a deploying producer does.
+
 ## Inclusion rule
 
 A thing belongs in the architecture data **if and only if it has a

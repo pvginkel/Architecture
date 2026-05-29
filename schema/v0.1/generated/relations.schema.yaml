@@ -39,6 +39,16 @@ properties:
     - Specialization
     - Triggering
     description: ArchiMate relationship type.
+  boundBy:
+    description: 'Binding recipe for a runtime dependency edge: where the concrete provider''s identity is found at deploy
+      time. `env:<VAR>` names a container environment variable in the rendered deployment; the producer that renders the deployment
+      resolves the value to a provider element and emits the concrete Serving edge. Rides on the provider-agnostic consumption
+      edge (e.g. an app to the capability it consumes) so the recipe lives with the consumer, not its packaging. The `env:`
+      prefix leaves room for other value sources later.
+
+      '
+    type: string
+    pattern: ^env:[A-Za-z_][A-Za-z0-9_]*$
 x-allowedTriples:
 - source: ApplicationComponent
   type: Access
