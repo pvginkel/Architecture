@@ -19,8 +19,10 @@ from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT202012
 
-UUID4_RE = re.compile(
-    r"^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+# Version-agnostic UUID shape (8-4-4-4-12 hex). Not pinned to uuid4: ids may be
+# hand-minted uuid4 or uuid5-from-natural-key (generated producers).
+UUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -122,8 +124,8 @@ def parse_id(s: str) -> tuple[str, str | None, str | None]:
     may be present or None depending on which of the three forms the
     string takes:
 
-    * composite — ``<kind>:<hint>,<uuid4>``      (declarations of instance kinds)
-    * uuid-only — ``<kind>:<uuid4>``             (external reference)
+    * composite — ``<kind>:<hint>,<uuid>``       (declarations of instance kinds)
+    * uuid-only — ``<kind>:<uuid>``              (external reference)
     * hint-only — ``<kind>:<hint>``              (internal reference / catalog
                                                   / curated kind)
 
@@ -145,7 +147,7 @@ def parse_id(s: str) -> tuple[str, str | None, str | None]:
     if "," in rest:
         hint, _, uuid_str = rest.partition(",")
         return kind, hint or None, uuid_str or None
-    if UUID4_RE.match(rest):
+    if UUID_RE.match(rest):
         return kind, None, rest
     return kind, rest, None
 

@@ -43,7 +43,10 @@ ENVIRONMENT_VALUES = ("dev", "tst", "uat", "prd")
 SCHEMA_BASE_URL = "https://architecture.webathome.org/schema/v0.1"
 JSON_SCHEMA_DRAFT = "https://json-schema.org/draft/2020-12/schema"
 
-UUID4_PATTERN = "[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+# Version-agnostic UUID shape (8-4-4-4-12 hex). We deliberately do NOT pin the
+# version/variant nibbles: producers may mint uuid4 by hand or derive uuid5 from
+# a natural key (generated producers), and the id must not lie about provenance.
+UUID_PATTERN = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 
 
 def load_yaml(path: Path) -> Any:
@@ -416,7 +419,7 @@ def emit_relations_schema(
         "properties": {
             "id": {
                 "type": "string",
-                "pattern": "^rel:[a-z][a-z0-9-]*$|^rel:" + UUID4_PATTERN + "$",
+                "pattern": "^rel:[a-z][a-z0-9-]*$|^rel:" + UUID_PATTERN + "$",
                 "description": "Stable identifier for this relation.",
             },
             "source": {"type": "string", "description": "Source element id."},

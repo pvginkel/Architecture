@@ -14,7 +14,7 @@ required:
 properties:
   id:
     type: string
-    pattern: ^rel:[a-z][a-z0-9-]*$|^rel:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    pattern: ^rel:[a-z][a-z0-9-]*$|^rel:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
     description: Stable identifier for this relation.
   source:
     type: string

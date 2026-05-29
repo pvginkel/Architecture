@@ -120,7 +120,7 @@ kinds:
     layer: technology
     archimateType: Node
     idPrefix: "node:"
-    idRegex: '^node:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+    idRegex: '^node:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
     description: Execution host. VMs, K8s clusters, Proxmox cluster, ESP32 devices.
     attributesAddition:
       environment:
@@ -137,14 +137,14 @@ kinds:
     layer: technology
     archimateType: Device
     idPrefix: "device:"
-    idRegex: '^device:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+    idRegex: '^device:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
     description: Physical hardware. Switches, APs, server hardware, IoT devices.
 
   SystemSoftware:
     layer: technology
     archimateType: SystemSoftware
     idPrefix: "ss:"
-    idRegex: '^ss:[a-z][a-z0-9-]*(,[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})?$'
+    idRegex: '^ss:[a-z][a-z0-9-]*(,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?$'
     description: Infra/middleware runtime. Running Keycloak, Postgres, nginx, OpenBao, dnsmasq.
     applicableStereotypes: [SoftwareProduct]
     attributesAddition:
@@ -162,7 +162,7 @@ kinds:
     layer: application
     archimateType: ApplicationComponent
     idPrefix: "app:"
-    idRegex: '^app:[a-z][a-z0-9-]*(,[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})?$'
+    idRegex: '^app:[a-z][a-z0-9-]*(,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?$'
     description: User-facing app workload. EI backend, EI frontend, DA portal, DA worker.
     applicableStereotypes: [SoftwareProduct]
     attributesAddition:
@@ -180,7 +180,7 @@ kinds:
     layer: application
     archimateType: ApplicationService
     idPrefix: "svc:"
-    idRegex: '^svc:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+    idRegex: '^svc:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
     description: App-layer consumption surface (an internal HTTP API).
     attributesAddition:
       environment:
@@ -197,7 +197,7 @@ kinds:
     layer: application
     archimateType: ApplicationInterface
     idPrefix: "if:"
-    idRegex: '^if:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+    idRegex: '^if:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
     description: Addressable point on an ApplicationService.
     attributesAddition:
       environment:
@@ -214,7 +214,7 @@ kinds:
     layer: technology
     archimateType: TechnologyService
     idPrefix: "svc:"
-    idRegex: '^svc:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+    idRegex: '^svc:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
     description: Infra consumption surface. Postgres-on-5432, OIDC issuer, ZFS volume API, GitHub API.
     attributesAddition:
       environment:
@@ -231,7 +231,7 @@ kinds:
     layer: technology
     archimateType: TechnologyInterface
     idPrefix: "if:"
-    idRegex: '^if:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+    idRegex: '^if:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
     description: Addressable point on a TechnologyService. Queue, topic, OpenBao path, DB name, subvolume.
     attributesAddition:
       environment:
@@ -266,5 +266,5 @@ kinds:
     layer: cross-cutting
     archimateType: Grouping
     idPrefix: "grp:"
-    idRegex: '^grp:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+    idRegex: '^grp:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
     description: Cosmetic clustering. No semantics.
