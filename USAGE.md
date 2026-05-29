@@ -55,7 +55,7 @@ specific schema or enum file relevant to the error.
     {
       "path": "/nodes/0/id",
       "keyword": "pattern",
-      "message": "value 'Node_BadId' does not match the required pattern /^node:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/",
+      "message": "value 'Node_BadId' does not match the required pattern /^node:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/",
       "value": "Node_BadId",
       "schemaUrl": "https://architecture.webathome.org/schema/v0.1/generated/node.schema.json",
       "hint": "see the schema's pattern for the exact rule"
