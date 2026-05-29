@@ -144,7 +144,7 @@ kinds:
     layer: technology
     archimateType: SystemSoftware
     idPrefix: "ss:"
-    idRegex: '^ss:[a-z][a-z0-9-]*(,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?$'
+    idRegex: '^ss:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
     description: Infra/middleware runtime. Running Keycloak, Postgres, nginx, OpenBao, dnsmasq.
     applicableStereotypes: [SoftwareProduct]
     attributesAddition:
@@ -162,7 +162,7 @@ kinds:
     layer: application
     archimateType: ApplicationComponent
     idPrefix: "app:"
-    idRegex: '^app:[a-z][a-z0-9-]*(,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?$'
+    idRegex: '^app:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
     description: User-facing app workload. EI backend, EI frontend, DA portal, DA worker.
     applicableStereotypes: [SoftwareProduct]
     attributesAddition:

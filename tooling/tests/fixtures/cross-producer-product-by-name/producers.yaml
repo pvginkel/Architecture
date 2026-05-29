@@ -1,0 +1,5 @@
+producers:
+- id: dockerimages
+  jenkinsJob: dockerimages/master
+- id: helmcharts
+  jenkinsJob: helmcharts/master

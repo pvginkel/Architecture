@@ -23,7 +23,7 @@ nodes:
     cluster: prd
 
 systemSoftware:
-  - id: ss:postgresql
+  - id: ss:postgresql,8df6a422-ee36-428d-9b96-cc65538e2772
     label: PostgreSQL
     summary: Software product identity for Postgres.
     introduced: 2024-07-12
@@ -32,7 +32,7 @@ systemSoftware:
     homepage: https://www.postgresql.org/
     logo: postgresql.svg
 
-  - id: ss:keycloak
+  - id: ss:keycloak,2d45bc1f-81c0-4a98-8c00-5aad17e55214
     label: Keycloak
     summary: Software product identity for Keycloak.
     introduced: 2024-09-04
@@ -186,7 +186,7 @@ relations:
 
   - id: rel:keycloak-instance-of-product
     source: ss:keycloak-prd,44444444-4444-4444-8444-444444444441
-    target: ss:keycloak
+    target: ss:keycloak,2d45bc1f-81c0-4a98-8c00-5aad17e55214
     type: Specialization
 
   - id: rel:shared-pg-realises-rel-db

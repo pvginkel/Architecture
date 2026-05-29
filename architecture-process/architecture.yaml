@@ -52,7 +52,7 @@ producer: <PRODUCER-ID>          # bare kebab; must match this repo's entry in p
 #     environment: prd
 #     cluster: prd
 #
-#   - id: ss:<product-name>          # bare kebab for SoftwareProduct catalog entries
+#   - id: ss:<product-name>,<uuid>   # composite; SoftwareProduct catalog entry (UUID is the normative cross-producer ref)
 #     label: ...
 #     summary: ...
 #     introduced: 2026-05-27

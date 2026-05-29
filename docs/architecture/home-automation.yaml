@@ -75,7 +75,7 @@ nodes:
     environment: prd
 
 systemSoftware:
-  - id: ss:home-assistant
+  - id: ss:home-assistant,4c3075c2-2a67-4788-851a-ff9f49cc7b09
     label: Home Assistant
     summary: Open-source home-automation platform.
     introduced: 2026-05-28
@@ -149,7 +149,7 @@ relations:
     type: Assignment
   - id: rel:home-assistant-prd-spec
     source: ss:home-assistant-prd,398e32ec-cbe7-40e4-8a66-094029653650
-    target: ss:home-assistant
+    target: ss:home-assistant,4c3075c2-2a67-4788-851a-ff9f49cc7b09
     type: Specialization
   # ArchiMate 3.2: a SystemSoftware realises a TechnologyService it
   # exposes (the service is the abstract behaviour) and composes the

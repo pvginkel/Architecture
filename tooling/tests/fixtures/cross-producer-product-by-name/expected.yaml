@@ -1,0 +1,7 @@
+# A «SoftwareProduct» catalog entry carries a UUID (bare-kebab ss:/app: is no
+# longer a valid id). A cross-producer reference to it MUST use that UUID — the
+# bare product name resolves only within the declaring producer (hint-only), so
+# referencing `app:git-sync` from another producer dangles. This locks the
+# "cross-producer references are by UUID" enforcement.
+exit_code: 1
+phase: cross-reference

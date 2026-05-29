@@ -1,0 +1,18 @@
+schemaVersion: "0.1"
+producer: helmcharts
+applicationComponents:
+  # HelmCharts deploys the instance and owns the Specialization edge. It must
+  # reference DockerImages' product by UUID; the bare name `app:git-sync` only
+  # resolves inside DockerImages, so this reference dangles at merge time.
+  - id: app:git-sync-prd,bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1
+    label: git-sync (prd)
+    summary: Running git-sync workload in the prd cluster.
+    introduced: 2026-05-29
+    lifecycle: active
+    environment: prd
+    cluster: prd
+relations:
+  - id: rel:git-sync-prd-specialises-product
+    source: app:git-sync-prd,bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1
+    target: app:git-sync
+    type: Specialization

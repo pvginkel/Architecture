@@ -1,0 +1,11 @@
+schemaVersion: "0.1"
+producer: dockerimages
+applicationComponents:
+  # DockerImages owns the in-house app's product identity (source lives here).
+  - id: app:git-sync,aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1
+    label: git-sync
+    summary: Product identity for the in-house git-sync app.
+    introduced: 2026-05-29
+    lifecycle: active
+    stereotype: SoftwareProduct
+    sourceRepository: git:pvginkel/DockerImages
