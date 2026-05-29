@@ -7,5 +7,5 @@
 
 producers:
   - id: ansible
-    jenkinsJob: Ansible
+    jenkinsJob: IaC/Architecture
   - id: architecture        # self-producer: source in docs/architecture/, no upstream Jenkins job
