@@ -107,8 +107,10 @@ podTemplate(inheritFrom: 'jenkins-agent kaniko', containers: [
                         --relaxed
                     # --relaxed tolerates dangling cross-producer refs while the
                     # federation is still onboarding (apps whose owning producer
-                    # isn't emitting yet). Drop it once every referenced producer
-                    # is online so dangling refs fail the build again.
+                    # isn't emitting yet). The Dockerfile's run-collector stage
+                    # carries the same flag (the two runs must match); drop it
+                    # from BOTH once every referenced producer is online so
+                    # dangling refs fail the build again.
                 '''
             }
             archiveArtifacts(

@@ -49,6 +49,12 @@ RUN npm run build
 # every registered producer's <id>/architecture.yaml from producer-artifacts/
 # in the build context, validates + merges + cross-checks, writes the merged
 # dataset to /work/dist/data/v0.1/. Fails the build on any collector error.
+#
+# --relaxed tolerates dangling cross-producer refs while the federation is
+# still onboarding (apps whose owning producer isn't emitting yet). This must
+# match the Jenkinsfile's preview "Run collector" stage — the two runs are
+# byte-identical only when given the same flags. Drop --relaxed from both once
+# every referenced producer is online so dangling refs fail the build again.
 FROM check-schemas AS run-collector
 WORKDIR /work
 COPY pipeline-producers.yaml pipeline-producers.schema.yaml ./
@@ -56,7 +62,8 @@ COPY producer-artifacts ./producer-artifacts
 RUN cd tooling && poetry run python collect.py \
       --producers /work/pipeline-producers.yaml \
       --in /work/producer-artifacts \
-      --out /work/dist
+      --out /work/dist \
+      --relaxed
 
 # ---- final runtime ----
 FROM node:20-alpine
