@@ -1,0 +1,5 @@
+# helm references cap:iam (Realization) but no producer declares it; the
+# collector materialises the node from the enum catalogue. Build succeeds and
+# the synthesised cap:iam carries producer: schema.
+exit_code: 0
+golden_dir: ./expected-dist

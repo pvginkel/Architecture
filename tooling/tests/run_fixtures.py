@@ -11,6 +11,7 @@ expected.yaml shape:
     phase: <collector phase that should fail>     # only when exit_code != 0
     golden_dir: ./expected-dist                   # only when exit_code == 0;
                                                   # compare byte-for-byte
+    args: [--relaxed, ...]                         # optional extra collect.py flags
 
 Exits 0 if every fixture matches its expectation, 1 otherwise.
 """
@@ -44,6 +45,7 @@ def run_fixture(fixture_dir: Path) -> tuple[bool, list[str]]:
                 "--producers", str(producers),
                 "--in", str(artifacts),
                 "--out", str(out_path),
+                *[str(a) for a in (expected.get("args") or [])],
             ],
             capture_output=True,
             text=True,

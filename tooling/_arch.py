@@ -119,6 +119,19 @@ def load_capability_enum() -> set[str]:
     return {entry["id"] for entry in doc["entries"]}
 
 
+def load_capability_catalog() -> dict[str, dict]:
+    """Full capability enum entries keyed by id. Each entry carries the
+    Capability element fields (id, label, summary, introduced, lifecycle).
+    The collector materialises Capability nodes from these for capabilities
+    that relations reference but no producer declares — the enum *is* the
+    capability catalogue, so the node body comes straight from it.
+
+    Normalised like producer docs so `introduced` is an ISO string, not a
+    YAML-parsed date — the materialised node has to JSON-serialise."""
+    doc = normalize(load_yaml(ENUMS_DIR / "capabilities.yaml"))
+    return {entry["id"]: entry for entry in doc["entries"]}
+
+
 def parse_id(s: str) -> tuple[str, str | None, str | None]:
     """Split a v0.1 element id into (kind, hint, uuid). Each component
     may be present or None depending on which of the three forms the

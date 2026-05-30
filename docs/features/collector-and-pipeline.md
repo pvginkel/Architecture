@@ -65,15 +65,18 @@ JSON-schema-validated at collector startup; the schema lives next to the file.
 - [x] Missing-producer-artifact fails the run.
 - [x] Extra directories in `producer-artifacts/` not listed in `pipeline-producers.yaml` fail the run (no stowaway producers).
 
-### 4. Capability-enum reconciliation
+### 4. Capability-enum reconciliation + node backfill
 
 Every `Capability` id referenced from any merged element must exist in `schema/v0.1/enums/capabilities.yaml`. Unknown reference fails the run with the offending producer + reference path.
+
+The enum is the capability *catalogue*, not just a name allow-list: producers reference `cap:` ids but do not own them. So after reconciliation the collector **materialises a Capability node** from the enum entry for every capability a relation references but no producer declares. There is exactly one node per capability (one `cap:iam`), shared by every realiser and consumer, so a `… —Realization→ cap:iam` edge has a node to resolve against. Only *referenced* capabilities are materialised (an unreferenced one would be an orphan node); capabilities a producer already declares are left untouched (no second node → no duplicate-id collision). Synthesised nodes are stamped `producer: schema` and carried in a synthetic `schema` artifact so the merge + resolution passes treat them like any element; `schema` is not a registered federation producer and is excluded from the report's producer count.
 
 **Exit criteria:**
 
 - [x] Unknown capability id fails the run.
 - [x] Known capability id passes.
-- [x] Test fixture covers both cases.
+- [x] Referenced-but-undeclared capability is materialised from the enum as a `producer: schema` node and resolves; declared capabilities are not duplicated.
+- [x] Test fixtures cover the unknown, declared, and backfilled cases.
 
 ### 5. Merge + duplicate-id detection
 
@@ -95,9 +98,12 @@ Combine all element-kind arrays across artifacts. Detect two producers emitting 
 
 Every relation's `source` and `target` id must resolve to an element in the merged dataset. Dangling fails the run. Reference to a `removed` element fails the run. Reference to a `deprecated` element produces a warning in the report.
 
+**Relaxed mode (`--relaxed`).** An opt-in, removable flag that downgrades a *dangling* reference from a build failure to a report warning (`kind: dangling-reference`), so a partially-onboarded federation still builds while a referenced producer is not yet emitting. Strict is the default; `removed`-target references stay hard failures even under `--relaxed` (the target exists and is tombstoned — a real integrity violation, not a missing producer). Intended use: pass `--relaxed` in the pipeline during onboarding and drop it once every referenced producer is online. The relaxed path resolves no extra references — it only changes the disposition of the unresolved ones — so cross-producer refs self-heal as the producers they point at come online.
+
 **Exit criteria:**
 
 - [x] Dangling reference fails the run with the offending relation pointer.
+- [x] `--relaxed` downgrades a dangling reference to a `dangling-reference` report warning and the run succeeds; `removed`-target stays a hard failure.
 - [x] `removed`-target reference fails the run.
 - [x] `deprecated`-target reference is captured as a warning in the report; run succeeds.
 - [x] All three id forms (composite `<kind>:<hint>,<uuid>`, uuid-only,

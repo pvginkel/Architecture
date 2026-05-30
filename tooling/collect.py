@@ -29,6 +29,7 @@ from _arch import (
     PIPELINE_PRODUCERS_FILE,
     PIPELINE_PRODUCERS_SCHEMA,
     load_allowed_triples,
+    load_capability_catalog,
     load_capability_enum,
     load_pipeline_producers,
     load_yaml,
@@ -36,6 +37,12 @@ from _arch import (
     parse_id,
     validate_doc,
 )
+
+# Synthetic producer that owns Capability nodes materialised from the enum
+# catalogue. Not a pipeline producer — it has no Jenkins job and no directory
+# under producer-artifacts; it exists only so backfilled capabilities carry a
+# `producer:` provenance stamp distinct from any real producer.
+SCHEMA_PRODUCER = "schema"
 
 
 ELEMENT_KIND_ARRAYS: tuple[str, ...] = (
@@ -282,6 +289,56 @@ def synthesize_provenance_attribute(docs: dict[str, Any]) -> int:
     return stamped
 
 
+def backfill_capability_nodes(docs: dict[str, Any]) -> int:
+    """Materialise a Capability element for every `cap:` a relation
+    references but no producer declares.
+
+    Capabilities are a curated catalogue (`schema/v0.1/enums/capabilities.yaml`),
+    not instance data — producers *reference* them, they don't own them. A
+    relation targeting `cap:iam` still needs a node to resolve against, so the
+    collector synthesises one from the enum entry. There is exactly one node
+    per capability (e.g. one `cap:iam`), shared by every realiser and consumer;
+    enum membership was already proven by `reconcile_capability_enum`.
+
+    Only *referenced* capabilities are materialised — the catalogue is not
+    dumped wholesale, since an unreferenced capability would be an orphan node.
+    Capabilities a producer already declares are left untouched (no second node,
+    so no duplicate-id collision at merge). The synthetic nodes are stamped
+    `producer: "schema"` and carried in a synthetic `schema` artifact added to
+    `docs`, so the merge + resolution passes treat them like any element.
+
+    Returns the number of nodes synthesised (0 → no synthetic artifact added).
+    """
+    declared: set[str] = set()
+    referenced: set[str] = set()
+    for pid in docs:
+        doc = docs[pid]
+        for cap in doc.get("capabilities") or []:
+            declared.add(cap["id"])
+        for rel in doc.get("relations") or []:
+            for field in ("source", "target"):
+                ref = rel[field]
+                if ref.startswith("cap:"):
+                    referenced.add(ref)
+
+    missing = sorted(referenced - declared)
+    if not missing:
+        return 0
+
+    catalog = load_capability_catalog()
+    nodes = [{**catalog[cap_id], "producer": SCHEMA_PRODUCER} for cap_id in missing]
+
+    synthetic: dict[str, Any] = {
+        "schemaVersion": "0.1",
+        "producer": SCHEMA_PRODUCER,
+    }
+    for kind in (*ELEMENT_KIND_ARRAYS, "relations"):
+        synthetic[kind] = []
+    synthetic["capabilities"] = nodes
+    docs[SCHEMA_PRODUCER] = synthetic
+    return len(nodes)
+
+
 def merge_artifacts(docs: dict[str, Any]) -> dict[str, list]:
     """Union every element-kind array (and relations) across producers.
     Fails the run if any id appears in more than one place, reporting
@@ -377,11 +434,20 @@ def resolve_cross_references(
     docs: dict[str, Any],
     index: ResolutionIndex,
     report: dict[str, Any],
+    relaxed: bool = False,
 ) -> None:
     """For every relation source/target, check the id resolves. Dangling =
     fail. Reference to a `removed` element = fail. Reference to a
     `deprecated` element = warning in the report; the run still succeeds.
     Composite + uuid-only + hint-only forms all flow through `index`.
+
+    Under `relaxed`, a dangling reference is downgraded from a build failure
+    to a report warning so a partially-onboarded federation still builds —
+    a relation may point at a producer not yet emitting. `removed`-target
+    references stay hard failures even when relaxed: the target exists and
+    is tombstoned, which is a real integrity violation, not a missing
+    producer. The relaxed path is an explicit, removable opt-in
+    (`--relaxed`); strict is the default.
     """
     messages: list[str] = []
 
@@ -391,6 +457,20 @@ def resolve_cross_references(
                 ref = rel[field]
                 entry, _ = index.resolve(ref, pid)
                 if entry is None:
+                    if relaxed:
+                        report["warnings"].append(
+                            {
+                                "kind": "dangling-reference",
+                                "producer": pid,
+                                "pointer": f"/relations/{i}/{field}",
+                                "reference": ref,
+                                "message": (
+                                    f"dangling reference to {ref!r} "
+                                    f"(unresolved; tolerated under --relaxed)"
+                                ),
+                            }
+                        )
+                        continue
                     messages.append(
                         f"{pid}: at /relations/{i}/{field}: dangling reference to "
                         f"{ref!r} (no element resolves; cross-producer references "
@@ -665,7 +745,9 @@ def finalize_report(
     Errors never appear in the report — they failed the run before emit.
     """
     report["summary"] = {
-        "producers": len(docs),
+        # Registered producers only — the synthetic SCHEMA_PRODUCER that may
+        # carry backfilled Capability nodes is not a federation producer.
+        "producers": len([p for p in docs if p != SCHEMA_PRODUCER]),
         "elements": sum(len(merged[k]) for k in ELEMENT_KIND_ARRAYS),
         "relations": len(merged["relations"]),
         "warnings": len(report["warnings"]),
@@ -738,7 +820,18 @@ def _fail(err: CollectorError) -> None:
     show_default=True,
     help="Output root; collector writes <out>/data/v0.1/*.",
 )
-def main(producers_path: Path, input_dir: Path, output_dir: Path) -> None:
+@click.option(
+    "--relaxed",
+    is_flag=True,
+    default=False,
+    help="Downgrade dangling cross-producer references from build failures to "
+    "report warnings, so a partially-onboarded federation still builds. "
+    "Opt-in and removable; strict is the default. removed-target references "
+    "stay hard failures.",
+)
+def main(
+    producers_path: Path, input_dir: Path, output_dir: Path, relaxed: bool
+) -> None:
     try:
         producers = load_pipeline_producers(producers_path, PIPELINE_PRODUCERS_SCHEMA)
     except ValueError as e:
@@ -779,6 +872,12 @@ def main(producers_path: Path, input_dir: Path, output_dir: Path) -> None:
         f"across {len(docs)} artifact(s)."
     )
 
+    backfilled = backfill_capability_nodes(docs)
+    click.echo(
+        f"Capability backfill: synthesised {backfilled} Capability node(s) from the "
+        f"enum for referenced-but-undeclared capabilities."
+    )
+
     try:
         merged = merge_artifacts(docs)
     except CollectorError as e:
@@ -794,18 +893,22 @@ def main(producers_path: Path, input_dir: Path, output_dir: Path) -> None:
     index = ResolutionIndex(docs)
 
     try:
-        resolve_cross_references(docs, index, report)
+        resolve_cross_references(docs, index, report, relaxed=relaxed)
     except CollectorError as e:
         _fail(e)
 
     deprecated_warnings = sum(
         1 for w in report["warnings"] if w["kind"] == "deprecated-target"
     )
-    suffix = (
-        f" ({deprecated_warnings} deprecated-target warning(s))."
-        if deprecated_warnings
-        else "."
+    dangling_warnings = sum(
+        1 for w in report["warnings"] if w["kind"] == "dangling-reference"
     )
+    notes = []
+    if dangling_warnings:
+        notes.append(f"{dangling_warnings} dangling tolerated under --relaxed")
+    if deprecated_warnings:
+        notes.append(f"{deprecated_warnings} deprecated-target warning(s)")
+    suffix = f" ({', '.join(notes)})." if notes else "."
     click.echo(f"Cross-reference resolution: all references resolved{suffix}")
 
     reconcile_alias_hints(docs, index, report)

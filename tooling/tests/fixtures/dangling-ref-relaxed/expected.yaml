@@ -1,0 +1,6 @@
+# Same dangling reference as the `dangling-ref` fixture, but --relaxed
+# downgrades it from a build failure to a report warning, so the build
+# succeeds. The validation report records the dangling-reference warning.
+exit_code: 0
+golden_dir: ./expected-dist
+args: [--relaxed]

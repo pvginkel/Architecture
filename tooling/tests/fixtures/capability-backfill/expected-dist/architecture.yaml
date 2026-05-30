@@ -1,0 +1,50 @@
+schemaVersion: '0.1'
+producers:
+- ansible
+- helm
+nodes:
+- id: node:prd-cluster,33333333-3333-4333-8333-333333333331
+  label: Production cluster
+  summary: Production Kubernetes cluster.
+  introduced: '2024-07-12'
+  lifecycle: active
+  cluster: prd
+  producer: ansible
+devices: []
+systemSoftware:
+- id: ss:keycloak-prd,44444444-4444-4444-8444-444444444441
+  label: Keycloak (prd)
+  summary: Running Keycloak.
+  introduced: '2024-09-04'
+  lifecycle: active
+  environment: prd
+  cluster: prd
+  producer: helm
+applicationComponents: []
+applicationServices: []
+applicationInterfaces: []
+technologyServices: []
+technologyInterfaces: []
+capabilities:
+- id: cap:iam
+  label: Identity & Access Management
+  summary: Identity store, authentication, authorisation, SSO realisation.
+  lifecycle: active
+  introduced: '2024-07-12'
+  producer: schema
+businessServices: []
+groupings: []
+relations:
+- id: rel:cluster-runs-keycloak
+  source: node:prd-cluster,33333333-3333-4333-8333-333333333331
+  target: ss:keycloak-prd,44444444-4444-4444-8444-444444444441
+  type: Assignment
+- id: rel:keycloak-realises-iam
+  source: ss:keycloak-prd,44444444-4444-4444-8444-444444444441
+  target: cap:iam
+  type: Realization
+derived:
+  groupings: {}
+  capabilityRealizations:
+    cap:iam:
+    - ss:keycloak-prd,44444444-4444-4444-8444-444444444441

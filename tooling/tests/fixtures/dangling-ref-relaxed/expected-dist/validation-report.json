@@ -1,0 +1,19 @@
+{
+  "summary": {
+    "producers": 1,
+    "elements": 2,
+    "relations": 1,
+    "warnings": 1,
+    "divergences": 0
+  },
+  "warnings": [
+    {
+      "kind": "dangling-reference",
+      "producer": "ansible",
+      "pointer": "/relations/0/target",
+      "reference": "ss:does-not-exist,99999999-9999-4999-8999-999999999999",
+      "message": "dangling reference to 'ss:does-not-exist,99999999-9999-4999-8999-999999999999' (unresolved; tolerated under --relaxed)"
+    }
+  ],
+  "divergences": []
+}
