@@ -82,16 +82,12 @@ producer: <PRODUCER-ID>          # bare kebab; must match this repo's entry in p
 #   - id: if:<hint>,<uuid4>
 #     ...
 
-# capabilities:
-#   # Reference any capabilities you realise. The id MUST exist in the
-#   # central enum (see producer-manual.md § Capability enum). Producers cannot
-#   # mint new capabilities; a PR against the Architecture repo's enum
-#   # is needed first.
-#   - id: cap:secrets-management
-#     label: Secrets management
-#     summary: Secrets storage / rotation / lease management.
-#     introduced: 2024-07-12
-#     lifecycle: active
+# No capabilities: array. Producers never declare Capability elements —
+# capabilities are declared only in the Architecture repo's enum. Reference a
+# cap: id as a Realization/Association target (e.g. target: cap:secrets-management)
+# and the collector backfills the node from the enum. See producer-manual.md
+# § Capability enum. The id must exist in the enum; adding one is a PR against
+# schema/v0.1/enums/capabilities.yaml in the Architecture repo.
 
 # businessServices:
 #   - id: bsvc:<kebab>

@@ -77,7 +77,8 @@ applicationServices: [...]
 applicationInterfaces: [...]
 technologyServices: [...]
 technologyInterfaces: [...]
-capabilities: [...]
+# no capabilities: array — producers never declare Capability elements
+# (see the Capability enum appendix); reference cap: ids from relations only.
 businessServices: [...]
 groupings: [...]
 relations: [...]
@@ -105,7 +106,7 @@ References between elements (in `relations`) use the same ids.
 | `ApplicationInterface` | `if:` | composite | Addressable point on an ApplicationService (specific endpoint path) |
 | `TechnologyService` | `svc:` | composite | Infra consumption surface (Postgres-on-5432, OIDC issuer, Proxmox API) |
 | `TechnologyInterface` | `if:` | composite | Addressable point on a TechnologyService (queue, topic, vault path, db name) |
-| `Capability` | `cap:` | bare kebab | Business-architecture role (centrally curated; see appendix) |
+| `Capability` | `cap:` | reference only | Business-architecture role. Declared only in the Architecture repo's enum, never in a producer artifact — reference `cap:` ids from relations and the collector backfills the node (see appendix) |
 | `BusinessService` | `bsvc:` | bare kebab | What the system delivers to humans (SSO, self-service tooling) |
 | `Grouping` | `grp:` | composite | Cosmetic clustering of producer-local members |
 
@@ -473,6 +474,15 @@ dedicated `provenance` slot is a v0.2 question.
 You may **reference** any of these but cannot mint new ones without
 a PR against `schema/v0.1/enums/capabilities.yaml` in the
 Architecture repo.
+
+**Capabilities are declared only in the Architecture repo — never in a
+downstream/app producer.** A `cap:` is reference-only: name it as a
+`Realization` target (something you own realizes it) or an `Association`
+target (something you own consumes it). Do **not** put a `capabilities:`
+array in your artifact — the enum is the single source of truth for each
+capability's id, label, summary, and lifecycle, and the collector
+materializes one shared node per *referenced* capability straight from it.
+Declaring your own copy duplicates the enum and is rejected at review.
 
 ```
 cap:iam                       Identity & Access Management
