@@ -8,15 +8,18 @@
 //    - if `jenkinsJob` is absent: this is a self-producer whose
 //      source lives in docs/architecture/ of this very repo; copy
 //      those files into producer-artifacts/<producer-id>/.
-// 4. Run the collector (`tooling/collect.py`) in a Python sidecar to
+// 4. Bundle producer-artifacts/ into producer-artifacts.tgz and
+//    archive it as a build artifact, before the collector runs, so
+//    the raw inputs are available for debugging even on failure.
+// 5. Run the collector (`tooling/collect.py`) in a Python sidecar to
 //    archive validation-report.json as a Jenkins build artifact.
-// 5. Clear the `producer-artifacts/` line in .dockerignore so kaniko
+// 6. Clear the `producer-artifacts/` line in .dockerignore so kaniko
 //    sees the populated directory.
-// 6. Kaniko-build the multi-stage Dockerfile. The Dockerfile's
+// 7. Kaniko-build the multi-stage Dockerfile. The Dockerfile's
 //    `run-collector` stage reruns collect.py against the same inputs
-//    inside the image; output is byte-identical to step 4 by the
+//    inside the image; output is byte-identical to step 5 by the
 //    collector's determinism guarantee.
-// 7. Trigger the Helm-side redeploy job (unchanged from v2).
+// 8. Trigger the Helm-side redeploy job (unchanged from v2).
 //
 // Triggers wired below:
 //   - SCM push to this repo (the default poll-or-webhook).
@@ -72,6 +75,22 @@ podTemplate(inheritFrom: 'jenkins-agent kaniko', containers: [
                     """
                 }
             }
+        }
+
+        stage('Archive collected artifacts') {
+            // Debugging aid: bundle the raw producer-artifacts/ tree
+            // and expose it as a build artifact before the collector
+            // runs, so the inputs are available even if collection
+            // fails downstream.
+            sh '''
+                set -eu
+                tar -czf producer-artifacts.tgz producer-artifacts
+            '''
+            archiveArtifacts(
+                artifacts: 'producer-artifacts.tgz',
+                fingerprint: true,
+                allowEmptyArchive: false
+            )
         }
 
         stage('Run collector') {
