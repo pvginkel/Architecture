@@ -108,12 +108,10 @@ technologyInterfaces:
     stats:
       url: https://homeassistant.webathome.org
 
-capabilities:
-  - id: cap:home-automation
-    label: Home automation
-    summary: Sensor/actuator orchestration over Zigbee/MQTT.
-    introduced: 2026-05-28
-    lifecycle: active
+# Capabilities are not declared by producers — the enum
+# (schema/v0.1/enums/capabilities.yaml) is the catalogue, and the collector
+# backfills a cap:home-automation node from it because the relations below
+# reference it. See docs/features/collector-and-pipeline.md § 4.
 
 relations:
   # ─── PoE wiring of home-automation devices off the rack switch ──────
