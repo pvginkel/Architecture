@@ -2,11 +2,11 @@
 
 This is the operator-side reference for becoming a producer in the
 webathome.org federated architecture system. It lives at
-`~/.claude/architecture/producer-manual.md` and the
-`inventory-architecture` and `update-architecture` agents read it from
-there on startup. Producer repos copy `arch-validate.py` into
-`scripts/arch-validate.py` for their Jenkinsfile to call; everything else
-is operator-side.
+`~/.claude/architecture/producer-manual.md`. The `/seed-architecture`
+skill (first-version authoring) and the `update-architecture` /
+`update-architecture-generated` agents read it from there on startup.
+Producer repos copy `arch-validate.py` into `scripts/arch-validate.py`
+for their Jenkinsfile to call; everything else is operator-side.
 
 ## What you're producing and why
 
@@ -295,33 +295,117 @@ leaves room for other value sources later; only `env:` exists in v0.1.)
 
 ```yaml
 relations:
+  # substitutable infra — target is a capability; boundBy REQUIRED
   - id: rel:design-assistant-consumes-iam
     source: app:design-assistant      # the consumer
     target: cap:iam                   # the capability it consumes
     type: Association
     boundBy: "env:OIDC_ISSUER_URL"
+  # known in-house provider — target is its service; boundBy OPTIONAL
+  - id: rel:nginx-configurator-consumes-certbot
+    source: app:nginx-configurator    # the consumer
+    target: svc:certbot,<uuid>        # the specific provider service
+    type: Association
+    boundBy: "env:NGINX_CERTBOT_ENDPOINT"
 ```
 
-`boundBy` rides on the **provider-agnostic consumption edge** — the
-consumer to the capability it consumes — so the recipe lives with the
-consumer (its own producer authors it), never in whatever packages or
-deploys it. The edge says *what* is consumed and *how to locate the
-provider*; it deliberately does not name the provider.
+The consumption edge's **`source` is always the consumer** and `type` is
+`Association`. The recipe lives with the consumer (its own producer
+authors it), never in whatever packages or deploys it. The edge's
+**target** says how specific the dependency is:
+
+- **`target: cap:<x>`** — a *substitutable* capability the consumer's
+  producer does not pin to a concrete provider (any OIDC IdP, any
+  Postgres). `boundBy` is **required** — it is the only thing that lets a
+  deployer find the provider. The deployer resolves the env host to an
+  element that **`Realize`s that capability**: a checked invariant; if the
+  resolved provider doesn't realize it, generation fails loudly.
+- **`target: svc:<id>`** — a *specific* service of a known provider
+  (typically another in-house app modelled by the same federation, e.g.
+  `nginx-configurator → svc:certbot`). The target already names the
+  provider, so `boundBy` is **optional**: include it to record which env
+  var carries the wire (and to let the deployer project the edge onto the
+  right instance/container); omit it when the logical edge suffices.
+
+A real runtime dependency whose provider is located by something *other*
+than an environment variable — a config file, an in-cluster service
+account — is still a legitimate consumption edge; it simply carries no
+`boundBy` (no `env:` recipe exists) and never resolves to a concrete
+`Serving` edge. Model it when it documents a real dependency.
 
 **Who resolves it.** The producer that *renders the deployment* (it is
 the only one that sees the env value, which is runtime state and stays
 unpublished). For each deployed instance that specialises the consumer
-product, that producer: reads the env var's rendered value, parses out
-the host, maps the host to a provider element (its own services, an
-exposed host, or a hand-mapped cross-producer host), and emits the
-concrete `provider —Serving→ instance` edge. The consumption edge's
-**target capability is a checked invariant** — the resolved provider
-must `Realize` it, else generation fails loudly. An unresolvable host
-also fails loudly; nothing is silently skipped.
+product, that producer reads the env var's rendered value, parses out the
+host, maps the host to a provider element (its own services, an exposed
+host, or a hand-mapped cross-producer host), checks the invariant above,
+and emits the concrete `provider —Serving→ instance` edge. An
+unresolvable host fails loudly; nothing is silently skipped.
 
 Until such a producer resolves it, a `boundBy` edge is just the recipe —
 no concrete `Serving` edge exists. The recipe can be authored before any
 deployer consumes it; resolution appears when a deploying producer does.
+
+**Resolving it (deployer-side mechanics).** Lessons from the first
+resolver — the details bite:
+
+- **Resolve cross-producer ids from the published dataset; don't
+  hand-copy.** The resolver fetches the merged dataset as its base and
+  overlays any not-yet-published sibling producer (a local checkout) so
+  authored-but-unpublished recipes resolve while testing. `hint`+kind →
+  uuid is a read-only lookup; hand-copied constants are the last resort,
+  not the norm. (There is no "can't link cross-producer" blocker — the
+  UUID is in the dataset; fetch and resolve it.)
+- **Parse the host, preserve identity.** Strip scheme / `user:pass@` /
+  path from the env value, but keep the host *and* port — same-pod and
+  `localhost` providers differ only by port, so trimming it collapses
+  distinct wires. Normalize Kubernetes Service DNS to `(ns, svc)` only by
+  stripping a recognized `.svc[.cluster.local]` suffix, and trust the
+  result only if that `(ns, svc)` actually exists — never strip arbitrary
+  domains (`ca.home` is an external host, not `svc=ca, ns=home`).
+- **A provider is a long-running container.** Exclude init containers: one
+  sharing the product image "realizes" the capability per annotation but
+  doesn't serve the wire. For `cap:` targets keep only providers that both
+  Realize the capability and aren't init.
+- **A provider may be SystemSoftware.** Keycloak/Jenkins back their
+  exposed host as `ss:`; match the Service selector over *all* workload
+  containers, not just ApplicationComponents.
+- **`svc:` targets locate, not just name.** When the named app runs in
+  several workloads the env value's host picks which instance — a loopback
+  host means the same pod; otherwise the workload whose name the host
+  carries (`dns-0.dns-headless` → the `dns` workload).
+- **Two real consumers, two edges.** A recipe set on the same container in
+  two workloads (a Deployment and its renewal CronJob) resolves to two
+  genuine `Serving` edges — not a duplicate to suppress.
+- **Draw at the coarsest granularity the signal honestly supports.** The
+  env-var-presence test already discriminates per-role workloads for free
+  — a migration job that doesn't set `OIDC_ISSUER_URL` gets no IAM edge,
+  so least-privilege env scoping *is* the model's precision, no hardcoding.
+  For a deployer-owned wire with *no* env signal (a secret store, below),
+  don't manufacture pod-level precision — attach to the primary controller,
+  not every pod that shares the capability.
+
+### An application's exposed surface
+
+An app that offers a network API is modelled as one `ApplicationService`
+realized by the app (`app —Realization→ svc`), with one
+`ApplicationInterface` **per distinct consumer** of that service
+(`if —Assignment→ svc`). Most apps have a single consumer class and so a
+single interface; model several only when the API genuinely serves
+different client types (a public read surface vs an admin/IaC surface, a
+frontend vs a separate portal). Group by consumer, not by route — an
+interface per HTTP path is an endpoint inventory, not an architecture.
+
+The **logical** ApplicationService belongs to the app's own producer; the
+**deployer** that exposes it publicly references that service's UUID and
+attaches the public host as an `ApplicationInterface` on it, rather than
+minting a second service for the same app. The deployer detects this case
+from the published dataset — the backing product carries an
+`app —Realization→ svc` edge — and references that `svc` UUID; for an
+upstream app with no such product it mints its own service as before. It
+does **not** re-emit the `instance —Realization→ svc` edge: that
+realization is the app producer's, and the instance reaches the service
+transitively through its `Specialization`.
 
 ## Inclusion rule
 
@@ -362,6 +446,15 @@ can't drift) and the «SoftwareProduct» spine + `Specialization` keeps a
 clean logical type layer under the instance detail. Hand-authored
 producers stay at the coarser logical grain. The identity fence above
 still binds: named surfaces and edges, never runtime state.
+
+**Deterministic natural keys.** The uuid5 natural key must be stable
+across renders, or every build re-mints the id and dangles any
+cross-producer ref to it. Strip deploy-time randomness out of the key —
+a Helm `randAlphaNum` suffix on a one-shot Job name (`...-setup-x7f2a`)
+churns the id every render; normalize it to the stable base. Likewise a
+random value the render bakes into a manifest (a generated secret) must
+not reach any id or emitted field. Verify by regenerating twice and
+diffing — a clean producer is byte-identical.
 
 **Legibility.** One app × {dev,tst,uat,prd} × N containers explodes into
 near-identical instances. Use a `Grouping` per release and set
@@ -532,7 +625,7 @@ The conventions below describe the **expected** ownership patterns per producer 
 | Ansible | Devices, Nodes (hypervisors/VMs/clusters), VM-level daemons, OS-layer services |
 | HelmCharts | Cluster-deployed SystemSoftware, ApplicationServices/Interfaces, SoftwareProduct entries for cluster-published software |
 | Per-app repos (EI, IoT, …) | ApplicationComponents (pods), ApplicationServices/Interfaces, app-specific SoftwareProduct entries |
-| DockerImages | The «SoftwareProduct» product identity (`app:<name>,<uuid>`, via `sourceRepository`) for each in-house app whose source lives here — and there are many. Image identity / build provenance is a *separate* concern, still v0.2 (no v0.1 element kind for container images). |
+| DockerImages | Each in-house app's **full logical architecture** — the «SoftwareProduct» identity (`app:<name>,<uuid>`, via `sourceRepository`), the ApplicationServices/Interfaces it exposes, any capability it realizes, and its consumption edges. Source for many apps lives here, so it plays the per-app-repo role for each. Image identity / build provenance is a *separate* concern, still v0.2 (no v0.1 element kind for container images). |
 | Architecture (self-producer) | Homeless elements: physical network/rack hardware, IoT/RF devices, Home Assistant. Files live under `docs/architecture/` in the Architecture repo itself. |
 
 ### Product vs instance, across producers
@@ -553,6 +646,12 @@ merge-conflict point:
   its UUID.
 - A product is declared **once**; everyone else references the UUID,
   resolved from the published dataset.
+- **Model what a thing is, not how it's packaged.** A custom-built image
+  that is really an upstream product plus baked config — a Postgres image
+  with an init script — is modelled as the upstream product
+  (`ss:postgresql`, realizing what it provides), not as a bespoke in-house
+  product. The packaging is a build artifact; the element is the database
+  it runs. The source repo owns no product for it.
 
 ### Consuming another producer's platform
 
@@ -571,6 +670,17 @@ Two shapes:
   `TechnologyService` **you** own, which your workloads then consume.
   Ceph storage: `ceph-csi-rbd` realises `svc:cluster-ceph-rbd,<uuid>`
   (yours), served by Ansible's `svc:ceph-vip-prd,<uuid>`.
+- **Operator-mediated** — a deploy-time operator reads a backend on behalf
+  of many workloads and hands them a *derived* local resource. The real
+  runtime edge is `backend —Serving→ the operator`, drawn once from the
+  deployer-owned config that wires them; the workloads depend on the
+  derived resource (a Kubernetes Secret, read through the platform), not on
+  the backend, so they get **no** edge to it. External Secrets Operator
+  reading OpenBao: `svc:openbao-api-prd —Serving→ the ESO controller`,
+  derived from the deployer-owned ClusterSecretStore — not one edge per
+  consuming app, and not OpenBao→app (the apps can't even address it).
+  Attach to the controller instance (the primary workload realizing the
+  capability), not the whole operator deployment set.
 
 ## Worked example
 

@@ -16,7 +16,7 @@ Before you start, read:
 
 1. `~/.claude/architecture/producer-manual.md` — full vocabulary, ID grammar, stereotypes, inclusion rule, ArchiMate relation matrix guidance.
 2. `CLAUDE.md` at repo root — repo conventions, commit cadence, what's in scope.
-3. Every `docs/architecture/*.yaml` (one file or several; if there are zero, stop and tell the operator to run `inventory-architecture` first). All files declare the same `producer:` envelope key.
+3. Every `docs/architecture/*.yaml` (one file or several; if there are zero, stop and tell the operator to run the `/seed-architecture` skill first). All files declare the same `producer:` envelope key.
 
 If the producer manual is missing, stop. You need the vocabulary to make correct edits.
 
