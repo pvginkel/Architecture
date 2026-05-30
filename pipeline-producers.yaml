@@ -7,5 +7,9 @@
 
 producers:
   - id: ansible
-    jenkinsJob: IaC/Architecture
+    jenkinsJob: IaC/Ansible Architecture
   - id: architecture        # self-producer: source in docs/architecture/, no upstream Jenkins job
+  - id: helm-charts
+    jenkinsJob: IaC/HelmCharts Architecture
+  - id: docker-images
+    jenkinsJob: DockerImages Architecture
