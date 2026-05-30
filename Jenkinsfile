@@ -103,7 +103,12 @@ podTemplate(inheritFrom: 'jenkins-agent kaniko', containers: [
                     poetry run python collect.py \
                         --producers "${WORKSPACE}/pipeline-producers.yaml" \
                         --in "${WORKSPACE}/producer-artifacts" \
-                        --out "${WORKSPACE}/dist"
+                        --out "${WORKSPACE}/dist" \
+                        --relaxed
+                    # --relaxed tolerates dangling cross-producer refs while the
+                    # federation is still onboarding (apps whose owning producer
+                    # isn't emitting yet). Drop it once every referenced producer
+                    # is online so dangling refs fail the build again.
                 '''
             }
             archiveArtifacts(
