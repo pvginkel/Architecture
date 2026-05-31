@@ -31,3 +31,17 @@ export function loadCollapsed(src: string): CollapsedState {
 export function saveCollapsed(src: string, state: CollapsedState): void {
   window.localStorage.setItem(keyFor(src), JSON.stringify(state));
 }
+
+const ACTIVE_VIEW_PREFIX = "arch-viewer:active-view:";
+
+function activeViewKeyFor(src: string): string {
+  return `${ACTIVE_VIEW_PREFIX}${hashSrc(src)}`;
+}
+
+export function loadActiveView(src: string): string | null {
+  return window.localStorage.getItem(activeViewKeyFor(src));
+}
+
+export function saveActiveView(src: string, viewId: string): void {
+  window.localStorage.setItem(activeViewKeyFor(src), viewId);
+}
