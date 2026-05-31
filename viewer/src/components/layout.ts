@@ -22,17 +22,21 @@ const elk = new ELK();
 // the ArchiMate layered view and the way an infrastructure stack reads: the most
 // depended-upon element sinks to the bottom.
 //
-// The technology layer is split by kind into a hardware -> system-software ->
-// service -> interface sub-stack, so the infra layer reads as a stack (devices
-// under the software that runs on them, under the services they expose) instead
-// of leaving that order to topology. The other layers stay one band each.
-// Cross-cutting groupings get the bottom band for now.
+// Hardware (Node, Device) is split off into its own band at the bottom — it is
+// unambiguously the physical foundation, so pinning it there is safe and lets
+// hosts/routers sit beneath the software that runs on them. The rest of the
+// technology layer (SystemSoftware, TechnologyService, TechnologyInterface)
+// stays a SINGLE band ordered by topology, deliberately NOT sub-banded by kind:
+// SystemSoftware spans both low-level infra (a CSI driver) and app-grade
+// software (a database), so a fixed kind order fights the graph. A storage
+// TechnologyService that serves databases must sit below them, while the CSI
+// SystemSoftware that realizes it must sit below the service — contradictory as
+// fixed bands, but a clean bottom-up chain once topology (under the UP flow)
+// orders them. Cross-cutting groupings get the bottom band for now.
 const BAND_ORDER = [
   "cross-cutting",
   "hardware", // Node, Device
-  "system-software", // SystemSoftware
-  "technology-service", // TechnologyService
-  "technology-interface", // TechnologyInterface
+  "technology", // SystemSoftware, TechnologyService, TechnologyInterface — topology-ordered
   "application", // ApplicationComponent / ApplicationService / ApplicationInterface
   "business", // BusinessService
   "strategy", // Capability
@@ -40,22 +44,13 @@ const BAND_ORDER = [
 
 type BandKey = (typeof BAND_ORDER)[number];
 
-/** The band an element belongs to. Technology kinds get their own sub-band;
+/** The band an element belongs to. Hardware kinds are pinned to their own band;
  *  every other kind falls back to its layer (always a band key). */
 function bandKey(kind: ElementKind, layer: LayerId): BandKey {
-  switch (kind) {
-    case "Node":
-    case "Device":
-      return "hardware";
-    case "SystemSoftware":
-      return "system-software";
-    case "TechnologyService":
-      return "technology-service";
-    case "TechnologyInterface":
-      return "technology-interface";
-    default:
-      return layer as BandKey; // application | business | strategy | cross-cutting
+  if (kind === "Node" || kind === "Device") {
+    return "hardware";
   }
+  return layer as BandKey; // technology | application | business | strategy | cross-cutting
 }
 
 function bandPartition(node: Node): number {
