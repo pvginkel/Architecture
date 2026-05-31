@@ -39,6 +39,10 @@ export interface ManifestRelation {
   type: RelationshipType;
   boundBy?: string;
   boundByDefaultValue?: string;
+  // Set by the collector on relations it synthesised by projecting an
+  // instance-level edge onto its definition. Rendered as an inferred (dashed)
+  // edge. Absent on authored relations.
+  derived?: boolean;
 }
 
 export interface ManifestDerived {

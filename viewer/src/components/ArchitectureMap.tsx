@@ -253,9 +253,15 @@ function RelationshipEdge({
   // marker (a separate, shared SVG element that doesn't inherit strokeOpacity)
   // dims and brightens together with the line.
   const opacity = data.dimmed ? 0.12 : data.highlighted ? 0.98 : baseOpacity;
+  // Derived edges (collector-projected from instance-level facts) read as
+  // inferred, not modelled: dashed line, slightly muted unless highlighted.
+  const derived = data.relation.derived === true;
 
   return (
-    <g className="relationship-edge" style={{ opacity }}>
+    <g
+      className="relationship-edge"
+      style={{ opacity: derived && !data.highlighted ? opacity * 0.8 : opacity }}
+    >
       <path
         id={id}
         className="relationship-edge__path"
@@ -264,6 +270,7 @@ function RelationshipEdge({
         markerEnd={markerEnd}
         stroke={data.color}
         strokeWidth={strokeWidth}
+        strokeDasharray={derived ? "6 4" : undefined}
       />
       <path
         className="relationship-edge__interaction"
