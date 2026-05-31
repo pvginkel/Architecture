@@ -31,6 +31,8 @@ GENERATED_DIR = SCHEMA_DIR / "generated"
 ENUMS_DIR = SCHEMA_DIR / "enums"
 PIPELINE_PRODUCERS_FILE = REPO_ROOT / "pipeline-producers.yaml"
 PIPELINE_PRODUCERS_SCHEMA = REPO_ROOT / "pipeline-producers.schema.yaml"
+VIEWS_DIR = REPO_ROOT / "views"
+VIEWS_SCHEMA = REPO_ROOT / "views.schema.yaml"
 
 
 def normalize(obj: Any) -> Any:
@@ -130,6 +132,31 @@ def load_capability_catalog() -> dict[str, dict]:
     YAML-parsed date — the materialised node has to JSON-serialise."""
     doc = normalize(load_yaml(ENUMS_DIR / "capabilities.yaml"))
     return {entry["id"]: entry for entry in doc["entries"]}
+
+
+def load_layer_ids() -> set[str]:
+    """The ArchiMate layer ids the subset declares (one per kind's `layer`)."""
+    doc = load_yaml(SCHEMA_DIR / "subset.yaml")
+    return {kind["layer"] for kind in doc["kinds"].values()}
+
+
+def load_kind_names() -> set[str]:
+    """The ArchiMate kind names the subset declares (the merged dataset's
+    element `kind` discriminant, e.g. SystemSoftware, ApplicationComponent)."""
+    doc = load_yaml(SCHEMA_DIR / "subset.yaml")
+    return set(doc["kinds"].keys())
+
+
+def load_lifecycle_ids() -> set[str]:
+    """Lifecycle state ids from enums/lifecycle-states.yaml."""
+    doc = load_yaml(ENUMS_DIR / "lifecycle-states.yaml")
+    return {entry["id"] for entry in doc["entries"]}
+
+
+def load_environment_ids() -> set[str]:
+    """Environment (DTAP) ids from enums/environments.yaml."""
+    doc = load_yaml(ENUMS_DIR / "environments.yaml")
+    return {entry["id"] for entry in doc["entries"]}
 
 
 def parse_id(s: str) -> tuple[str, str | None, str | None]:

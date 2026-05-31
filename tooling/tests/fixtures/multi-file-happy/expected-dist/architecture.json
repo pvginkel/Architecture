@@ -52,5 +52,13 @@
   "derived": {
     "groupings": {},
     "capabilityRealizations": {}
-  }
+  },
+  "views": [
+    {
+      "id": "everything",
+      "label": "Everything",
+      "description": "The whole model — explore freely with the filters.",
+      "predicate": {}
+    }
+  ]
 }

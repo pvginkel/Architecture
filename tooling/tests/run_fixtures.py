@@ -13,6 +13,10 @@ expected.yaml shape:
                                                   # compare byte-for-byte
     args: [--relaxed, ...]                         # optional extra collect.py flags
 
+A fixture may carry a `views/` directory (view files + _order.yaml); when
+present it is passed as --views, otherwise an empty temp dir is used so the
+collector inlines only the synthesised Everything view.
+
 Exits 0 if every fixture matches its expectation, 1 otherwise.
 """
 
@@ -36,8 +40,11 @@ def run_fixture(fixture_dir: Path) -> tuple[bool, list[str]]:
     producers = fixture_dir / "producers.yaml"
     artifacts = fixture_dir / "producer-artifacts"
 
-    with tempfile.TemporaryDirectory() as out_dir:
+    fixture_views = fixture_dir / "views"
+
+    with tempfile.TemporaryDirectory() as out_dir, tempfile.TemporaryDirectory() as empty_views:
         out_path = Path(out_dir)
+        views_path = fixture_views if fixture_views.exists() else Path(empty_views)
         proc = subprocess.run(
             [
                 sys.executable,
@@ -45,6 +52,7 @@ def run_fixture(fixture_dir: Path) -> tuple[bool, list[str]]:
                 "--producers", str(producers),
                 "--in", str(artifacts),
                 "--out", str(out_path),
+                "--views", str(views_path),
                 *[str(a) for a in (expected.get("args") or [])],
             ],
             capture_output=True,

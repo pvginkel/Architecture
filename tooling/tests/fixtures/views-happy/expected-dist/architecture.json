@@ -37,14 +37,23 @@
     {
       "id": "cap:iam",
       "label": "Identity & Access Management",
-      "summary": "Identity store, authentication, authorisation, SSO realisation.",
-      "lifecycle": "active",
+      "summary": "IAM capability.",
       "introduced": "2024-07-12",
-      "producer": "schema"
+      "lifecycle": "active",
+      "producer": "helm"
     }
   ],
   "businessServices": [],
-  "groupings": [],
+  "groupings": [
+    {
+      "id": "grp:identity,88888888-8888-4888-8888-888888888881",
+      "label": "Identity stack",
+      "summary": "All identity-related services in the prd cluster.",
+      "introduced": "2024-09-04",
+      "lifecycle": "active",
+      "producer": "helm"
+    }
+  ],
   "relations": [
     {
       "id": "rel:cluster-runs-keycloak",
@@ -57,10 +66,20 @@
       "source": "ss:keycloak-prd,44444444-4444-4444-8444-444444444441",
       "target": "cap:iam",
       "type": "Realization"
+    },
+    {
+      "id": "rel:identity-aggregates-keycloak",
+      "source": "grp:identity,88888888-8888-4888-8888-888888888881",
+      "target": "ss:keycloak-prd,44444444-4444-4444-8444-444444444441",
+      "type": "Aggregation"
     }
   ],
   "derived": {
-    "groupings": {},
+    "groupings": {
+      "grp:identity,88888888-8888-4888-8888-888888888881": [
+        "ss:keycloak-prd,44444444-4444-4444-8444-444444444441"
+      ]
+    },
     "capabilityRealizations": {
       "cap:iam": [
         "ss:keycloak-prd,44444444-4444-4444-8444-444444444441"
@@ -68,6 +87,32 @@
     }
   },
   "views": [
+    {
+      "id": "infra",
+      "label": "Infrastructure",
+      "description": "Compute nodes only.",
+      "predicate": {
+        "kinds": [
+          "Node"
+        ]
+      },
+      "neighbourDepth": 0
+    },
+    {
+      "id": "identity",
+      "label": "Identity",
+      "description": "IAM realisers plus an explicitly included element.",
+      "predicate": {
+        "capabilities": [
+          "cap:iam"
+        ]
+      },
+      "include": [
+        "ss:keycloak-prd,44444444-4444-4444-8444-444444444441"
+      ],
+      "neighbourDepth": 1,
+      "defaultEnvironment": "prd"
+    },
     {
       "id": "everything",
       "label": "Everything",

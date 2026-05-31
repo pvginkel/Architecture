@@ -24,13 +24,20 @@ from typing import Any
 
 import click
 import yaml
+from jsonschema import Draft202012Validator
 
 from _arch import (
     PIPELINE_PRODUCERS_FILE,
     PIPELINE_PRODUCERS_SCHEMA,
+    VIEWS_DIR,
+    VIEWS_SCHEMA,
     load_allowed_triples,
     load_capability_catalog,
     load_capability_enum,
+    load_environment_ids,
+    load_kind_names,
+    load_layer_ids,
+    load_lifecycle_ids,
     load_pipeline_producers,
     load_yaml,
     normalize,
@@ -43,6 +50,18 @@ from _arch import (
 # under producer-artifacts; it exists only so backfilled capabilities carry a
 # `producer:` provenance stamp distinct from any real producer.
 SCHEMA_PRODUCER = "schema"
+
+# The Everything view is synthesised, not authored: an empty predicate matches
+# every element, so it is the explore-by-filters escape hatch. Appended as the
+# last entry of the inlined `views` list. `everything` is therefore a reserved
+# view id — an authored view may not claim it.
+EVERYTHING_VIEW_ID = "everything"
+EVERYTHING_VIEW: dict[str, Any] = {
+    "id": EVERYTHING_VIEW_ID,
+    "label": "Everything",
+    "description": "The whole model — explore freely with the filters.",
+    "predicate": {},
+}
 
 
 ELEMENT_KIND_ARRAYS: tuple[str, ...] = (
@@ -706,10 +725,155 @@ def new_report() -> dict[str, Any]:
     return {"summary": {}, "warnings": [], "divergences": []}
 
 
+def load_views(views_dir: Path) -> list[dict]:
+    """Load + schema-validate the authored view files under `views_dir`,
+    returned in the order declared by `views_dir/_order.yaml`.
+
+    One file per view (any `*.yaml` other than `_order.yaml`). Each is
+    validated against views.schema.yaml. `_order.yaml` carries an `order` list
+    that must be an exact permutation of the authored view ids — a self-
+    documenting, drift-proof ordering source. The synthetic Everything view is
+    appended later (assemble_merged_dataset), not here.
+
+    Raises CollectorError on a missing directory, schema violation, the
+    reserved `everything` id, a duplicate id, or any order/file mismatch.
+    """
+    if not views_dir.exists():
+        raise CollectorError("views", [f"views directory not found: {views_dir}"])
+
+    schema = load_yaml(VIEWS_SCHEMA)
+    Draft202012Validator.check_schema(schema)
+    validator = Draft202012Validator(schema)
+
+    view_files = sorted(
+        p for p in views_dir.glob("*.yaml") if p.name != "_order.yaml"
+    )
+
+    messages: list[str] = []
+    by_id: dict[str, dict] = {}
+    for path in view_files:
+        doc = normalize(load_yaml(path))
+        errors = sorted(
+            validator.iter_errors(doc), key=lambda e: list(e.absolute_path)
+        )
+        if errors:
+            for e in errors:
+                pointer = "/" + "/".join(str(p) for p in e.absolute_path)
+                messages.append(f"views/{path.name}: at {pointer}: {e.message}")
+            continue
+        vid = doc["id"]
+        if vid == EVERYTHING_VIEW_ID:
+            messages.append(
+                f"views/{path.name}: id {vid!r} is reserved for the synthesised "
+                f"Everything view"
+            )
+            continue
+        if vid in by_id:
+            messages.append(f"views/{path.name}: duplicate view id {vid!r}")
+            continue
+        by_id[vid] = doc
+    if messages:
+        raise CollectorError("views", messages)
+
+    if not view_files:
+        return []
+
+    order_file = views_dir / "_order.yaml"
+    if not order_file.exists():
+        raise CollectorError(
+            "views",
+            [
+                f"{order_file} missing but {len(view_files)} view file(s) present "
+                f"— _order.yaml must list the view order"
+            ],
+        )
+    order = load_yaml(order_file)["order"]
+
+    order_set = set(order)
+    id_set = set(by_id)
+    if len(order) != len(order_set):
+        messages.append("views/_order.yaml: duplicate ids in `order`")
+    for vid in order:
+        if vid not in id_set:
+            messages.append(
+                f"views/_order.yaml: lists {vid!r} but no views/*.yaml declares it"
+            )
+    for vid in sorted(id_set - order_set):
+        messages.append(
+            f"views/{vid}.yaml: declared but not listed in views/_order.yaml"
+        )
+    if messages:
+        raise CollectorError("views", messages)
+
+    return [by_id[vid] for vid in order]
+
+
+def check_views(
+    views: list[dict],
+    index: ResolutionIndex,
+    producers: list[dict],
+) -> None:
+    """Cross-check every authored view against the merged dataset + vocab:
+
+    - each `predicate.<field>` value is a member of that field's vocabulary
+      (layers/kinds from subset.yaml, capabilities/lifecycle/environments from
+      the enums, producers from the registry);
+    - `defaultEnvironment` is a known environment;
+    - every `include`/`exclude` id resolves to an element in the merged set
+      (same fail-loud stance as a dangling relation ref).
+
+    Schema-shape was already enforced by load_views; this is the semantic pass.
+    """
+    field_vocab: dict[str, tuple[set[str], str]] = {
+        "layers": (load_layer_ids(), "subset.yaml layers"),
+        "kinds": (load_kind_names(), "subset.yaml kinds"),
+        "producers": ({p["id"] for p in producers}, "pipeline-producers.yaml"),
+        "capabilities": (load_capability_enum(), "enums/capabilities.yaml"),
+        "lifecycle": (load_lifecycle_ids(), "enums/lifecycle-states.yaml"),
+        "environments": (load_environment_ids(), "enums/environments.yaml"),
+    }
+    environment_ids = field_vocab["environments"][0]
+
+    messages: list[str] = []
+    for view in views:
+        vid = view["id"]
+        predicate = view.get("predicate") or {}
+        for field, (vocab, source) in field_vocab.items():
+            for value in predicate.get(field) or []:
+                if value not in vocab:
+                    messages.append(
+                        f"view {vid!r}: predicate.{field} value {value!r} "
+                        f"not in {source}"
+                    )
+
+        default_env = view.get("defaultEnvironment")
+        if default_env is not None and default_env not in environment_ids:
+            messages.append(
+                f"view {vid!r}: defaultEnvironment {default_env!r} "
+                f"not in enums/environments.yaml"
+            )
+
+        for field in ("include", "exclude"):
+            for ref in view.get(field) or []:
+                # Views are repo-level, not a producer; hint-only references
+                # would need an owning producer to resolve, so pass "" and
+                # require full/uuid ids (matches cross-producer ref rules).
+                entry, _ = index.resolve(ref, "")
+                if entry is None:
+                    messages.append(
+                        f"view {vid!r}: {field} id {ref!r} resolves to no "
+                        f"element in the merged dataset"
+                    )
+
+    if messages:
+        raise CollectorError("views", messages)
+
+
 def assemble_merged_dataset(
     producers: list[dict],
     merged: dict[str, list],
     rollups: dict[str, Any],
+    views: list[dict],
 ) -> dict[str, Any]:
     """The shape downstream consumers (validation service, viewer) read
     from `/data/v0.1/architecture.yaml` and `architecture.json`.
@@ -720,10 +884,15 @@ def assemble_merged_dataset(
       <every element-kind array>
       relations: [...]
       derived: {groupings, capabilityRealizations}
+      views: [...authored in order, Everything last]
 
     Top-level `producer:` (single-producer artifact-envelope convention)
     is absent because the merged set has no single producer; the
     registered-producer list captures who contributed.
+
+    `views` carries the authored views in their _order.yaml order with the
+    synthesised Everything view appended last; the viewer fetches one document
+    and the views ride along.
     """
     doc: dict[str, Any] = {
         "schemaVersion": "0.1",
@@ -733,6 +902,7 @@ def assemble_merged_dataset(
         doc[kind] = merged[kind]
     doc["relations"] = merged["relations"]
     doc["derived"] = rollups
+    doc["views"] = [*views, EVERYTHING_VIEW]
     return doc
 
 
@@ -821,6 +991,15 @@ def _fail(err: CollectorError) -> None:
     help="Output root; collector writes <out>/data/v0.1/*.",
 )
 @click.option(
+    "--views",
+    "views_dir",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=VIEWS_DIR,
+    show_default=True,
+    help="Directory of authored view files + _order.yaml, inlined into the "
+    "merged dataset.",
+)
+@click.option(
     "--relaxed",
     is_flag=True,
     default=False,
@@ -830,13 +1009,27 @@ def _fail(err: CollectorError) -> None:
     "stay hard failures.",
 )
 def main(
-    producers_path: Path, input_dir: Path, output_dir: Path, relaxed: bool
+    producers_path: Path,
+    input_dir: Path,
+    output_dir: Path,
+    views_dir: Path,
+    relaxed: bool,
 ) -> None:
     try:
         producers = load_pipeline_producers(producers_path, PIPELINE_PRODUCERS_SCHEMA)
     except ValueError as e:
         click.echo(f"FAIL [registry] {e}", err=True)
         sys.exit(1)
+
+    try:
+        views = load_views(views_dir)
+    except CollectorError as e:
+        _fail(e)
+
+    click.echo(
+        f"Loaded {len(views)} authored view(s) from {views_dir} "
+        f"(+ synthesised Everything)."
+    )
 
     click.echo(f"Loaded {len(producers)} registered producer(s) from {producers_path}.")
     for p in producers:
@@ -938,7 +1131,17 @@ def main(
         f"{len(rollups['capabilityRealizations'])} capability realisation map(s)."
     )
 
-    merged_doc = assemble_merged_dataset(producers, merged, rollups)
+    try:
+        check_views(views, index, producers)
+    except CollectorError as e:
+        _fail(e)
+
+    click.echo(
+        f"View cross-check: {len(views)} authored view(s) resolve against vocab "
+        f"+ merged set."
+    )
+
+    merged_doc = assemble_merged_dataset(producers, merged, rollups, views)
     finalize_report(report, docs, merged)
     written = emit_outputs(output_dir, merged_doc, report)
     for p in written:

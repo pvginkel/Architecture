@@ -85,5 +85,13 @@
         "ss:keycloak-prd,44444444-4444-4444-8444-444444444441"
       ]
     }
-  }
+  },
+  "views": [
+    {
+      "id": "everything",
+      "label": "Everything",
+      "description": "The whole model — explore freely with the filters.",
+      "predicate": {}
+    }
+  ]
 }

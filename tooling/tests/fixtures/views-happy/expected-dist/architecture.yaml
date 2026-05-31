@@ -61,6 +61,23 @@ derived:
     cap:iam:
     - ss:keycloak-prd,44444444-4444-4444-8444-444444444441
 views:
+- id: infra
+  label: Infrastructure
+  description: Compute nodes only.
+  predicate:
+    kinds:
+    - Node
+  neighbourDepth: 0
+- id: identity
+  label: Identity
+  description: IAM realisers plus an explicitly included element.
+  predicate:
+    capabilities:
+    - cap:iam
+  include:
+  - ss:keycloak-prd,44444444-4444-4444-8444-444444444441
+  neighbourDepth: 1
+  defaultEnvironment: prd
 - id: everything
   label: Everything
   description: "The whole model \u2014 explore freely with the filters."

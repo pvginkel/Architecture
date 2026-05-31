@@ -1,0 +1,6 @@
+id: infra
+label: Infrastructure
+description: Compute nodes only.
+predicate:
+  kinds: [Node]
+neighbourDepth: 0

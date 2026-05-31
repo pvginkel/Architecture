@@ -48,3 +48,8 @@ derived:
   capabilityRealizations:
     cap:iam:
     - ss:keycloak-prd,44444444-4444-4444-8444-444444444441
+views:
+- id: everything
+  label: Everything
+  description: "The whole model \u2014 explore freely with the filters."
+  predicate: {}
