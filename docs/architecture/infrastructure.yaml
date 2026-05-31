@@ -15,24 +15,28 @@ devices:
     summary: Physical server chassis hosting Proxmox VE node "pve". Operator-owned hardware.
     introduced: 2026-05-28
     lifecycle: active
+    logo: proxmox
 
   - id: device:pve1-hw,66fdb2b8-8b7d-42b2-acf6-c23bb7683eab
     label: pve1 chassis
     summary: Physical server chassis hosting Proxmox VE node "pve1".
     introduced: 2026-05-28
     lifecycle: active
+    logo: proxmox
 
   - id: device:pve2-hw,64bc1c28-d388-4c85-b5b2-5852a4f72bb6
     label: pve2 chassis
     summary: Physical server chassis hosting Proxmox VE node "pve2".
     introduced: 2026-05-28
     lifecycle: active
+    logo: proxmox
 
   - id: device:udm-pro,feef6808-3014-4de8-bd3e-afd68a427912
     label: UDM Pro
     summary: Ubiquiti Unifi Dream Machine Pro — router, firewall, and topology root. WAN-side connects to Freedom Internet upstream.
     introduced: 2026-05-28
     lifecycle: active
+    logo: ubiquiti
 
   - id: device:switch-rack,a5466336-3d04-43f8-b4b5-f37e41cefa26
     label: Rack switch (1 Gb managed, PoE)
@@ -51,6 +55,7 @@ devices:
     summary: Ubiquiti U6 Mesh access point. Wired to the rack switch via PoE.
     introduced: 2026-05-28
     lifecycle: active
+    logo: ubiquiti
     stats:
       model: U6 Mesh
 
@@ -59,6 +64,7 @@ devices:
     summary: Ubiquiti U6 Pro access point covering the ground floor. Wired to the rack switch via PoE.
     introduced: 2026-05-28
     lifecycle: active
+    logo: ubiquiti
     stats:
       model: U6 Pro
 
@@ -67,6 +73,7 @@ devices:
     summary: Ubiquiti U6 Pro access point covering the first floor.
     introduced: 2026-05-28
     lifecycle: active
+    logo: ubiquiti
     stats:
       model: U6 Pro
 
@@ -75,6 +82,7 @@ devices:
     summary: Ubiquiti U6 Pro access point covering the second floor.
     introduced: 2026-05-28
     lifecycle: active
+    logo: ubiquiti
     stats:
       model: U6 Pro
 

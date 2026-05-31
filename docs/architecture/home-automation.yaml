@@ -82,6 +82,7 @@ systemSoftware:
     lifecycle: active
     stereotype: SoftwareProduct
     homepage: https://www.home-assistant.io/
+    logo: home-assistant
 
   - id: ss:home-assistant-prd,398e32ec-cbe7-40e4-8a66-094029653650
     label: Home Assistant (prd)
@@ -89,6 +90,7 @@ systemSoftware:
     introduced: 2026-05-28
     lifecycle: active
     environment: prd
+    logo: home-assistant
 
 technologyServices:
   - id: svc:home-assistant-api,001f7df8-de45-471c-9307-13466784ea1d
