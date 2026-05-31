@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import sys
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -665,6 +666,95 @@ def compute_rollups(
     }
 
 
+# Fixed namespace so a derived edge's id is a deterministic function of its
+# (source, type, target) — byte-identical across reruns, stable across builds.
+DERIVED_RELATION_NAMESPACE = uuid.UUID("6f3d2a1e-7c84-4b2f-9a16-2e5d8c0b41af")
+
+
+def _is_instance(elem: dict[str, Any]) -> bool:
+    """A runtime instance — a concrete deployed unit, not an architectural
+    definition. Mirrors the viewer's rule (model.ts): an element carrying an
+    `environment` (it lives in dev/tst/uat/prd) and/or a `stats.release` (a Helm
+    release's deployed workload/container). Definitions are environment-agnostic.
+    """
+    return elem.get("environment") is not None or "release" in (elem.get("stats") or {})
+
+
+def project_instance_relations(
+    docs: dict[str, Any],
+    index: ResolutionIndex,
+) -> list[dict[str, Any]]:
+    """Derive definition-level relations by projecting instance-level ones onto
+    their definitions, so a definitions-only view (e.g. Landscape) shows how the
+    catalogue connects rather than a field of disconnected nodes.
+
+    Trigger: `Specialization` edges (instance -> definition) form the lift map.
+    For every *other* relation, each endpoint that is an instance is lifted to
+    its definition(s); a definition endpoint passes through unchanged. The
+    lifted edge is emitted (relationship type preserved) when at least one
+    endpoint moved, deduped against existing relations and against itself, with
+    self-loops and edges whose instance endpoint has no definition dropped.
+
+    Each emitted edge carries `derived: true`. Because both endpoints share the
+    kind of the instance they were lifted from, every derived triple has the
+    same (source-kind, type, target-kind) signature as a relation that already
+    passed the triple-matrix check — valid by construction.
+
+    The projection is a pure function of the merged instance truth, so it
+    regenerates every build with no separate source to drift. It is NOT folded
+    into `derived.capabilityRealizations`: that rollup stays a view of authored
+    realizations, so the capability views are unchanged.
+
+    Iteration is producer-sorted and the result is sorted by (source, type,
+    target) so reruns produce byte-identical output.
+    """
+    lift: dict[str, set[str]] = {}  # canonical instance id -> definition id(s)
+    existing: set[tuple[str, str, str]] = set()  # (source-id, type, target-id)
+    liftable: list[tuple[dict, dict, str]] = []  # (src_elem, tgt_elem, type)
+
+    for pid in sorted(docs):
+        for rel in docs[pid].get("relations") or []:
+            src_entry, _ = index.resolve(rel["source"], pid)
+            tgt_entry, _ = index.resolve(rel["target"], pid)
+            if src_entry is None or tgt_entry is None:
+                continue
+            _, src_elem, _ = src_entry
+            _, tgt_elem, _ = tgt_entry
+            existing.add((src_elem["id"], rel["type"], tgt_elem["id"]))
+            if rel["type"] == "Specialization":
+                if _is_instance(src_elem) and not _is_instance(tgt_elem):
+                    lift.setdefault(src_elem["id"], set()).add(tgt_elem["id"])
+            else:
+                liftable.append((src_elem, tgt_elem, rel["type"]))
+
+    derived: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for src_elem, tgt_elem, rtype in liftable:
+        src_inst, tgt_inst = _is_instance(src_elem), _is_instance(tgt_elem)
+        if not (src_inst or tgt_inst):
+            continue  # both already definitions — nothing to project
+        sources = lift.get(src_elem["id"], set()) if src_inst else {src_elem["id"]}
+        targets = lift.get(tgt_elem["id"], set()) if tgt_inst else {tgt_elem["id"]}
+        if (src_inst and not sources) or (tgt_inst and not targets):
+            continue  # an instance endpoint has no definition to lift to
+        for ds in sources:
+            for dt in targets:
+                if ds == dt:
+                    continue
+                key = (ds, rtype, dt)
+                if key in existing or key in derived:
+                    continue
+                rid = uuid.uuid5(DERIVED_RELATION_NAMESPACE, f"{ds}|{rtype}|{dt}")
+                derived[key] = {
+                    "id": f"rel:{rid}",
+                    "source": ds,
+                    "target": dt,
+                    "type": rtype,
+                    "derived": True,
+                }
+
+    return [derived[key] for key in sorted(derived)]
+
+
 def reconcile_alias_hints(
     docs: dict[str, Any],
     index: ResolutionIndex,
@@ -1129,6 +1219,12 @@ def main(
         f"Grouping checks + rollup: "
         f"{len(rollups['groupings'])} grouping(s), "
         f"{len(rollups['capabilityRealizations'])} capability realisation map(s)."
+    )
+
+    projected = project_instance_relations(docs, index)
+    merged["relations"].extend(projected)
+    click.echo(
+        f"Instance->definition projection: {len(projected)} derived relation(s)."
     )
 
     try:

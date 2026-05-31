@@ -500,6 +500,18 @@ def emit_relations_schema(
             "enum": sorted(relationship_types),
             "description": "ArchiMate relationship type.",
         },
+        # Collector-set marker, never producer-authored: true on a relation the
+        # collector synthesised by projecting an instance-level edge onto its
+        # definition (see collect.py project_instance_relations). Lets consumers
+        # render inferred edges distinctly from modelled ones.
+        "derived": {
+            "type": "boolean",
+            "description": (
+                "True when the collector synthesised this relation by projecting "
+                "an instance-level edge onto its definition. Absent on authored "
+                "relations."
+            ),
+        },
     }
     for attr_name, spec in relation_attributes.items():
         properties[attr_name] = attribute_to_json_schema(attr_name, spec, "")

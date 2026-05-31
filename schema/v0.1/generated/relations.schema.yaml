@@ -39,6 +39,10 @@ properties:
     - Specialization
     - Triggering
     description: ArchiMate relationship type.
+  derived:
+    type: boolean
+    description: True when the collector synthesised this relation by projecting an instance-level edge onto its definition.
+      Absent on authored relations.
   boundBy:
     description: 'Binding recipe for a runtime dependency edge: where the concrete provider''s identity is found at deploy
       time. `env:<VAR>` names a container environment variable in the rendered deployment; the producer that renders the deployment
