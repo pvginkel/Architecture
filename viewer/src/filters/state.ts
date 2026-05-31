@@ -83,7 +83,7 @@ export function matchesSearch(el: ArchElement, term: string): boolean {
   if (!term) {
     return true;
   }
-  const haystack = [el.label, KIND_LABELS[el.kind], el.summary, el.producer]
+  const haystack = [el.label, KIND_LABELS[el.kind], el.producer]
     .join(" ")
     .toLowerCase();
   return haystack.includes(term);
