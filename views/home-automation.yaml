@@ -1,6 +1,7 @@
 id: home-automation
 label: Home automation
 description: The home-automation slice — sensor/actuator orchestration over Zigbee/MQTT and its broker.
+icon: House
 predicate:
   capabilities:
     - cap:home-automation

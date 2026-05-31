@@ -58,6 +58,7 @@
       "id": "everything",
       "label": "Everything",
       "description": "The whole model — explore freely with the filters.",
+      "icon": "Globe",
       "predicate": {}
     }
   ]

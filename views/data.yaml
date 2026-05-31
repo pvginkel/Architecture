@@ -1,6 +1,7 @@
 id: data
 label: Data & storage
 description: Databases, caches, search, object/block/file storage, and messaging — with their consumers.
+icon: Database
 predicate:
   capabilities:
     - cap:relational-database

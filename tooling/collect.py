@@ -61,6 +61,7 @@ EVERYTHING_VIEW: dict[str, Any] = {
     "id": EVERYTHING_VIEW_ID,
     "label": "Everything",
     "description": "The whole model — explore freely with the filters.",
+    "icon": "Globe",
     "predicate": {},
 }
 

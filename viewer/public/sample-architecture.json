@@ -575,6 +575,7 @@
       "id": "landscape",
       "label": "Landscape",
       "description": "The big picture — capabilities and applications with their immediate technical context.",
+      "icon": "Map",
       "predicate": { "layers": ["strategy", "application"] },
       "neighbourDepth": 1
     },
@@ -582,6 +583,7 @@
       "id": "delivery",
       "label": "Delivery pipeline",
       "description": "The source-to-deploy chain — SCM, CI, image registry, and configuration management.",
+      "icon": "Rocket",
       "predicate": {
         "capabilities": [
           "cap:source-control",
@@ -596,6 +598,7 @@
       "id": "infrastructure",
       "label": "Infrastructure & network",
       "description": "The physical and host substrate — devices, compute nodes, and the system software that runs on them.",
+      "icon": "Network",
       "predicate": { "kinds": ["Node", "Device", "SystemSoftware"] },
       "neighbourDepth": 0
     },
@@ -603,6 +606,7 @@
       "id": "application",
       "label": "Application landscape",
       "description": "In-house applications with the services, data stores, and interfaces they consume.",
+      "icon": "AppWindow",
       "predicate": { "kinds": ["ApplicationComponent"] },
       "neighbourDepth": 1
     },
@@ -610,6 +614,7 @@
       "id": "identity",
       "label": "Identity & secrets",
       "description": "Identity, secrets, and PKI services with the workloads that realise and consume them.",
+      "icon": "KeyRound",
       "predicate": { "capabilities": ["cap:iam", "cap:secrets-management", "cap:pki"] },
       "neighbourDepth": 1
     },
@@ -617,6 +622,7 @@
       "id": "data",
       "label": "Data & storage",
       "description": "Databases, caches, search, object/block/file storage, and messaging — with their consumers.",
+      "icon": "Database",
       "predicate": {
         "capabilities": [
           "cap:relational-database",
@@ -637,6 +643,7 @@
       "id": "home-automation",
       "label": "Home automation",
       "description": "The home-automation slice — sensor/actuator orchestration over Zigbee/MQTT and its broker.",
+      "icon": "House",
       "predicate": { "capabilities": ["cap:home-automation", "cap:pub-sub-broker"] },
       "neighbourDepth": 1
     },
@@ -644,6 +651,7 @@
       "id": "everything",
       "label": "Everything",
       "description": "The whole model — explore freely with the filters.",
+      "icon": "Globe",
       "predicate": {}
     }
   ]

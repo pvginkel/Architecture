@@ -1,6 +1,7 @@
 id: infra
 label: Infrastructure
 description: Compute nodes only.
+icon: Network
 predicate:
   kinds: [Node]
 neighbourDepth: 0

@@ -43,8 +43,9 @@ opens `views[0]`.
 ## Step 1 — View schema + the seven view files
 
 - `views.schema.yaml` (repo root, alongside `pipeline-producers.schema.yaml`):
-  one view = `{ id, label, description, predicate?, include?, exclude?,
-  neighbourDepth?, defaultEnvironment? }`. `predicate` fields:
+  one view = `{ id, label, description, icon, predicate?, include?, exclude?,
+  neighbourDepth?, defaultEnvironment? }`. `icon` is a PascalCase lucide-react
+  icon name rendered on the view tab. `predicate` fields:
   `layers?`, `kinds?`, `producers?`, `capabilities?`, `lifecycle?`,
   `environments?` (each an array of vocab values). `additionalProperties: false`.
 - `views/` directory with one file per view, plus an ordering source. Two viable

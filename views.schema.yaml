@@ -23,7 +23,7 @@ description: |
 
 type: object
 additionalProperties: false
-required: [id, label, description]
+required: [id, label, description, icon]
 properties:
   id:
     type: string
@@ -36,6 +36,14 @@ properties:
     type: string
     minLength: 1
     description: Tab label shown in the viewer's view strip.
+  icon:
+    type: string
+    pattern: ^[A-Z][A-Za-z0-9]*$
+    description: |
+      Lucide icon name in PascalCase, exactly as exported by lucide-react (e.g.
+      `Map`, `Database`, `ScanLine`). Rendered as the glyph on the view's tab.
+      Resolved against the lucide-react registry at render time — an
+      unrecognised name fails loudly in the viewer, there is no default glyph.
   description:
     type: string
     minLength: 1

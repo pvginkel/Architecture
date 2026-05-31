@@ -1,6 +1,7 @@
 id: identity
 label: Identity
 description: IAM realisers plus an explicitly included element.
+icon: KeyRound
 predicate:
   capabilities: [cap:iam]
 include:

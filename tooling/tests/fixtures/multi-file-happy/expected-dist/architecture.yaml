@@ -43,4 +43,5 @@ views:
 - id: everything
   label: Everything
   description: "The whole model \u2014 explore freely with the filters."
+  icon: Globe
   predicate: {}

@@ -1,6 +1,7 @@
 id: delivery
 label: Delivery pipeline
 description: The source-to-deploy chain — SCM, CI, image registry, and configuration management.
+icon: Rocket
 predicate:
   capabilities:
     - cap:source-control

@@ -1,6 +1,7 @@
 id: application
 label: Application landscape
 description: In-house applications with the services, data stores, and interfaces they consume.
+icon: AppWindow
 predicate:
   kinds: [ApplicationComponent]
 neighbourDepth: 1

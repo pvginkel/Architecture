@@ -442,7 +442,6 @@ body,
   flex-shrink: 0;
   display: flex;
   gap: 0;
-  padding: 0 8px;
   overflow-x: auto;
   scrollbar-width: none; /* Firefox: no persistent horizontal track */
   border-bottom: 1px solid var(--line);
@@ -456,12 +455,15 @@ body,
 
 .view-tab {
   flex-shrink: 0;
-  min-height: 34px;
-  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 30px;
+  padding: 0 10px;
   border: none;
   background: transparent;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px !important;
   font-weight: 700;
   white-space: nowrap;
   transition:

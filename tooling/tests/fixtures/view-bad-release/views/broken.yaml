@@ -1,6 +1,7 @@
 id: broken
 label: Broken
 description: References a release that does not exist in the merged set.
+icon: Map
 predicate:
   releases:
     - release-that-does-not-exist

@@ -5,6 +5,7 @@
 
 import {
   Activity,
+  AppWindow,
   Archive,
   Box,
   Boxes,
@@ -27,12 +28,15 @@ import {
   Inbox,
   KeyRound,
   LockKeyhole,
+  Map,
   Monitor,
   Network,
   Package,
   Plug,
   Radio,
+  Rocket,
   Scale,
+  ScanLine,
   ScrollText,
   Search,
   Server,
@@ -105,4 +109,22 @@ export const CAPABILITY_ICON: Record<CapabilityId, LucideIcon> = {
   "cap:vpn": Waypoints,
   "cap:media-streaming": Clapperboard,
   "cap:home-automation": House,
+};
+
+// View-tab glyphs, keyed by the `icon` name a view declares in its YAML. The
+// map doubles as the allow-list: a view may only name an icon imported here, so
+// the tab-strip's icon set stays explicit and tree-shaken (no full-registry
+// import). Adding an icon to a view = add it here. ViewTabs throws on a name not
+// in this map, matching the no-default-glyph stance above.
+export const VIEW_ICON: Record<string, LucideIcon> = {
+  Map,
+  Rocket,
+  Network,
+  AppWindow,
+  KeyRound,
+  Database,
+  House,
+  Sparkles,
+  ScanLine,
+  Globe,
 };

@@ -1,5 +1,6 @@
 id: broken
 label: Broken
 description: References an element that does not exist in the merged set.
+icon: Map
 include:
   - ss:does-not-exist

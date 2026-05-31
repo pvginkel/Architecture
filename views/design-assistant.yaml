@@ -1,6 +1,7 @@
 id: design-assistant
 label: Design Assistant
 description: The Design Assistant application — its prd runtime, components, and everything it consumes.
+icon: Sparkles
 # The release is the grouping handle. `releases: [design-assistant@prd]` selects
 # the prd deployed runtime as one set — no instance ids to chase, and it scopes
 # cleanly to prd without leaning on the Environment filter. neighbourDepth 1 then

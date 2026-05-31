@@ -91,6 +91,7 @@
       "id": "infra",
       "label": "Infrastructure",
       "description": "Compute nodes only.",
+      "icon": "Network",
       "predicate": {
         "kinds": [
           "Node"
@@ -102,6 +103,7 @@
       "id": "identity",
       "label": "Identity",
       "description": "IAM realisers plus an explicitly included element.",
+      "icon": "KeyRound",
       "predicate": {
         "capabilities": [
           "cap:iam"
@@ -117,6 +119,7 @@
       "id": "everything",
       "label": "Everything",
       "description": "The whole model — explore freely with the filters.",
+      "icon": "Globe",
       "predicate": {}
     }
   ]

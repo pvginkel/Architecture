@@ -3,11 +3,11 @@
 # `everything` view last. Adding a view = a file under views/ + an entry here.
 order:
   - landscape
+  - design-assistant
+  - scanner
   - delivery
   - infrastructure
   - application
   - identity
   - data
   - home-automation
-  - design-assistant
-  - scanner

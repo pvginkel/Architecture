@@ -68,6 +68,9 @@ export interface ViewDefinition {
   id: string;
   label: string;
   description: string;
+  // Lucide icon name (PascalCase, as exported by lucide-react), resolved to a
+  // glyph on the view tab. See ViewTabs.
+  icon: string;
   predicate?: ViewPredicate;
   include?: string[];
   exclude?: string[];
