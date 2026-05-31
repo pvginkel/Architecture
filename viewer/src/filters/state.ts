@@ -1,0 +1,177 @@
+// Filter state model + visible-graph computation. Replaces Plan 1's per-set
+// filter state and inline useVisibleGraph.
+//
+// Semantics (locked, see plan-3-filter-rail.md Step 4):
+//   - Within a group: OR. Empty selection in a group = no constraint.
+//   - Across groups: AND.
+//   - Relationship type filters EDGES, not nodes. No relation type selected =>
+//     all relations among visible nodes; some selected => only those types.
+//   - Environment defaults to {prd}; elements with no environment are
+//     env-agnostic and always pass.
+
+import { KIND_LABELS } from "../generated/vocab";
+import type { ArchElement, ArchModel } from "../data/model";
+import type { ManifestRelation } from "../data/manifest";
+
+export const KIND_GROUP = "kind";
+export const RELATIONSHIP_GROUP = "relationship";
+export const LAYER_GROUP = "layer";
+export const PRODUCER_GROUP = "producer";
+export const ENVIRONMENT_GROUP = "environment";
+
+// The node-filtering groups, in no particular order (group display order lives
+// in groups.ts). The relationship group is deliberately excluded — it filters
+// edges, not nodes.
+export const NODE_GROUP_IDS = [
+  KIND_GROUP,
+  LAYER_GROUP,
+  PRODUCER_GROUP,
+  ENVIRONMENT_GROUP,
+] as const;
+
+export type FilterState = Map<string, Set<string>>;
+
+/** The attribute a node group tests on an element. `undefined` = the element
+ *  doesn't carry that attribute (only meaningful for environment). */
+export function nodeValue(el: ArchElement, groupId: string): string | undefined {
+  switch (groupId) {
+    case KIND_GROUP:
+      return el.kind;
+    case LAYER_GROUP:
+      return el.layer;
+    case PRODUCER_GROUP:
+      return el.producer;
+    case ENVIRONMENT_GROUP:
+      return el.environment;
+    default:
+      throw new Error(`nodeValue: '${groupId}' is not a node group`);
+  }
+}
+
+/** Does an element satisfy one node group's selection? Empty/absent selection =
+ *  no constraint. Env-agnostic elements (no environment) always pass the
+ *  environment group. */
+export function passesNodeGroup(
+  el: ArchElement,
+  groupId: string,
+  selection: Set<string> | undefined,
+): boolean {
+  if (!selection || selection.size === 0) {
+    return true;
+  }
+  const value = nodeValue(el, groupId);
+  if (groupId === ENVIRONMENT_GROUP && value === undefined) {
+    return true;
+  }
+  return value !== undefined && selection.has(value);
+}
+
+export function matchesSearch(el: ArchElement, term: string): boolean {
+  if (!term) {
+    return true;
+  }
+  const haystack = [el.label, KIND_LABELS[el.kind], el.summary, el.producer]
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(term);
+}
+
+/** Elements passing every node group's selection (AND across groups) and the
+ *  global search term. */
+export function computeVisibleElements(
+  model: ArchModel,
+  filterState: FilterState,
+  searchTerm: string,
+): ArchElement[] {
+  const term = searchTerm.trim().toLowerCase();
+  return model.elements.filter(
+    (el) =>
+      matchesSearch(el, term) &&
+      NODE_GROUP_IDS.every((g) => passesNodeGroup(el, g, filterState.get(g))),
+  );
+}
+
+export interface VisibleGraph {
+  visibleElements: ArchElement[];
+  visibleRelations: ManifestRelation[];
+}
+
+/** Visible nodes (AND-of-OR predicates + search), then edges among them
+ *  filtered by the relation-type selection. */
+export function computeVisibleGraph(
+  model: ArchModel,
+  filterState: FilterState,
+  searchTerm: string,
+): VisibleGraph {
+  const visibleElements = computeVisibleElements(model, filterState, searchTerm);
+  const visibleIds = new Set(visibleElements.map((el) => el.id));
+  const relSelection = filterState.get(RELATIONSHIP_GROUP);
+  const visibleRelations = model.relations.filter(
+    (rel) =>
+      (!relSelection || relSelection.size === 0 || relSelection.has(rel.type)) &&
+      visibleIds.has(rel.source) &&
+      visibleIds.has(rel.target),
+  );
+  return { visibleElements, visibleRelations };
+}
+
+export function initialFilterState(): FilterState {
+  // prd default until Plan 4's views own the baseline.
+  return new Map([[ENVIRONMENT_GROUP, new Set(["prd"])]]);
+}
+
+export function toggleFilterOption(
+  state: FilterState,
+  groupId: string,
+  value: string,
+): FilterState {
+  const next = new Map(state);
+  const current = new Set(next.get(groupId) ?? []);
+  if (current.has(value)) {
+    current.delete(value);
+  } else {
+    current.add(value);
+  }
+  if (current.size === 0) {
+    next.delete(groupId);
+  } else {
+    next.set(groupId, current);
+  }
+  return next;
+}
+
+export function addFilterOptions(
+  state: FilterState,
+  groupId: string,
+  values: string[],
+): FilterState {
+  const next = new Map(state);
+  const current = new Set(next.get(groupId) ?? []);
+  for (const value of values) {
+    current.add(value);
+  }
+  if (current.size === 0) {
+    next.delete(groupId);
+  } else {
+    next.set(groupId, current);
+  }
+  return next;
+}
+
+export function serializeFilters(state: FilterState): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const [groupId, values] of state) {
+    out[groupId] = [...values];
+  }
+  return out;
+}
+
+export function deserializeFilters(obj: Record<string, string[]>): FilterState {
+  const state: FilterState = new Map();
+  for (const [groupId, values] of Object.entries(obj)) {
+    if (Array.isArray(values) && values.length > 0) {
+      state.set(groupId, new Set(values));
+    }
+  }
+  return state;
+}
