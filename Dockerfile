@@ -24,13 +24,13 @@ WORKDIR /work
 RUN pip install --no-cache-dir poetry
 COPY tooling/pyproject.toml tooling/poetry.lock ./tooling/
 RUN cd tooling && poetry install --no-root --without dev
-COPY schema/ ./schema/
-COPY tooling/ ./tooling/
-# generate.py --check reads the logo library (to derive the logoLibrary enum)
-# and the committed viewer vocab module (to detect drift). Both live under
-# viewer/; copy just those two paths rather than the whole viewer tree.
-COPY viewer/public/logos/ ./viewer/public/logos/
-COPY viewer/src/generated/vocab.ts ./viewer/src/generated/vocab.ts
+# Copy the whole context (poetry deps are already layered above off
+# pyproject/poetry.lock). generate.py and collect.py read from schema/,
+# tooling/, viewer/, views/, pipeline-producers.yaml and producer-artifacts/;
+# a blanket copy keeps the build from breaking each time the tooling reaches
+# into a new path. node_modules/.git/dist stay out via .dockerignore, which CI
+# strips only the producer-artifacts/ entry from.
+COPY . .
 RUN cd tooling && poetry run python generate.py --check
 
 # ---- stage 2: viewer ----
@@ -62,9 +62,8 @@ RUN npm run build
 # every referenced producer is online so dangling refs fail the build again.
 FROM check-schemas AS run-collector
 WORKDIR /work
-COPY pipeline-producers.yaml pipeline-producers.schema.yaml ./
-COPY views ./views
-COPY producer-artifacts ./producer-artifacts
+# pipeline-producers.yaml, views/ and producer-artifacts/ already arrived with
+# the check-schemas COPY . . above.
 RUN cd tooling && poetry run python collect.py \
       --producers /work/pipeline-producers.yaml \
       --in /work/producer-artifacts \
