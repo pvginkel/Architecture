@@ -1,30 +1,19 @@
 id: design-assistant
 label: Design Assistant
-description: The Design Assistant application — its components, its prd runtime, and everything it consumes.
-# `producers: [design-assistant]` selects the definitions the app owns (the
-# product plus its frontend/portal/manuals/canon-docs sub-apps) — no instance
-# ids to chase. The prd runtime containers come from the generic `helm-charts`
-# producer and carry no predicate handle that isolates this release, so the
-# release `design-assistant@prd` containers are named explicitly. neighbourDepth
-# expands one hop to the consumed capabilities/services and the platform the prd
-# containers run on; the prd Environment default keeps any dev/tst/uat instances
-# pulled in by that expansion hidden until toggled.
+description: The Design Assistant application — its prd runtime, components, and everything it consumes.
+# The release is the grouping handle. `releases: [design-assistant@prd]` selects
+# the prd deployed runtime as one set — no instance ids to chase, and it scopes
+# cleanly to prd without leaning on the Environment filter. neighbourDepth 1 then
+# pulls each container's component definition back in via the Specialization edge
+# it carries.
+#
+# The one definition named in include is the anchor: every consumes-* edge (IAM,
+# OpenAI, object storage, message queue, full-text search, …) is authored on it,
+# so naming it lands the consumed capabilities at depth 1. Without it those edges
+# would start a hop further out and the whole "what it consumes" half of the view
+# would fall to depth 2 and vanish.
 predicate:
-  producers: [design-assistant]
+  releases: [design-assistant@prd]
 include:
-  # prd runtime — data stores
-  - ss:design-assistant-prd-design-assistant-db-design-assistant-db,1062d7ef-9aa9-5f9f-8485-c16f65bcc2c3
-  - ss:design-assistant-prd-design-assistant-opensearch-design-assistant-opensearch,0627fef5-a0a9-5f22-be3d-ad46888730ce
-  - ss:design-assistant-prd-design-assistant-rabbitmq-design-assistant-rabbitmq,9cd37d6b-2310-53a2-ad20-1501cad214b2
-  # prd runtime — workload containers
-  - app:design-assistant-prd-design-assistant-design-assistant-app,38feb289-5663-5b0d-8eb0-433abfd69798
-  - app:design-assistant-prd-design-assistant-design-assistant-canon-docs,7ca308b1-4729-5390-97bd-28610f7aadb2
-  - app:design-assistant-prd-design-assistant-design-assistant-frontend-app,44f20384-eabf-55ab-8137-c98278c13642
-  - app:design-assistant-prd-design-assistant-design-assistant-manuals,f243538e-70c0-54f9-82cb-809bc0b4bf2c
-  - app:design-assistant-prd-design-assistant-design-assistant-portal-app,cb4e2f47-9b56-5070-ac54-a396135223eb
-  - app:design-assistant-prd-design-assistant-document-conversion,02ad0e88-ea15-58f9-a052-f36dcd2f656a
-  - app:design-assistant-prd-design-assistant-setup-design-assistant-setup,ed005872-ab13-5b4b-afef-f51cd8f600aa
-  - app:design-assistant-prd-design-assistant-sse-gateway-app,5bc50d96-5411-5b2e-b9fa-e13b360987bd
-  - app:design-assistant-prd-design-assistant-worker-design-assistant-worker,baacdfce-64b5-54d3-ac12-3aced638ff36
-  - app:design-assistant-prd-design-assistant-worker-document-conversion,65345d54-417b-5ac2-838b-7e96ff0803bb
+  - app:design-assistant,7ec690ae-15cd-4453-ace0-ede62f8a3e4d
 neighbourDepth: 1
