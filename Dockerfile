@@ -63,6 +63,7 @@ RUN npm run build
 FROM check-schemas AS run-collector
 WORKDIR /work
 COPY pipeline-producers.yaml pipeline-producers.schema.yaml ./
+COPY views ./views
 COPY producer-artifacts ./producer-artifacts
 RUN cd tooling && poetry run python collect.py \
       --producers /work/pipeline-producers.yaml \
