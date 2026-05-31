@@ -66,6 +66,7 @@ export interface ViewDefinition {
   predicate?: ViewPredicate;
   include?: string[];
   exclude?: string[];
+  excludeInstances?: boolean;
   neighbourDepth?: number;
   defaultEnvironment?: string;
 }

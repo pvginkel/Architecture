@@ -7,6 +7,10 @@
 //   base   = (base ∪ include) − exclude
 //   scoped = base ∪ { elements within neighbourDepth relation-hops of base }
 //
+// `excludeInstances: true` removes runtime instances (elements carrying
+// stats.release) from the universe first, so they appear in neither the base
+// nor the neighbour expansion — a definitions-only view that depth can't undo.
+//
 // Environment is deliberately NOT folded into the scope: it is the one
 // dimension the live Environment filter owns, seeded to the view's
 // `defaultEnvironment` (default "prd"). That is what lets a view reveal
@@ -104,11 +108,15 @@ function buildAdjacency(model: ArchModel): Map<string, string[]> {
   return adjacency;
 }
 
-/** Grow `seed` by `depth` undirected relation hops, staying within the model. */
+/** Grow `seed` by `depth` undirected relation hops, staying within the model.
+ *  `admits` gates which elements may be reached — an element it rejects is
+ *  neither added nor traversed, so the hop budget is spent only on admitted
+ *  nodes (used to keep excluded instances out of the expansion entirely). */
 function expandNeighbours(
   seed: Set<string>,
   depth: number,
   model: ArchModel,
+  admits: (id: string) => boolean,
 ): Set<string> {
   if (depth <= 0) {
     return new Set(seed);
@@ -120,7 +128,7 @@ function expandNeighbours(
     const next: string[] = [];
     for (const id of frontier) {
       for (const neighbour of adjacency.get(id) ?? []) {
-        if (!result.has(neighbour) && model.elementById.has(neighbour)) {
+        if (!result.has(neighbour) && model.elementById.has(neighbour) && admits(neighbour)) {
           result.add(neighbour);
           next.push(neighbour);
         }
@@ -142,27 +150,35 @@ export function resolveViewScope(
   manifest: Manifest,
 ): Set<string> {
   const capMembers = capabilityMembers(manifest);
+  // When excludeInstances is set, runtime instances never participate — not in
+  // the base, not as expansion neighbours, not even via explicit include. They
+  // are invisible to the whole resolution, so neighbourDepth can't pull them back.
+  const admits = view.excludeInstances
+    ? (id: string) => !model.elementById.get(id)?.isInstance
+    : () => true;
   const base = new Set<string>();
   if (isEmptyPredicate(view.predicate)) {
     for (const el of model.elements) {
-      base.add(el.id);
+      if (admits(el.id)) {
+        base.add(el.id);
+      }
     }
   } else {
     for (const el of model.elements) {
-      if (matchesPredicate(el, view.predicate!, capMembers)) {
+      if (admits(el.id) && matchesPredicate(el, view.predicate!, capMembers)) {
         base.add(el.id);
       }
     }
   }
   for (const id of view.include ?? []) {
-    if (model.elementById.has(id)) {
+    if (model.elementById.has(id) && admits(id)) {
       base.add(id);
     }
   }
   for (const id of view.exclude ?? []) {
     base.delete(id);
   }
-  return expandNeighbours(base, view.neighbourDepth ?? 0, model);
+  return expandNeighbours(base, view.neighbourDepth ?? 0, model, admits);
 }
 
 /** The filter state a view seeds on open: the Environment group set to the

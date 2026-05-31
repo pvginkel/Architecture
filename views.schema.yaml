@@ -13,6 +13,10 @@ description: |
       base   = (base ∪ include) − exclude
       scoped = base ∪ { elements within neighbourDepth relation-hops of base }
 
+  `excludeInstances: true` first removes runtime instances (elements carrying
+  stats.release) from the universe, so they appear in neither the base nor the
+  expansion — a definitions-only view.
+
   Environment is NOT part of the resolved scope — it is applied by the viewer's
   live Environment filter, seeded to `defaultEnvironment` (default "prd") on
   open, so a view can still reveal dev/tst/uat within its scope.
@@ -75,6 +79,14 @@ properties:
     description: |
       Explicit element ids removed from the base set after include. Every id
       must resolve in the merged dataset.
+  excludeInstances:
+    type: boolean
+    description: |
+      Drop runtime instances — elements carrying a `stats.release` attribute
+      (a Helm release's deployed workloads/containers) — from the view entirely.
+      They appear in neither the base nor the neighbour expansion, so the view
+      shows architectural definitions only and neighbourDepth cannot pull
+      instances back in. Defaults to false.
   neighbourDepth:
     type: integer
     minimum: 0
