@@ -1,0 +1,18 @@
+id: scanner
+label: Scanner
+description: The ScanToPdf application and the SANE scanner station (Raspberry Pi + Canon scanner) it drives.
+# The app side is its own producer; the SANE station lives under the shared
+# `architecture` producer (alongside home-automation/infra), so its four
+# elements are named explicitly rather than scoped by producer. The
+# `scantopdf-server-consumes-sane` relation stitches the two halves into one
+# connected graph; the station's own edges (Assignment, Realization,
+# Composition) all sit between included elements, so the physical scanner and
+# its links render without depending on neighbour expansion.
+predicate:
+  producers: [scantopdf-server]
+include:
+  - node:scanner-pi,7cb7b613-4049-4a0d-a640-a2fa6d28182d
+  - device:canoscan-lide-400,7474469e-6ab1-45ff-a8ed-fa569512a643
+  - ss:sane,dad94c80-25d2-43cb-87da-fa6a284256db
+  - svc:sane,e84330dd-c453-4bd4-a112-f83366de453c
+neighbourDepth: 1
