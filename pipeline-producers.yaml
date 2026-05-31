@@ -7,9 +7,43 @@
 
 producers:
   - id: ansible
-    jenkinsJob: IaC/Ansible Architecture
-  - id: architecture        # self-producer: source in docs/architecture/, no upstream Jenkins job
+    jenkinsJob: AaC/Ansible
+  - id: architecture
   - id: helm-charts
-    jenkinsJob: IaC/HelmCharts Architecture
+    jenkinsJob: AaC/HelmCharts
   - id: docker-images
-    jenkinsJob: DockerImages Architecture
+    jenkinsJob: AaC/DockerImages
+  - id: ssegateway
+    jenkinsJob: AaC/SSEGateway
+  - id: electronics-inventory
+    jenkinsJob: AaC/ElectronicsInventory
+  - id: electronics-inventory-ui
+    jenkinsJob: AaC/ElectronicsInventoryUI
+  - id: iotsupport-app
+    jenkinsJob: AaC/IoTSupport
+  - id: iotsupport-ui
+    jenkinsJob: AaC/IoTSupportUI
+  - id: dhcpapp
+    jenkinsJob: AaC/DHCPApp
+  - id: dhcpapp-ui
+    jenkinsJob: AaC//DHCPAppUI
+  - id: zigbee-control
+    jenkinsJob: AaC/ZigbeeControl
+  - id: zigbee-control-ui
+    jenkinsJob: AaC/ZigbeeControlUI
+  - id: design-assistant
+    jenkinsJob: AaC/DesignAssistant
+  - id: ginbov-nl
+    jenkinsJob: AaC/Ginbov
+  - id: newsfilter
+    jenkinsJob: AaC/NewsFilter
+  - id: scantopdf-server
+    jenkinsJob: AaC/ScanToPdf
+  - id: webathome-org
+    jenkinsJob: AaC/Webathome
+  - id: mydownloads
+    jenkinsJob: AaC/MyDownloads
+  - id: gitblit-mcp-server
+    jenkinsJob: AaC/GitblitMCPServer
+  - id: gitblit-initializer
+    jenkinsJob: AaC/GitblitMCPSupportPlugin
