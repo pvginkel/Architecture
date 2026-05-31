@@ -35,13 +35,11 @@ export const NODE_GROUP_IDS = [
 
 export type FilterState = Map<string, Set<string>>;
 
-/** Relationship types kept off the canvas by default. These are the high-volume,
- *  low-structural-signal edges (a provider served by dozens of consumers; loose
- *  associations) that turn any non-trivial view into a hairball. The view
- *  baseline pre-selects every *other* type so these stay hidden until the user
- *  opts in; switching views or clearing filters restores this. */
+/** Relationship types kept off the canvas by default — loose Association edges,
+ *  which carry little structural signal and clutter the view. The view baseline
+ *  pre-selects every *other* type so these stay hidden until the user opts in;
+ *  switching views or clearing filters restores this. */
 export const HIDDEN_RELATIONSHIP_TYPES: ReadonlySet<string> = new Set([
-  "Serving",
   "Association",
 ]);
 
