@@ -124,11 +124,28 @@ function ArchitectureNodeCard({ data }: NodeProps<Node<ArchNodeData>>) {
     }
   }
 
+  // A deployed-container instance (helm-charts producer) carries release /
+  // workload / container in stats; its card leads with the container and a
+  // "release » workload" locator. Everything else (products, services) keeps
+  // the label + kind-label shape.
+  const stats = data.stats ?? {};
+  const isInstance =
+    typeof stats.container === "string" &&
+    typeof stats.release === "string" &&
+    typeof stats.workload === "string";
+  const stage = data.environment;
+  // The merged label carries a " (env)" postfix; the stage now has its own
+  // chip, so strip it from the displayed label.
+  const displayLabel =
+    stage && data.label.endsWith(` (${stage})`)
+      ? data.label.slice(0, -` (${stage})`.length)
+      : data.label;
+
   return (
     <article
       className={`arch-node arch-node--${data.lifecycle}${
         data.dimmed ? " arch-node--dimmed" : ""
-      }`}
+      }${data.highlighted ? " arch-node--highlighted" : ""}`}
       style={{ "--node-accent": accent } as CSSProperties}
     >
       <Handle type="target" position={Position.Left} className="node-handle" />
@@ -137,12 +154,28 @@ function ArchitectureNodeCard({ data }: NodeProps<Node<ArchNodeData>>) {
         <span className="arch-node__icon" aria-hidden="true">
           <Icon size={16} strokeWidth={2.2} />
         </span>
-        <span className="arch-node__logo" aria-hidden="true">
-          {rightImage}
+        <span className="arch-node__top-right">
+          {stage ? <span className="arch-node__stage">{stage}</span> : null}
+          <span className="arch-node__logo" aria-hidden="true">
+            {rightImage}
+          </span>
         </span>
       </div>
-      <h3>{data.label}</h3>
-      <p>{KIND_LABELS[data.kind]}</p>
+      {isInstance ? (
+        <>
+          <h3>{stats.container}</h3>
+          <p className="arch-node__locator">
+            <span className="arch-node__release">{stats.release}</span>
+            <span className="arch-node__locator-sep"> » </span>
+            <span className="arch-node__workload">{stats.workload}</span>
+          </p>
+        </>
+      ) : (
+        <>
+          <h3>{displayLabel}</h3>
+          <p>{KIND_LABELS[data.kind]}</p>
+        </>
+      )}
       <div className="arch-node__meta">
         <span>{data.producer}</span>
         {data.introduced ? <span>{data.introduced}</span> : null}
@@ -468,12 +501,15 @@ function ArchitectureMapInner() {
       return nodes;
     }
     return nodes.map((node) => {
+      if (node.id === selectedId) {
+        return { ...node, zIndex: 20, data: { ...node.data, highlighted: true } };
+      }
       if (connectedNodeIds.has(node.id)) {
         return node;
       }
       return { ...node, data: { ...node.data, dimmed: true } };
     });
-  }, [nodes, connectedNodeIds]);
+  }, [nodes, connectedNodeIds, selectedId]);
 
   const layoutKey = useMemo(
     () =>

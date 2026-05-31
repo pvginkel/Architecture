@@ -1,5 +1,6 @@
 import type { Edge, Node } from "@xyflow/react";
 import ELK from "elkjs/lib/elk.bundled.js";
+import { NODE_WIDTH, NODE_HEIGHT } from "../data/model";
 
 const elk = new ELK();
 
@@ -22,8 +23,8 @@ export async function getDirectedLayout(nodes: Node[], edges: Edge[]) {
     },
     children: architectureNodes.map((node) => ({
       id: node.id,
-      width: 270,
-      height: 132,
+      width: NODE_WIDTH,
+      height: NODE_HEIGHT,
     })),
     edges: architectureEdges.map((edge) => ({
       id: edge.id,

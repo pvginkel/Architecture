@@ -25,7 +25,7 @@ export interface ArchElement extends ManifestElement {
   [key: string]: unknown;
 }
 
-export type ArchNodeData = ArchElement & { dimmed?: boolean };
+export type ArchNodeData = ArchElement & { dimmed?: boolean; highlighted?: boolean };
 
 export interface RelationshipEdgeData extends Record<string, unknown> {
   relation: ManifestRelation;
@@ -43,8 +43,8 @@ export interface ArchModel {
   elementById: Map<string, ArchElement>;
 }
 
-export const NODE_WIDTH = 270;
-export const NODE_HEIGHT = 132;
+export const NODE_WIDTH = 300;
+export const NODE_HEIGHT = 158;
 
 /** Invert derived.capabilityRealizations into element-id → capability. First
  *  realized capability wins, deterministically (object insertion order). */

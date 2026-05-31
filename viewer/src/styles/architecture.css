@@ -468,19 +468,31 @@ body,
 
 .arch-node {
   position: relative;
-  width: 270px;
-  height: 132px;
+  width: 300px;
+  height: 158px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 5px;
   padding: 12px;
   border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--node-accent), #ffffff 62%);
-  background:
-    linear-gradient(180deg, #ffffff, #fbfbf8),
-    linear-gradient(90deg, color-mix(in srgb, var(--node-accent), #ffffff 88%), #ffffff);
+  border: 1px solid color-mix(in srgb, var(--node-accent), #ffffff 52%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--node-accent), #ffffff 84%),
+    color-mix(in srgb, var(--node-accent), #ffffff 90%)
+  );
   box-shadow: 0 10px 24px rgba(42, 44, 40, 0.12);
+}
+
+/* Selected node: border grows and gains an accent ring, mirroring how a
+   highlighted edge thickens. box-sizing keeps the 300x158 footprint. */
+.arch-node--highlighted {
+  border-width: 3px;
+  border-color: color-mix(in srgb, var(--node-accent), #ffffff 20%);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--node-accent), #ffffff 72%),
+    0 14px 30px rgba(42, 44, 40, 0.2);
 }
 
 .node-handle {
@@ -556,6 +568,23 @@ body,
   color: var(--node-accent);
 }
 
+.arch-node__top-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Deployment stage, shown small-caps just left of the logo (replaces the old
+   " (prd)" label postfix). */
+.arch-node__stage {
+  font-variant: all-small-caps;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  color: color-mix(in srgb, var(--node-accent), #2a2c28 30%);
+}
+
 .arch-node__logo {
   width: 32px;
   height: 32px;
@@ -593,6 +622,29 @@ body,
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* "release » workload" locator on instance cards. Smaller than the container
+   title; release reads a touch stronger, the » carries the accent. */
+.arch-node__locator {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.3;
+  color: #6a6f68;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.arch-node__release {
+  color: #4a4f49;
+  font-weight: 760;
+}
+
+.arch-node__locator-sep {
+  color: var(--node-accent);
+  font-weight: 800;
 }
 
 .arch-node__meta {
