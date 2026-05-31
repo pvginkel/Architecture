@@ -14,15 +14,20 @@ const elk = new ELK();
 //      structurally important relations (composition, realization, serving) are
 //      drawn short and straight while associations stop dragging the layout.
 
-// Top-to-bottom band order. Strategy on top, technology at the bottom — the
-// conventional ArchiMate stack. Cross-cutting groupings get their own band at
-// the bottom for now; this ordering is the obvious knob to revisit.
+// Vertical band per layer. The layout flows UP (see elk.direction below), so a
+// higher partition index sits higher on the canvas: strategy on top, technology
+// at the bottom — the conventional ArchiMate stack. Flowing up rather than down
+// is what makes Serving/Realization arrows point upward (provider/realizer at
+// the bottom, consumer/capability above), matching both the ArchiMate layered
+// view and the way an infrastructure stack reads: the most depended-upon
+// element sinks to the bottom. Cross-cutting groupings get the bottom band for
+// now; this ordering is the obvious knob to revisit.
 const LAYER_BAND: Record<LayerId, number> = {
-  strategy: 0,
-  business: 1,
+  strategy: 4,
+  business: 3,
   application: 2,
-  technology: 3,
-  "cross-cutting": 4,
+  technology: 1,
+  "cross-cutting": 0,
 };
 
 // Higher = ELK tries harder to keep the two endpoints close and aligned.
@@ -59,7 +64,12 @@ export async function getDirectedLayout(nodes: Node[], edges: Edge[]) {
     id: "root",
     layoutOptions: {
       "elk.algorithm": "layered",
-      "elk.direction": "DOWN",
+      // UP, not DOWN: ArchiMate Serving/Realization point from provider to
+      // consumer (edge source = the lower-layer provider). Flowing up places the
+      // source below the target, so dependencies point upward and the most
+      // depended-upon element settles at the bottom — the conventional layered
+      // view. With UP, partition 0 is the bottom band (see LAYER_BAND).
+      "elk.direction": "UP",
       "elk.edgeRouting": "ORTHOGONAL",
       "elk.partitioning.activate": "true",
       // Lay every node out in one shared coordinate system. With this on by
