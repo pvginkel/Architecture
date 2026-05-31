@@ -46,6 +46,30 @@ export interface ManifestDerived {
   capabilityRealizations: Record<string, string[]>;
 }
 
+// A view's attribute selector. Within a field the values OR; across fields they
+// AND. An absent/empty predicate matches every element (the Everything view).
+export interface ViewPredicate {
+  layers?: string[];
+  kinds?: string[];
+  producers?: string[];
+  capabilities?: string[];
+  lifecycle?: string[];
+  environments?: string[];
+}
+
+// A curated view, authored as YAML in the Architecture repo and inlined into
+// the manifest by the collector. See src/views/scope.ts for resolution.
+export interface ViewDefinition {
+  id: string;
+  label: string;
+  description: string;
+  predicate?: ViewPredicate;
+  include?: string[];
+  exclude?: string[];
+  neighbourDepth?: number;
+  defaultEnvironment?: string;
+}
+
 export interface Manifest {
   schemaVersion: string;
   producers: string[];
@@ -62,6 +86,7 @@ export interface Manifest {
   groupings: ManifestElement[];
   relations: ManifestRelation[];
   derived: ManifestDerived;
+  views: ViewDefinition[];
 }
 
 /**

@@ -338,11 +338,60 @@ body,
 }
 
 .diagram-region {
-  position: relative;
   flex: 1;
   min-width: 0;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   background: #f8f8f4;
+}
+
+/* ---- View tab strip across the top of the canvas ---- */
+
+.view-tabs {
+  flex-shrink: 0;
+  display: flex;
+  gap: 2px;
+  padding: 8px 12px 0;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+  background: rgba(251, 251, 248, 0.92);
+  backdrop-filter: blur(16px);
+}
+
+.view-tab {
+  flex-shrink: 0;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease;
+}
+
+.view-tab:hover {
+  color: var(--ink);
+  background: #f1f0fb;
+}
+
+.view-tab--active {
+  color: #3b3976;
+  background: #fff;
+  border-color: var(--line);
+  margin-bottom: -1px;
+}
+
+.canvas-region {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .react-flow__attribution {

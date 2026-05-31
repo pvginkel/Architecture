@@ -2,17 +2,19 @@
 // v0 has no consumers; this exists so retrofitting later is cheap.
 //
 // Contract:
-//   - Inbound:  { type: "set-view", view: string } from PARENT_ORIGIN only.
+//   - Inbound:  { type: "set-view", view: string } from PARENT_ORIGIN only,
+//               where `view` is a view id (e.g. "landscape").
 //   - Outbound: { type: "ready" } on mount.
-//               { type: "view-change", view: string } when the viewer's filter
-//               state changes (wired by ArchitectureMap once a view model exists).
+//               { type: "view-change", view: string, filters: string } when the
+//               active view or filter state changes — `view` is the active view
+//               id, `filters` a JSON blob of the search + filter selections.
 
 const PARENT_ORIGIN = "https://webathome.org";
 
 type InboundMessage = { type: "set-view"; view: string };
 type OutboundMessage =
   | { type: "ready" }
-  | { type: "view-change"; view: string };
+  | { type: "view-change"; view: string; filters: string };
 
 type SetViewHandler = (view: string) => void;
 

@@ -39,9 +39,15 @@ import {
   type ArchNodeData,
   type RelationshipEdgeData,
 } from "../data/model";
-import { loadManifest, resolveSrc, type Manifest } from "../data/manifest";
+import {
+  loadManifest,
+  resolveSrc,
+  type Manifest,
+  type ViewDefinition,
+} from "../data/manifest";
 import { CAPABILITY_ICON, KIND_ICON, LAYER_ACCENT } from "../theme";
 import { getDirectedLayout } from "./layout";
+import { ViewTabs } from "./ViewTabs";
 import { emitToParent, onSetView } from "../parent-bridge";
 import { FilterRail } from "../filters/FilterRail";
 import { buildGroups } from "../filters/groups";
@@ -49,12 +55,16 @@ import { loadCollapsed, saveCollapsed } from "../filters/persistence";
 import {
   addFilterOptions,
   computeVisibleGraph,
-  deserializeFilters,
   initialFilterState,
   serializeFilters,
   toggleFilterOption,
   type FilterState,
 } from "../filters/state";
+import {
+  pickInitialView,
+  resolveViewScope,
+  viewBaselineFilterState,
+} from "../views/scope";
 
 interface TooltipState {
   x: number;
@@ -292,6 +302,7 @@ function ArchitectureMapInner() {
   const [error, setError] = useState<Error | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterState, setFilterState] = useState<FilterState>(() => initialFilterState());
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => loadCollapsed(src));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
@@ -305,8 +316,14 @@ function ArchitectureMapInner() {
     let cancelled = false;
     loadManifest(src)
       .then((loaded) => {
-        if (!cancelled) {
-          setManifest(loaded);
+        if (cancelled) {
+          return;
+        }
+        setManifest(loaded);
+        const initial = pickInitialView(loaded.views);
+        if (initial) {
+          setActiveViewId(initial.id);
+          setFilterState(viewBaselineFilterState(initial));
         }
       })
       .catch((err: unknown) => {
@@ -321,42 +338,76 @@ function ArchitectureMapInner() {
 
   const model = useMemo(() => (manifest ? buildModel(manifest) : null), [manifest]);
 
+  const activeView = useMemo<ViewDefinition | null>(
+    () => manifest?.views.find((v) => v.id === activeViewId) ?? null,
+    [manifest, activeViewId],
+  );
+
+  // The active view restricts the model to its scoped element set; the filter
+  // rail and canvas then operate within that scope. With no active view yet
+  // (manifest still loading its first view) the full model stands in.
+  const scopedModel = useMemo<ArchModel | null>(() => {
+    if (!model) {
+      return null;
+    }
+    if (!manifest || !activeView) {
+      return model;
+    }
+    const scope = resolveViewScope(activeView, model, manifest);
+    const elements = model.elements.filter((el) => scope.has(el.id));
+    const relations = model.relations.filter(
+      (rel) => scope.has(rel.source) && scope.has(rel.target),
+    );
+    return {
+      elements,
+      relations,
+      elementById: new Map(elements.map((el) => [el.id, el])),
+    };
+  }, [model, manifest, activeView]);
+
   const { nodes, edges, visibleElements } = useVisibleGraph(
-    model,
+    scopedModel,
     filterState,
     searchTerm,
     directedPositions,
   );
 
   const groups = useMemo(
-    () => (model ? buildGroups(model, filterState, searchTerm) : []),
-    [model, filterState, searchTerm],
+    () => (scopedModel ? buildGroups(scopedModel, filterState, searchTerm) : []),
+    [scopedModel, filterState, searchTerm],
+  );
+
+  const selectView = useCallback(
+    (viewId: string) => {
+      const view = manifest?.views.find((v) => v.id === viewId);
+      if (!view) {
+        return;
+      }
+      setActiveViewId(viewId);
+      setSearchTerm("");
+      setFilterState(viewBaselineFilterState(view));
+      setSelectedId(null);
+    },
+    [manifest],
   );
 
   useEffect(() => {
+    if (!activeViewId) {
+      return;
+    }
     emitToParent({
       type: "view-change",
-      view: JSON.stringify({
+      view: activeViewId,
+      filters: JSON.stringify({
         search: searchTerm,
         filters: serializeFilters(filterState),
       }),
     });
-  }, [searchTerm, filterState]);
+  }, [activeViewId, searchTerm, filterState]);
 
   useEffect(() => {
-    return onSetView((view) => {
-      const parsed = JSON.parse(view) as {
-        search?: string;
-        filters?: Record<string, string[]>;
-      };
-      if (typeof parsed.search === "string") {
-        setSearchTerm(parsed.search);
-      }
-      if (parsed.filters) {
-        setFilterState(deserializeFilters(parsed.filters));
-      }
-    });
-  }, []);
+    return onSetView((viewId) => selectView(viewId));
+  }, [selectView]);
 
   const toggleOption = useCallback((groupId: string, value: string) => {
     setFilterState((current) => toggleFilterOption(current, groupId, value));
@@ -528,8 +579,10 @@ function ArchitectureMapInner() {
 
   const clearFilters = useCallback(() => {
     setSearchTerm("");
-    setFilterState(initialFilterState());
-  }, []);
+    setFilterState(
+      activeView ? viewBaselineFilterState(activeView) : initialFilterState(),
+    );
+  }, [activeView]);
 
   return (
     <div className="architecture-page">
@@ -549,6 +602,15 @@ function ArchitectureMapInner() {
         ) : null}
 
         <div className="diagram-region" data-testid="architecture-diagram">
+          {manifest && manifest.views.length > 0 ? (
+            <ViewTabs
+              views={manifest.views}
+              activeViewId={activeViewId}
+              onSelect={selectView}
+            />
+          ) : null}
+
+          <div className="canvas-region">
           {error ? (
             <div className="load-state load-state--error">
               <TriangleAlert size={22} />
@@ -584,6 +646,7 @@ function ArchitectureMapInner() {
           )}
           {tooltip ? <Tooltip tooltip={tooltip} /> : null}
           {edgeTooltip ? <EdgeTooltip tooltip={edgeTooltip} /> : null}
+          </div>
         </div>
       </section>
     </div>
