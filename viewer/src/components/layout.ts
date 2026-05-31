@@ -43,6 +43,11 @@ const RELATION_PRIORITY: Record<string, number> = {
 };
 const DEFAULT_PRIORITY = 20;
 
+function relationPriority(edge: Edge): number {
+  const type = (edge.data as RelationshipEdgeData).relation.type;
+  return RELATION_PRIORITY[type] ?? DEFAULT_PRIORITY;
+}
+
 export async function getDirectedLayout(nodes: Node[], edges: Edge[]) {
   const architectureNodes = nodes.filter((node) => node.type === "architecture");
   const visibleIds = new Set(architectureNodes.map((node) => node.id));
@@ -57,7 +62,15 @@ export async function getDirectedLayout(nodes: Node[], edges: Edge[]) {
       "elk.direction": "DOWN",
       "elk.edgeRouting": "ORTHOGONAL",
       "elk.partitioning.activate": "true",
-      "elk.layered.spacing.nodeNodeBetweenLayers": "72",
+      // Lay every node out in one shared coordinate system. With this on by
+      // default, ELK packs each disconnected component independently and resets
+      // their Y, which lets a fragment of (say) technology nodes float above the
+      // strategy band — partitioning only orders within a component. Forcing a
+      // single component makes the layer bands global and strict. The cost is a
+      // wider canvas on dense views; that's acceptable — dense views are the
+      // firehose, and the answer there is to scope, not to lay out.
+      "elk.separateConnectedComponents": "false",
+      "elk.layered.spacing.nodeNodeBetweenLayers": "96",
       // ReactFlow redraws every edge between handles, so ELK's edge geometry is
       // discarded. Reserving per-edge channels between layers is therefore pure
       // wasted vertical space — and with >1000 edges it dominates the layout
@@ -65,7 +78,7 @@ export async function getDirectedLayout(nodes: Node[], edges: Edge[]) {
       // height plus nodeNodeBetweenLayers.
       "elk.layered.spacing.edgeNodeBetweenLayers": "0",
       "elk.layered.spacing.edgeEdgeBetweenLayers": "0",
-      "elk.spacing.nodeNode": "40",
+      "elk.spacing.nodeNode": "64",
       "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
     },
     children: architectureNodes.map((node) => {
@@ -80,13 +93,12 @@ export async function getDirectedLayout(nodes: Node[], edges: Edge[]) {
       };
     }),
     edges: architectureEdges.map((edge) => {
-      const type = (edge.data as RelationshipEdgeData).relation.type;
       return {
         id: edge.id,
         sources: [edge.source],
         targets: [edge.target],
         layoutOptions: {
-          "elk.priority": String(RELATION_PRIORITY[type] ?? DEFAULT_PRIORITY),
+          "elk.priority": String(relationPriority(edge)),
         },
       };
     }),
