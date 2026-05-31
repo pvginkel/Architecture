@@ -83,8 +83,8 @@ export function toFlowNode(el: ArchElement): Node<ArchNodeData> {
     position: { x: 0, y: 0 },
     data: el,
     draggable: false,
-    sourcePosition: Position.Right,
-    targetPosition: Position.Left,
+    sourcePosition: Position.Bottom,
+    targetPosition: Position.Top,
     zIndex: 10,
     style: { width: NODE_WIDTH, height: NODE_HEIGHT },
   };

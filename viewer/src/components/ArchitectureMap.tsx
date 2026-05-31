@@ -93,8 +93,8 @@ function ArchitectureNodeCard({ data }: NodeProps<Node<ArchNodeData>>) {
     console.error(`[viewer] unknown ${what} — vocab is stale, rebuild`);
     return (
       <article className="arch-node arch-node--stale">
-        <Handle type="target" position={Position.Left} className="node-handle" />
-        <Handle type="source" position={Position.Right} className="node-handle" />
+        <Handle type="target" position={Position.Top} className="node-handle" />
+        <Handle type="source" position={Position.Bottom} className="node-handle" />
         <div className="arch-node__stale-badge">
           <TriangleAlert size={16} /> unknown {what}
         </div>
@@ -148,8 +148,8 @@ function ArchitectureNodeCard({ data }: NodeProps<Node<ArchNodeData>>) {
       }${data.highlighted ? " arch-node--highlighted" : ""}`}
       style={{ "--node-accent": accent } as CSSProperties}
     >
-      <Handle type="target" position={Position.Left} className="node-handle" />
-      <Handle type="source" position={Position.Right} className="node-handle" />
+      <Handle type="target" position={Position.Top} className="node-handle" />
+      <Handle type="source" position={Position.Bottom} className="node-handle" />
       <div className="arch-node__top">
         <span className="arch-node__icon" aria-hidden="true">
           <Icon size={16} strokeWidth={2.2} />
