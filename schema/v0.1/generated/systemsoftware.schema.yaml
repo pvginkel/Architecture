@@ -43,6 +43,83 @@ properties:
     type: object
     additionalProperties:
       type: string
+  logo:
+    description: 'Name of a logo from the bundled library (viewer/public/logos/), without the file extension (e.g. `ubiquiti`).
+      Picked from the curated set; validated against it. Optional, on any kind.
+
+      '
+    type: string
+    enum:
+    - ansible
+    - c
+    - calico
+    - ceph
+    - code-server
+    - coredns
+    - cpp
+    - csharp
+    - dnsmasq
+    - docker
+    - elastic
+    - elasticsearch
+    - electronics-inventory
+    - external-secrets
+    - gitblit
+    - github
+    - gluetun
+    - go
+    - grafana
+    - guacamole
+    - haproxy
+    - helm
+    - home-assistant
+    - html5
+    - iot-support
+    - java
+    - javascript
+    - jenkins
+    - json
+    - kaniko
+    - keepalived
+    - keycloak
+    - kibana
+    - kubernetes
+    - markdown
+    - maven
+    - metallb
+    - mosquitto
+    - msbuild
+    - nginx
+    - nodejs
+    - openbao
+    - opensearch
+    - pgadmin
+    - playwright
+    - plex
+    - pnpm
+    - poetry
+    - postgresql
+    - prometheus
+    - proxmox
+    - pytest
+    - python
+    - qemu
+    - rabbitmq
+    - rclone
+    - ruff
+    - rust
+    - s3
+    - samba
+    - smallstep
+    - systemd
+    - terraform
+    - typescript
+    - ubiquiti
+    - ubuntu
+    - xaml
+    - xml
+    - yaml
+    - zigbee2mqtt
   environment:
     description: DTAP stage. Custom attribute, not ArchiMate's Plateau.
     type: string
@@ -64,10 +141,6 @@ properties:
     description: Upstream product homepage, if applicable.
     type: string
     format: uri
-  logo:
-    description: Filename under viewer/public/logos/.
-    type: string
-    minLength: 1
   sourceRepository:
     description: "Free-form source-repository identifier for in-house products, e.g. `git:pvginkel/Ansible`. Informational\
       \ only \u2014 no graph edge is derived from this field.\n"
@@ -83,9 +156,6 @@ allOf:
     - not:
         required:
         - homepage
-    - not:
-        required:
-        - logo
     - not:
         required:
         - sourceRepository
