@@ -80,6 +80,39 @@ interface EdgeTooltipState {
   typeLabel: string;
 }
 
+// Each node exposes a source and a target handle on both its top and bottom
+// edges. The edge builder picks which pair to use per relation so an upward
+// edge connects the two facing sides (top of the lower node → bottom of the
+// upper node) instead of looping around. Handle ids are referenced by the
+// sourceHandle/targetHandle assigned in useVisibleGraph.
+const HANDLE = {
+  sourceTop: "src-top",
+  sourceBottom: "src-bottom",
+  targetTop: "tgt-top",
+  targetBottom: "tgt-bottom",
+} as const;
+
+function NodeHandles() {
+  return (
+    <>
+      <Handle id={HANDLE.targetTop} type="target" position={Position.Top} className="node-handle" />
+      <Handle id={HANDLE.sourceTop} type="source" position={Position.Top} className="node-handle" />
+      <Handle
+        id={HANDLE.targetBottom}
+        type="target"
+        position={Position.Bottom}
+        className="node-handle"
+      />
+      <Handle
+        id={HANDLE.sourceBottom}
+        type="source"
+        position={Position.Bottom}
+        className="node-handle"
+      />
+    </>
+  );
+}
+
 function ArchitectureNodeCard({ data }: NodeProps<Node<ArchNodeData>>) {
   const Icon = KIND_ICON[data.kind];
   const accent = LAYER_ACCENT[data.layer];
@@ -93,8 +126,7 @@ function ArchitectureNodeCard({ data }: NodeProps<Node<ArchNodeData>>) {
     console.error(`[viewer] unknown ${what} — vocab is stale, rebuild`);
     return (
       <article className="arch-node arch-node--stale">
-        <Handle type="target" position={Position.Top} className="node-handle" />
-        <Handle type="source" position={Position.Bottom} className="node-handle" />
+        <NodeHandles />
         <div className="arch-node__stale-badge">
           <TriangleAlert size={16} /> unknown {what}
         </div>
@@ -148,8 +180,7 @@ function ArchitectureNodeCard({ data }: NodeProps<Node<ArchNodeData>>) {
       }${data.highlighted ? " arch-node--highlighted" : ""}`}
       style={{ "--node-accent": accent } as CSSProperties}
     >
-      <Handle type="target" position={Position.Top} className="node-handle" />
-      <Handle type="source" position={Position.Bottom} className="node-handle" />
+      <NodeHandles />
       <div className="arch-node__top">
         <span className="arch-node__icon" aria-hidden="true">
           <Icon size={16} strokeWidth={2.2} />
@@ -287,7 +318,17 @@ function useVisibleGraph(
       const position = directedPositions?.get(node.id);
       return position ? { ...node, position } : node;
     });
-    const edges = toFlowEdges(visibleRelations, model.elementById);
+    const edges = toFlowEdges(visibleRelations, model.elementById).map((edge) => {
+      const source = directedPositions?.get(edge.source);
+      const target = directedPositions?.get(edge.target);
+      // Upward edge: the target sits higher (smaller y) than the source. Route
+      // it between the facing sides — out the source's top, into the target's
+      // bottom. Otherwise (downward or same row) keep the default bottom→top.
+      const upward = source && target && target.y < source.y;
+      return upward
+        ? { ...edge, sourceHandle: HANDLE.sourceTop, targetHandle: HANDLE.targetBottom }
+        : { ...edge, sourceHandle: HANDLE.sourceBottom, targetHandle: HANDLE.targetTop };
+    });
 
     return { nodes, edges, visibleElements };
   }, [model, filterState, searchTerm, directedPositions]);
