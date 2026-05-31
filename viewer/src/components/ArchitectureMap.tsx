@@ -28,12 +28,15 @@ import {
   KIND_LABELS,
   LAYER_LABELS,
   LOGO_FILES,
+  type LayerId,
   type LogoName,
 } from "../generated/vocab";
 import {
   buildModel,
   toFlowEdges,
   toFlowNodes,
+  NODE_WIDTH,
+  NODE_HEIGHT,
   type ArchElement,
   type ArchModel,
   type ArchNodeData,
@@ -303,8 +306,23 @@ function EdgeTooltip({ tooltip }: { tooltip: EdgeTooltipState }) {
   );
 }
 
+// A full-width translucent band painted behind the nodes of one ArchiMate
+// layer, so the strategy/application/technology stack reads at a glance. Purely
+// decorative: non-interactive, sits below the cards (zIndex 0 vs the cards' 10).
+function LayerBandNode({ data }: NodeProps) {
+  const color = data.color as string;
+  return (
+    <div className="layer-band" style={{ borderColor: `${color}33`, background: `${color}12` }}>
+      <span className="layer-band__label" style={{ color }}>
+        {data.label as string}
+      </span>
+    </div>
+  );
+}
+
 const nodeTypes = {
   architecture: ArchitectureNodeCard,
+  layerBand: LayerBandNode,
 };
 
 const edgeTypes = {
@@ -571,6 +589,51 @@ function ArchitectureMapInner() {
     });
   }, [nodes, connectedNodeIds, selectedId]);
 
+  // One translucent background band per ArchiMate layer, spanning the full
+  // diagram width and the vertical extent of that layer's laid-out nodes. The
+  // partitioned layout keeps each layer in a contiguous Y range, so the per-layer
+  // extents don't overlap. Recomputed whenever positions change.
+  const bandNodes = useMemo<Node[]>(() => {
+    if (nodes.length === 0) {
+      return [];
+    }
+    let minX = Infinity;
+    let maxX = -Infinity;
+    const extents = new Map<LayerId, { minY: number; maxY: number }>();
+    for (const node of nodes) {
+      const { x, y } = node.position;
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x + NODE_WIDTH);
+      const layer = (node.data as ArchNodeData).layer;
+      const ext = extents.get(layer) ?? { minY: Infinity, maxY: -Infinity };
+      ext.minY = Math.min(ext.minY, y);
+      ext.maxY = Math.max(ext.maxY, y + NODE_HEIGHT);
+      extents.set(layer, ext);
+    }
+    const PAD_X = 64;
+    const PAD_Y = 28;
+    return [...extents.entries()].map(([layer, ext]) => {
+      const width = maxX - minX + PAD_X * 2;
+      const height = ext.maxY - ext.minY + PAD_Y * 2;
+      return {
+        id: `band:${layer}`,
+        type: "layerBand",
+        position: { x: minX - PAD_X, y: ext.minY - PAD_Y },
+        data: { label: LAYER_LABELS[layer], color: LAYER_ACCENT[layer] },
+        draggable: false,
+        selectable: false,
+        focusable: false,
+        zIndex: 0,
+        style: { width, height, pointerEvents: "none" as const },
+      };
+    });
+  }, [nodes]);
+
+  const canvasNodes = useMemo(
+    () => [...bandNodes, ...decoratedNodes],
+    [bandNodes, decoratedNodes],
+  );
+
   const layoutKey = useMemo(
     () =>
       [
@@ -717,7 +780,7 @@ function ArchitectureMapInner() {
             <div className="load-state">Loading architecture…</div>
           ) : (
             <ReactFlow
-              nodes={decoratedNodes}
+              nodes={canvasNodes}
               edges={decoratedEdges}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
