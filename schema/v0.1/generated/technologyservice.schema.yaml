@@ -91,6 +91,7 @@ properties:
     - msbuild
     - nginx
     - nodejs
+    - openai
     - openbao
     - opensearch
     - pgadmin

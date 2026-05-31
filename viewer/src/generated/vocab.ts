@@ -280,6 +280,7 @@ export const LOGO_FILES = {
   "msbuild": "msbuild.svg",
   "nginx": "nginx.svg",
   "nodejs": "nodejs.svg",
+  "openai": "openai.svg",
   "openbao": "openbao.svg",
   "opensearch": "opensearch.svg",
   "pgadmin": "pgadmin.png",

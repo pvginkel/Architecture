@@ -17,5 +17,6 @@ applicationServices:
       for AI features. Hardcoded SDK base URL; consumers carry no boundBy.
     introduced: 2026-05-31
     lifecycle: active
+    logo: openai
     stats:
       homepage: https://openai.com/
