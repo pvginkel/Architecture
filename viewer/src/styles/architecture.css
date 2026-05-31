@@ -185,6 +185,13 @@ body,
   color: #3b3976;
 }
 
+.toggle-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
 .controls-panel__filters {
   display: flex;
   gap: 7px;
@@ -219,6 +226,35 @@ body,
 
 .react-flow__attribution {
   display: none;
+}
+
+.load-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 680;
+}
+
+.load-state--error {
+  color: #c0392b;
+}
+
+.load-state--error code {
+  max-width: 520px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fdecea;
+  color: #8c2f22;
+  font-size: 12px;
+  word-break: break-all;
 }
 
 .lane-node {
@@ -286,18 +322,49 @@ body,
   opacity: 0.34;
 }
 
-.arch-node--dev,
-.arch-node--legacy {
-  opacity: 0.64;
+.arch-node--deprecated {
+  opacity: 0.7;
+  border-style: dashed;
 }
 
-.arch-node--out-of-band {
+.arch-node--removed {
+  opacity: 0.45;
   border-style: dashed;
 }
 
 .arch-node--dimmed {
   opacity: 0.4;
   transition: opacity 160ms ease;
+}
+
+/* Runtime skew placeholder: data carries a kind/layer/capability this build's
+   vocab has never seen. Loud, glaring, non-crashing. */
+.arch-node--stale {
+  --node-accent: #c0392b;
+  border: 2px solid #c0392b;
+  background: repeating-linear-gradient(
+    45deg,
+    #fdecea,
+    #fdecea 8px,
+    #fbd9d4 8px,
+    #fbd9d4 16px
+  );
+}
+
+.arch-node__stale-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #c0392b;
+  font-size: 11px;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.arch-node__stale-mark {
+  color: #c0392b;
+  font-size: 18px;
+  font-weight: 820;
 }
 
 .arch-node__top,

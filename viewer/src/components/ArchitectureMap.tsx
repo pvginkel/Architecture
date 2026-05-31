@@ -1,30 +1,6 @@
+import { Cable, Filter, Layers, Search, Spline, TriangleAlert, X } from "lucide-react";
 import {
-  Activity,
-  Boxes,
-  Braces,
-  Cable,
-  CloudCog,
-  Code2,
-  Database,
-  Eye,
-  Filter,
-  Home,
-  KeyRound,
-  Layers,
-  LockKeyhole,
-  Monitor,
-  Network,
-  Package,
-  Route,
-  Search,
-  Server,
-  Shield,
-  Sparkles,
-  Workflow,
-  X,
-  type LucideIcon,
-} from "lucide-react";
-import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -49,156 +25,88 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import {
-  architectureEdges,
-  architectureNodes,
-  capabilityLabels,
-  edgeTypeLabels,
-  type ArchitectureEdge,
-  type ArchitectureNode,
-  type CapabilityId,
-  type EdgeType,
-} from "../data/architecture";
+  ELEMENT_KINDS,
+  KIND_LABELS,
+  LAYER_IDS,
+  LAYER_LABELS,
+  RELATIONSHIP_TYPES,
+  RELATIONSHIP_LABELS,
+  type ElementKind,
+  type LayerId,
+  type RelationshipType,
+} from "../generated/vocab";
+import {
+  buildModel,
+  toFlowEdges,
+  toFlowNodes,
+  type ArchElement,
+  type ArchModel,
+  type ArchNodeData,
+  type RelationshipEdgeData,
+} from "../data/model";
+import { loadManifest, resolveSrc, type Manifest } from "../data/manifest";
+import { CAPABILITY_ICON, KIND_ICON, LAYER_ACCENT } from "../theme";
 import { getDirectedLayout } from "./layout";
 import { emitToParent, onSetView } from "../parent-bridge";
-
-interface ArchitectureNodeData extends ArchitectureNode {
-  dimmed?: boolean;
-}
 
 interface TooltipState {
   x: number;
   y: number;
-  node: ArchitectureNode;
+  element: ArchElement;
 }
 
 interface EdgeTooltipState {
   x: number;
   y: number;
-  edge: ArchitectureEdge;
   sourceLabel: string;
   targetLabel: string;
   typeLabel: string;
 }
 
-interface RelationshipEdgeData extends Record<string, unknown> {
-  relationship: ArchitectureEdge;
-  sourceLabel: string;
-  targetLabel: string;
-  typeLabel: string;
-  color: string;
-  highlighted?: boolean;
-  dimmed?: boolean;
-}
+function ArchitectureNodeCard({ data }: NodeProps<Node<ArchNodeData>>) {
+  const Icon = KIND_ICON[data.kind];
+  const accent = LAYER_ACCENT[data.layer];
 
-const nodeWidth = 270;
-const nodeHeight = 132;
+  // Runtime skew guard: data newer than the build (a kind/layer the vocab
+  // doesn't know). The theme maps are typed complete, so this is unreachable
+  // unless the manifest carries a value this build has never seen. Be loud,
+  // not silently generic.
+  if (!Icon || !accent) {
+    const what = !Icon ? `kind '${data.kind}'` : `layer '${data.layer}'`;
+    console.error(`[viewer] unknown ${what} — vocab is stale, rebuild`);
+    return (
+      <article className="arch-node arch-node--stale">
+        <Handle type="target" position={Position.Left} className="node-handle" />
+        <Handle type="source" position={Position.Right} className="node-handle" />
+        <div className="arch-node__stale-badge">
+          <TriangleAlert size={16} /> unknown {what}
+        </div>
+        <h3>{data.label}</h3>
+      </article>
+    );
+  }
 
-const capabilityColors: Record<CapabilityId, string> = {
-  compute: "#52756f",
-  networking: "#c36f38",
-  storage: "#6d7f3f",
-  identity: "#835a9d",
-  observability: "#4f6fb0",
-  delivery: "#6a5ea8",
-  "developer-tools": "#3f7f8f",
-  "ai-rag": "#a64d66",
-  "home-automation": "#558046",
-  media: "#b17836",
-  "personal-apps": "#8d6351",
-};
-
-const edgeColors: Record<EdgeType, string> = {
-  "runs-on": "#52756f",
-  deploys: "#6a5ea8",
-  builds: "#8f5b2e",
-  "pulls-image": "#3f7f8f",
-  routes: "#c36f38",
-  "stores-data": "#6d7f3f",
-  authenticates: "#835a9d",
-  "gets-secrets": "#a64d66",
-  observes: "#4f6fb0",
-};
-
-const capabilityIcons: Record<CapabilityId, LucideIcon> = {
-  compute: Server,
-  networking: Network,
-  storage: Database,
-  identity: KeyRound,
-  observability: Activity,
-  delivery: Workflow,
-  "developer-tools": Code2,
-  "ai-rag": Sparkles,
-  "home-automation": Home,
-  media: Monitor,
-  "personal-apps": Boxes,
-};
-
-const edgeIcons: Record<EdgeType, LucideIcon> = {
-  "runs-on": Layers,
-  deploys: CloudCog,
-  builds: Package,
-  "pulls-image": Braces,
-  routes: Route,
-  "stores-data": Database,
-  authenticates: Shield,
-  "gets-secrets": LockKeyhole,
-  observes: Eye,
-};
-
-function toFlowNode(node: ArchitectureNode): Node<ArchitectureNodeData> {
-  return {
-    id: node.id,
-    type: "architecture",
-    position: node.position,
-    data: node,
-    draggable: false,
-    sourcePosition: Position.Right,
-    targetPosition: Position.Left,
-    zIndex: 10,
-    style: {
-      width: nodeWidth,
-      height: nodeHeight,
-    },
-  };
-}
-
-function toFlowEdge(edge: ArchitectureEdge): Edge<RelationshipEdgeData> {
-  const source = architectureNodes.find((node) => node.id === edge.source);
-  const target = architectureNodes.find((node) => node.id === edge.target);
-
-  return {
-    id: edge.id,
-    source: edge.source,
-    target: edge.target,
-    animated: false,
-    type: "relationship",
-    data: {
-      relationship: edge,
-      sourceLabel: source?.label ?? edge.source,
-      targetLabel: target?.label ?? edge.target,
-      typeLabel: edgeTypeLabels[edge.type],
-      color: edgeColors[edge.type],
-    },
-    interactionWidth: 18,
-    markerEnd: {
-      type: "arrowclosed",
-      color: edgeColors[edge.type],
-      width: 16,
-      height: 16,
-    },
-  };
-}
-
-function ArchitectureNodeCard({ data }: NodeProps<Node<ArchitectureNodeData>>) {
-  const Icon = capabilityIcons[data.capability];
-  const color = capabilityColors[data.capability];
+  let rightImage: ReactNode = null;
+  if (data.logo) {
+    rightImage = <img src={`${import.meta.env.BASE_URL}logos/${data.logo}`} alt="" />;
+  } else if (data.capabilityId) {
+    const CapIcon = CAPABILITY_ICON[data.capabilityId];
+    if (CapIcon) {
+      rightImage = <CapIcon size={18} strokeWidth={2} />;
+    } else {
+      console.error(
+        `[viewer] unknown capability '${data.capabilityId}' — vocab is stale, rebuild`,
+      );
+      rightImage = <span className="arch-node__stale-mark">?</span>;
+    }
+  }
 
   return (
     <article
-      className={`arch-node arch-node--${data.status}${
+      className={`arch-node arch-node--${data.lifecycle}${
         data.dimmed ? " arch-node--dimmed" : ""
       }`}
-      style={{ "--node-accent": color } as CSSProperties}
+      style={{ "--node-accent": accent } as CSSProperties}
     >
       <Handle type="target" position={Position.Left} className="node-handle" />
       <Handle type="source" position={Position.Right} className="node-handle" />
@@ -207,16 +115,14 @@ function ArchitectureNodeCard({ data }: NodeProps<Node<ArchitectureNodeData>>) {
           <Icon size={16} strokeWidth={2.2} />
         </span>
         <span className="arch-node__logo" aria-hidden="true">
-          {data.logo ? (
-            <img src={`${import.meta.env.BASE_URL}logos/${data.logo}`} alt="" />
-          ) : null}
+          {rightImage}
         </span>
       </div>
       <h3>{data.label}</h3>
-      <p>{data.kind}</p>
+      <p>{KIND_LABELS[data.kind]}</p>
       <div className="arch-node__meta">
-        <span>{capabilityLabels[data.capability]}</span>
-        {data.stats?.introduced ? <span>{data.stats.introduced}</span> : null}
+        <span>{data.producer}</span>
+        {data.introduced ? <span>{data.introduced}</span> : null}
       </div>
     </article>
   );
@@ -233,8 +139,7 @@ function RelationshipEdge({
   markerEnd,
   data,
 }: EdgeProps<Edge<RelationshipEdgeData>>) {
-  const relationship = data?.relationship;
-  if (!relationship) {
+  if (!data?.relation) {
     return null;
   }
 
@@ -247,15 +152,10 @@ function RelationshipEdge({
     targetPosition,
     borderRadius: 10,
   });
-  const isPrimary = relationship.strength === "primary";
-  const baseWidth = isPrimary ? 2.6 : 1.5;
-  const baseOpacity = isPrimary ? 0.78 : 0.46;
+  const baseWidth = 2.2;
+  const baseOpacity = 0.62;
   const strokeWidth = data.highlighted ? baseWidth + 1.6 : baseWidth;
-  const strokeOpacity = data.dimmed
-    ? baseOpacity * 0.15
-    : data.highlighted
-      ? 0.98
-      : baseOpacity;
+  const strokeOpacity = data.dimmed ? 0.12 : data.highlighted ? 0.98 : baseOpacity;
 
   return (
     <g className="relationship-edge">
@@ -266,7 +166,6 @@ function RelationshipEdge({
         fill="none"
         markerEnd={markerEnd}
         stroke={data.color}
-        strokeDasharray={isPrimary ? undefined : "7 7"}
         strokeOpacity={strokeOpacity}
         strokeWidth={strokeWidth}
       />
@@ -283,18 +182,15 @@ function RelationshipEdge({
 }
 
 function EdgeTooltip({ tooltip }: { tooltip: EdgeTooltipState }) {
-  const Icon = edgeIcons[tooltip.edge.type];
-
   return (
     <div
       className="edge-tooltip"
       style={{ left: tooltip.x + 14, top: tooltip.y + 14 }}
     >
       <div className="edge-tooltip__title">
-        <Icon size={15} />
+        <Spline size={15} />
         <span>{tooltip.typeLabel}</span>
       </div>
-      <p>{tooltip.edge.label}</p>
       <div className="edge-tooltip__route">
         <strong>{tooltip.sourceLabel}</strong>
         <span>to</span>
@@ -312,117 +208,93 @@ const edgeTypes = {
   relationship: RelationshipEdge,
 };
 
-function selectedNodeMatches(node: ArchitectureNode, term: string) {
+function elementMatchesSearch(el: ArchElement, term: string) {
   if (!term) {
     return true;
   }
-
-  const haystack = [node.label, node.kind, node.capability, node.status]
+  const haystack = [el.label, KIND_LABELS[el.kind], el.summary, el.producer]
     .join(" ")
     .toLowerCase();
-
-  return haystack.includes(term.toLowerCase());
+  return haystack.includes(term);
 }
 
 function useVisibleGraph(
+  model: ArchModel | null,
   searchTerm: string,
-  capabilityFilter: Set<CapabilityId>,
-  edgeFilter: Set<EdgeType>,
+  layerFilter: Set<LayerId>,
+  kindFilter: Set<ElementKind>,
+  relFilter: Set<RelationshipType>,
   directedPositions: Map<string, { x: number; y: number }> | null,
 ) {
   return useMemo(() => {
-    const edgeTypeVisible = (type: EdgeType) =>
-      edgeFilter.size === 0 || edgeFilter.has(type);
-
-    const baseIds = new Set<string>();
-    const noFilters = capabilityFilter.size === 0 && edgeFilter.size === 0;
-    if (noFilters) {
-      for (const node of architectureNodes) {
-        baseIds.add(node.id);
-      }
-    } else {
-      if (capabilityFilter.size > 0) {
-        for (const node of architectureNodes) {
-          if (capabilityFilter.has(node.capability)) {
-            baseIds.add(node.id);
-          }
-        }
-      }
-      if (edgeFilter.size > 0) {
-        for (const edge of architectureEdges) {
-          if (edgeFilter.has(edge.type)) {
-            baseIds.add(edge.source);
-            baseIds.add(edge.target);
-          }
-        }
-      }
+    if (!model) {
+      return { nodes: [], edges: [], visibleElements: [] as ArchElement[] };
     }
 
-    const visibleNodeIds = new Set<string>();
-    for (const node of architectureNodes) {
-      if (baseIds.has(node.id) && selectedNodeMatches(node, searchTerm)) {
-        visibleNodeIds.add(node.id);
-      }
-    }
-    const visibleArchitectureNodes = architectureNodes.filter((node) =>
-      visibleNodeIds.has(node.id),
-    );
+    const term = searchTerm.trim().toLowerCase();
 
-    const flowNodes = visibleArchitectureNodes.map((node) => {
-      const flowNode = toFlowNode(node);
-      const directedPosition = directedPositions?.get(node.id);
-      if (directedPosition) {
-        return {
-          ...flowNode,
-          position: directedPosition,
-        };
-      }
-      return flowNode;
+    // prd default: drop dev/tst/uat. (The Environment filter UI lands in Plan 3;
+    // the default applies now so the canvas isn't multiplied across stages.)
+    // Within-group OR, across-group AND.
+    const visibleElements = model.elements.filter((el) => {
+      const envOk = el.environment === undefined || el.environment === "prd";
+      const layerOk = layerFilter.size === 0 || layerFilter.has(el.layer);
+      const kindOk = kindFilter.size === 0 || kindFilter.has(el.kind);
+      return envOk && layerOk && kindOk && elementMatchesSearch(el, term);
     });
 
-    const flowEdges = architectureEdges
-      .filter((edge) => edgeTypeVisible(edge.type))
-      .filter(
-        (edge) =>
-          visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target),
-      )
-      .map(toFlowEdge);
+    const visibleIds = new Set(visibleElements.map((el) => el.id));
+    const nodes = toFlowNodes(visibleElements).map((node) => {
+      const position = directedPositions?.get(node.id);
+      return position ? { ...node, position } : node;
+    });
 
-    return {
-      nodes: flowNodes,
-      edges: flowEdges,
-      visibleArchitectureNodes,
-    };
-  }, [capabilityFilter, directedPositions, edgeFilter, searchTerm]);
+    // No relation type selected → all relations among visible nodes; some
+    // selected → restrict to those.
+    const visibleRelations = model.relations.filter(
+      (rel) =>
+        (relFilter.size === 0 || relFilter.has(rel.type)) &&
+        visibleIds.has(rel.source) &&
+        visibleIds.has(rel.target),
+    );
+    const edges = toFlowEdges(visibleRelations, model.elementById);
+
+    return { nodes, edges, visibleElements };
+  }, [model, searchTerm, layerFilter, kindFilter, relFilter, directedPositions]);
 }
 
 function Tooltip({ tooltip }: { tooltip: TooltipState }) {
-  const { node, x, y } = tooltip;
+  const { element, x, y } = tooltip;
+  const stats = element.stats ?? {};
 
   return (
     <div className="node-tooltip" style={{ left: x + 14, top: y + 14 }}>
-      <div className="node-tooltip__title">{node.label}</div>
-      <div className="node-tooltip__kind">{node.kind}</div>
-      <p>{node.summary}</p>
+      <div className="node-tooltip__title">{element.label}</div>
+      <div className="node-tooltip__kind">{KIND_LABELS[element.kind]}</div>
+      <p>{element.summary}</p>
       <dl>
-        {node.stats?.sourceRepo ? (
+        <dt>Layer</dt>
+        <dd>{LAYER_LABELS[element.layer]}</dd>
+        <dt>Lifecycle</dt>
+        <dd>{element.lifecycle}</dd>
+        {element.environment ? (
+          <>
+            <dt>Environment</dt>
+            <dd>{element.environment}</dd>
+          </>
+        ) : null}
+        {element.sourceRepository ? (
           <>
             <dt>Repo</dt>
-            <dd>{node.stats.sourceRepo}</dd>
+            <dd>{element.sourceRepository}</dd>
           </>
         ) : null}
-        {node.stats?.version ? (
-          <>
-            <dt>Version</dt>
-            <dd>{node.stats.version}</dd>
-          </>
-        ) : null}
-        {node.stats?.loc ? (
-          <>
-            <dt>LoC</dt>
-            <dd>{node.stats.loc}</dd>
-          </>
-        ) : null}
+        {Object.entries(stats).map(([key, value]) => (
+          <Fragment key={key}>
+            <dt>{key}</dt>
+            <dd>{value}</dd>
+          </Fragment>
+        ))}
       </dl>
     </div>
   );
@@ -451,13 +323,24 @@ function ToggleButton({
   );
 }
 
+function toggle<T>(set: Set<T>, value: T): Set<T> {
+  const next = new Set(set);
+  if (next.has(value)) {
+    next.delete(value);
+  } else {
+    next.add(value);
+  }
+  return next;
+}
+
 function ArchitectureMapInner() {
   const { fitView } = useReactFlow();
+  const [manifest, setManifest] = useState<Manifest | null>(null);
+  const [error, setError] = useState<Error | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [capabilityFilter, setCapabilityFilter] = useState<Set<CapabilityId>>(
-    new Set(),
-  );
-  const [edgeFilter, setEdgeFilter] = useState<Set<EdgeType>>(new Set());
+  const [layerFilter, setLayerFilter] = useState<Set<LayerId>>(new Set());
+  const [kindFilter, setKindFilter] = useState<Set<ElementKind>>(new Set());
+  const [relFilter, setRelFilter] = useState<Set<RelationshipType>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [edgeTooltip, setEdgeTooltip] = useState<EdgeTooltipState | null>(null);
@@ -465,10 +348,33 @@ function ArchitectureMapInner() {
     string,
     { x: number; y: number }
   > | null>(null);
-  const { nodes, edges, visibleArchitectureNodes } = useVisibleGraph(
+
+  useEffect(() => {
+    let cancelled = false;
+    loadManifest(resolveSrc())
+      .then((loaded) => {
+        if (!cancelled) {
+          setManifest(loaded);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err : new Error(String(err)));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const model = useMemo(() => (manifest ? buildModel(manifest) : null), [manifest]);
+
+  const { nodes, edges, visibleElements } = useVisibleGraph(
+    model,
     searchTerm,
-    capabilityFilter,
-    edgeFilter,
+    layerFilter,
+    kindFilter,
+    relFilter,
     directedPositions,
   );
 
@@ -477,31 +383,32 @@ function ArchitectureMapInner() {
       type: "view-change",
       view: JSON.stringify({
         search: searchTerm,
-        capabilities: Array.from(capabilityFilter),
-        edges: Array.from(edgeFilter),
+        layers: Array.from(layerFilter),
+        kinds: Array.from(kindFilter),
+        relationships: Array.from(relFilter),
       }),
     });
-  }, [searchTerm, capabilityFilter, edgeFilter]);
+  }, [searchTerm, layerFilter, kindFilter, relFilter]);
 
   useEffect(() => {
     return onSetView((view) => {
-      try {
-        const parsed = JSON.parse(view) as {
-          search?: string;
-          capabilities?: CapabilityId[];
-          edges?: EdgeType[];
-        };
-        if (typeof parsed.search === "string") {
-          setSearchTerm(parsed.search);
-        }
-        if (Array.isArray(parsed.capabilities)) {
-          setCapabilityFilter(new Set(parsed.capabilities));
-        }
-        if (Array.isArray(parsed.edges)) {
-          setEdgeFilter(new Set(parsed.edges));
-        }
-      } catch {
-        // ignore malformed views from the parent
+      const parsed = JSON.parse(view) as {
+        search?: string;
+        layers?: LayerId[];
+        kinds?: ElementKind[];
+        relationships?: RelationshipType[];
+      };
+      if (typeof parsed.search === "string") {
+        setSearchTerm(parsed.search);
+      }
+      if (Array.isArray(parsed.layers)) {
+        setLayerFilter(new Set(parsed.layers));
+      }
+      if (Array.isArray(parsed.kinds)) {
+        setKindFilter(new Set(parsed.kinds));
+      }
+      if (Array.isArray(parsed.relationships)) {
+        setRelFilter(new Set(parsed.relationships));
       }
     });
   }, []);
@@ -526,8 +433,7 @@ function ArchitectureMapInner() {
       return edges;
     }
     return edges.map((edge) => {
-      const touchesSelected =
-        edge.source === selectedId || edge.target === selectedId;
+      const touchesSelected = edge.source === selectedId || edge.target === selectedId;
       if (touchesSelected) {
         return {
           ...edge,
@@ -550,33 +456,29 @@ function ArchitectureMapInner() {
       if (connectedNodeIds.has(node.id)) {
         return node;
       }
-      return {
-        ...node,
-        data: { ...node.data, dimmed: true },
-      };
+      return { ...node, data: { ...node.data, dimmed: true } };
     });
   }, [nodes, connectedNodeIds]);
 
   const layoutKey = useMemo(
     () =>
       [
-        visibleArchitectureNodes.map((node) => node.id).join(","),
+        visibleElements.map((el) => el.id).join(","),
         edges.map((edge) => edge.id).join(","),
       ].join("|"),
-    [edges, visibleArchitectureNodes],
+    [edges, visibleElements],
   );
 
   useEffect(() => {
+    if (nodes.length === 0) {
+      return;
+    }
     let cancelled = false;
-
     getDirectedLayout(nodes, edges).then((laidOut) => {
       if (cancelled) {
         return;
       }
-
-      setDirectedPositions(
-        new Map(laidOut.map((item) => [item.id, item.position])),
-      );
+      setDirectedPositions(new Map(laidOut.map((item) => [item.id, item.position])));
       window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => {
           fitView({
@@ -587,21 +489,17 @@ function ArchitectureMapInner() {
         });
       });
     });
-
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutKey, fitView]);
 
   const onNodeMouseEnter = useCallback<NodeMouseHandler>((event, node) => {
     if (node.type !== "architecture") {
       return;
     }
-    setTooltip({
-      x: event.clientX,
-      y: event.clientY,
-      node: node.data as ArchitectureNode,
-    });
+    setTooltip({ x: event.clientX, y: event.clientY, element: node.data as ArchElement });
   }, []);
 
   const onNodeMouseMove = useCallback<NodeMouseHandler>((event, node) => {
@@ -609,13 +507,7 @@ function ArchitectureMapInner() {
       return;
     }
     setTooltip((current) =>
-      current
-        ? {
-            ...current,
-            x: event.clientX,
-            y: event.clientY,
-          }
-        : null,
+      current ? { ...current, x: event.clientX, y: event.clientY } : null,
     );
   }, []);
 
@@ -631,7 +523,6 @@ function ArchitectureMapInner() {
       setEdgeTooltip({
         x: event.clientX,
         y: event.clientY,
-        edge: edge.data.relationship,
         sourceLabel: edge.data.sourceLabel,
         targetLabel: edge.data.targetLabel,
         typeLabel: edge.data.typeLabel,
@@ -646,13 +537,7 @@ function ArchitectureMapInner() {
         return;
       }
       setEdgeTooltip((current) =>
-        current
-          ? {
-              ...current,
-              x: event.clientX,
-              y: event.clientY,
-            }
-          : null,
+        current ? { ...current, x: event.clientX, y: event.clientY } : null,
       );
     },
     [],
@@ -677,132 +562,137 @@ function ArchitectureMapInner() {
     setSelectedId(null);
   }, []);
 
-  const toggleCapability = (capability: CapabilityId) => {
-    setCapabilityFilter((current) => {
-      const next = new Set(current);
-      if (next.has(capability)) {
-        next.delete(capability);
-      } else {
-        next.add(capability);
-      }
-      return next;
-    });
-  };
-
-  const toggleEdge = (edgeType: EdgeType) => {
-    setEdgeFilter((current) => {
-      const next = new Set(current);
-      if (next.has(edgeType)) {
-        next.delete(edgeType);
-      } else {
-        next.add(edgeType);
-      }
-      return next;
-    });
-  };
-
   const clearFilters = () => {
     setSearchTerm("");
-    setCapabilityFilter(new Set());
-    setEdgeFilter(new Set());
+    setLayerFilter(new Set());
+    setKindFilter(new Set());
+    setRelFilter(new Set());
   };
 
   return (
     <div className="architecture-page">
       <section className="workspace">
         <div className="map-shell">
-          <div className="controls-panel">
-            <div className="controls-panel__row">
-              <label className="search-box">
-                <Search size={16} />
-                <input
-                  value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Search components"
-                />
-              </label>
-              <button
-                className="icon-text-button"
-                onClick={clearFilters}
-                title="Reset filters"
-              >
-                <X size={16} />
-                Reset Filters
-              </button>
-            </div>
+          {model ? (
+            <div className="controls-panel">
+              <div className="controls-panel__row">
+                <label className="search-box">
+                  <Search size={16} />
+                  <input
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Search elements"
+                  />
+                </label>
+                <button
+                  className="icon-text-button"
+                  onClick={clearFilters}
+                  title="Reset filters"
+                  type="button"
+                >
+                  <X size={16} />
+                  Reset Filters
+                </button>
+              </div>
 
-            <div className="controls-panel__filters">
-              <span className="controls-panel__label">
-                <Filter size={14} />
-                Capability
-              </span>
-              {(Object.keys(capabilityLabels) as CapabilityId[]).map(
-                (capability) => {
-                  const Icon = capabilityIcons[capability];
+              <div className="controls-panel__filters">
+                <span className="controls-panel__label">
+                  <Layers size={14} />
+                  Layer
+                </span>
+                {LAYER_IDS.map((layer) => (
+                  <ToggleButton
+                    key={layer}
+                    active={layerFilter.has(layer)}
+                    onClick={() => setLayerFilter((current) => toggle(current, layer))}
+                    title={LAYER_LABELS[layer]}
+                  >
+                    <span
+                      className="toggle-swatch"
+                      style={{ background: LAYER_ACCENT[layer] }}
+                      aria-hidden
+                    />
+                    {LAYER_LABELS[layer]}
+                  </ToggleButton>
+                ))}
+                <span className="controls-panel__break" aria-hidden />
+
+                <span className="controls-panel__label">
+                  <Filter size={14} />
+                  Kind
+                </span>
+                {ELEMENT_KINDS.map((kind) => {
+                  const Icon = KIND_ICON[kind];
                   return (
                     <ToggleButton
-                      key={capability}
-                      active={capabilityFilter.has(capability)}
-                      onClick={() => toggleCapability(capability)}
-                      title={capabilityLabels[capability]}
+                      key={kind}
+                      active={kindFilter.has(kind)}
+                      onClick={() => setKindFilter((current) => toggle(current, kind))}
+                      title={KIND_LABELS[kind]}
                     >
                       <Icon size={14} />
-                      {capabilityLabels[capability]}
+                      {KIND_LABELS[kind]}
                     </ToggleButton>
                   );
-                },
-              )}
-              <span className="controls-panel__break" aria-hidden />
-              <span className="controls-panel__label">
-                <Cable size={14} />
-                Relationship
-              </span>
-              {(Object.keys(edgeTypeLabels) as EdgeType[]).map((edgeType) => {
-                const Icon = edgeIcons[edgeType];
-                return (
+                })}
+                <span className="controls-panel__break" aria-hidden />
+
+                <span className="controls-panel__label">
+                  <Cable size={14} />
+                  Relationship
+                </span>
+                {RELATIONSHIP_TYPES.map((rel) => (
                   <ToggleButton
-                    key={edgeType}
-                    active={edgeFilter.has(edgeType)}
-                    onClick={() => toggleEdge(edgeType)}
-                    title={edgeTypeLabels[edgeType]}
+                    key={rel}
+                    active={relFilter.has(rel)}
+                    onClick={() => setRelFilter((current) => toggle(current, rel))}
+                    title={RELATIONSHIP_LABELS[rel]}
                   >
-                    <Icon size={14} />
-                    {edgeTypeLabels[edgeType]}
+                    {RELATIONSHIP_LABELS[rel]}
                   </ToggleButton>
-                );
-              })}
+                ))}
+              </div>
             </div>
-          </div>
+          ) : null}
 
           <div className="diagram-region" data-testid="architecture-diagram">
-            <ReactFlow
-              nodes={decoratedNodes}
-              edges={decoratedEdges}
-              nodeTypes={nodeTypes}
-              edgeTypes={edgeTypes}
-              nodesDraggable={false}
-              defaultViewport={{ x: 0, y: 0, zoom: 0.72 }}
-              minZoom={0.24}
-              maxZoom={1.35}
-              onNodeClick={onNodeClick}
-              onNodeMouseEnter={onNodeMouseEnter}
-              onNodeMouseMove={onNodeMouseMove}
-              onNodeMouseLeave={onNodeMouseLeave}
-              onEdgeClick={onEdgeClick}
-              onEdgeMouseEnter={onEdgeMouseEnter}
-              onEdgeMouseMove={onEdgeMouseMove}
-              onEdgeMouseLeave={onEdgeMouseLeave}
-              onPaneClick={onPaneClick}
-              proOptions={{ hideAttribution: true }}
-            >
-              <Background color="#d7d7ce" gap={24} size={1} />
-              <Controls showInteractive={false} />
-            </ReactFlow>
+            {error ? (
+              <div className="load-state load-state--error">
+                <TriangleAlert size={22} />
+                <p>Failed to load the architecture manifest.</p>
+                <code>{error.message}</code>
+              </div>
+            ) : !model ? (
+              <div className="load-state">Loading architecture…</div>
+            ) : (
+              <ReactFlow
+                nodes={decoratedNodes}
+                edges={decoratedEdges}
+                nodeTypes={nodeTypes}
+                edgeTypes={edgeTypes}
+                nodesDraggable={false}
+                defaultViewport={{ x: 0, y: 0, zoom: 0.72 }}
+                minZoom={0.24}
+                maxZoom={1.35}
+                onNodeClick={onNodeClick}
+                onNodeMouseEnter={onNodeMouseEnter}
+                onNodeMouseMove={onNodeMouseMove}
+                onNodeMouseLeave={onNodeMouseLeave}
+                onEdgeClick={onEdgeClick}
+                onEdgeMouseEnter={onEdgeMouseEnter}
+                onEdgeMouseMove={onEdgeMouseMove}
+                onEdgeMouseLeave={onEdgeMouseLeave}
+                onPaneClick={onPaneClick}
+                proOptions={{ hideAttribution: true }}
+              >
+                <Background color="#d7d7ce" gap={24} size={1} />
+                <Controls showInteractive={false} />
+              </ReactFlow>
+            )}
             {tooltip ? <Tooltip tooltip={tooltip} /> : null}
             {edgeTooltip ? <EdgeTooltip tooltip={edgeTooltip} /> : null}
           </div>
         </div>
-
       </section>
     </div>
   );
