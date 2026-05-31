@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, Search } from "lucide-react";
+import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import type { FilterGroupModel, FilterOption } from "./groups";
 
@@ -94,6 +94,16 @@ export function FilterGroup({
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search"
             />
+            {search ? (
+              <button
+                type="button"
+                className="search-box__clear"
+                onClick={() => setSearch("")}
+                aria-label="Clear search"
+              >
+                <X size={13} />
+              </button>
+            ) : null}
           </label>
 
           <button

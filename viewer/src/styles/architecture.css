@@ -237,6 +237,24 @@ body,
   font-size: 12px;
 }
 
+.search-box__clear {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.search-box__clear:hover {
+  color: var(--ink);
+  background: var(--hover-neutral);
+}
+
 /* ---- Filter group ---- */
 
 .filter-group {

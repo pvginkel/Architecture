@@ -58,6 +58,16 @@ export function FilterRail({
             onChange={(event) => onSearch(event.target.value)}
             placeholder="Search elements"
           />
+          {searchTerm ? (
+            <button
+              type="button"
+              className="search-box__clear"
+              onClick={() => onSearch("")}
+              aria-label="Clear search"
+            >
+              <X size={14} />
+            </button>
+          ) : null}
         </label>
       </div>
 
