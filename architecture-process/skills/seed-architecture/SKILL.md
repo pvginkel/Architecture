@@ -62,7 +62,10 @@ conventions** below, and tell it to return a tagged candidate table with
 - **Endpoints / dependencies** — DNS names, VIPs, ingress hosts, ports, API
   paths (candidate Services/Interfaces), and runtime dependency wires
   (`OIDC_ISSUER_URL`, DB URLs, secret stores) that become `boundBy` recipes
-  or `Serving` edges.
+  or `Serving` edges. Sweep for outbound dependencies with `grep -rIi '://'` and
+  triage the hits — most are docs, examples, or schema/namespace URLs; keep the
+  genuine runtime calls (SaaS base URLs, webhook/favicon targets), which live as
+  base-URL constants in code and so hide from an env-var scan.
 
 Skip vendor dirs, lockfiles, `.venv/`, `__pycache__/`, `tmp/`. Aggregate the
 agents' findings into one inventory file:
