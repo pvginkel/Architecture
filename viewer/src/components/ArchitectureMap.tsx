@@ -1,4 +1,4 @@
-import { Cable, Filter, Layers, Search, Spline, TriangleAlert, X } from "lucide-react";
+import { Spline, TriangleAlert } from "lucide-react";
 import {
   Fragment,
   useCallback,
@@ -25,17 +25,10 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import {
-  ELEMENT_KINDS,
   KIND_LABELS,
-  LAYER_IDS,
   LAYER_LABELS,
   LOGO_FILES,
-  RELATIONSHIP_TYPES,
-  RELATIONSHIP_LABELS,
-  type ElementKind,
-  type LayerId,
   type LogoName,
-  type RelationshipType,
 } from "../generated/vocab";
 import {
   buildModel,
@@ -50,6 +43,18 @@ import { loadManifest, resolveSrc, type Manifest } from "../data/manifest";
 import { CAPABILITY_ICON, KIND_ICON, LAYER_ACCENT } from "../theme";
 import { getDirectedLayout } from "./layout";
 import { emitToParent, onSetView } from "../parent-bridge";
+import { FilterRail } from "../filters/FilterRail";
+import { buildGroups } from "../filters/groups";
+import { loadCollapsed, saveCollapsed } from "../filters/persistence";
+import {
+  addFilterOptions,
+  computeVisibleGraph,
+  deserializeFilters,
+  initialFilterState,
+  serializeFilters,
+  toggleFilterOption,
+  type FilterState,
+} from "../filters/state";
 
 interface TooltipState {
   x: number;
@@ -216,22 +221,10 @@ const edgeTypes = {
   relationship: RelationshipEdge,
 };
 
-function elementMatchesSearch(el: ArchElement, term: string) {
-  if (!term) {
-    return true;
-  }
-  const haystack = [el.label, KIND_LABELS[el.kind], el.summary, el.producer]
-    .join(" ")
-    .toLowerCase();
-  return haystack.includes(term);
-}
-
 function useVisibleGraph(
   model: ArchModel | null,
+  filterState: FilterState,
   searchTerm: string,
-  layerFilter: Set<LayerId>,
-  kindFilter: Set<ElementKind>,
-  relFilter: Set<RelationshipType>,
   directedPositions: Map<string, { x: number; y: number }> | null,
 ) {
   return useMemo(() => {
@@ -239,36 +232,20 @@ function useVisibleGraph(
       return { nodes: [], edges: [], visibleElements: [] as ArchElement[] };
     }
 
-    const term = searchTerm.trim().toLowerCase();
+    const { visibleElements, visibleRelations } = computeVisibleGraph(
+      model,
+      filterState,
+      searchTerm,
+    );
 
-    // prd default: drop dev/tst/uat. (The Environment filter UI lands in Plan 3;
-    // the default applies now so the canvas isn't multiplied across stages.)
-    // Within-group OR, across-group AND.
-    const visibleElements = model.elements.filter((el) => {
-      const envOk = el.environment === undefined || el.environment === "prd";
-      const layerOk = layerFilter.size === 0 || layerFilter.has(el.layer);
-      const kindOk = kindFilter.size === 0 || kindFilter.has(el.kind);
-      return envOk && layerOk && kindOk && elementMatchesSearch(el, term);
-    });
-
-    const visibleIds = new Set(visibleElements.map((el) => el.id));
     const nodes = toFlowNodes(visibleElements).map((node) => {
       const position = directedPositions?.get(node.id);
       return position ? { ...node, position } : node;
     });
-
-    // No relation type selected → all relations among visible nodes; some
-    // selected → restrict to those.
-    const visibleRelations = model.relations.filter(
-      (rel) =>
-        (relFilter.size === 0 || relFilter.has(rel.type)) &&
-        visibleIds.has(rel.source) &&
-        visibleIds.has(rel.target),
-    );
     const edges = toFlowEdges(visibleRelations, model.elementById);
 
     return { nodes, edges, visibleElements };
-  }, [model, searchTerm, layerFilter, kindFilter, relFilter, directedPositions]);
+  }, [model, filterState, searchTerm, directedPositions]);
 }
 
 function Tooltip({ tooltip }: { tooltip: TooltipState }) {
@@ -308,47 +285,14 @@ function Tooltip({ tooltip }: { tooltip: TooltipState }) {
   );
 }
 
-function ToggleButton({
-  active,
-  onClick,
-  children,
-  title,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-  title?: string;
-}) {
-  return (
-    <button
-      className={`toggle-button ${active ? "toggle-button--active" : ""}`}
-      onClick={onClick}
-      title={title}
-      type="button"
-    >
-      {children}
-    </button>
-  );
-}
-
-function toggle<T>(set: Set<T>, value: T): Set<T> {
-  const next = new Set(set);
-  if (next.has(value)) {
-    next.delete(value);
-  } else {
-    next.add(value);
-  }
-  return next;
-}
-
 function ArchitectureMapInner() {
   const { fitView } = useReactFlow();
+  const src = useMemo(() => resolveSrc(), []);
   const [manifest, setManifest] = useState<Manifest | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [layerFilter, setLayerFilter] = useState<Set<LayerId>>(new Set());
-  const [kindFilter, setKindFilter] = useState<Set<ElementKind>>(new Set());
-  const [relFilter, setRelFilter] = useState<Set<RelationshipType>>(new Set());
+  const [filterState, setFilterState] = useState<FilterState>(() => initialFilterState());
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => loadCollapsed(src));
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [edgeTooltip, setEdgeTooltip] = useState<EdgeTooltipState | null>(null);
@@ -359,7 +303,7 @@ function ArchitectureMapInner() {
 
   useEffect(() => {
     let cancelled = false;
-    loadManifest(resolveSrc())
+    loadManifest(src)
       .then((loaded) => {
         if (!cancelled) {
           setManifest(loaded);
@@ -373,17 +317,20 @@ function ArchitectureMapInner() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [src]);
 
   const model = useMemo(() => (manifest ? buildModel(manifest) : null), [manifest]);
 
   const { nodes, edges, visibleElements } = useVisibleGraph(
     model,
+    filterState,
     searchTerm,
-    layerFilter,
-    kindFilter,
-    relFilter,
     directedPositions,
+  );
+
+  const groups = useMemo(
+    () => (model ? buildGroups(model, filterState, searchTerm) : []),
+    [model, filterState, searchTerm],
   );
 
   useEffect(() => {
@@ -391,35 +338,44 @@ function ArchitectureMapInner() {
       type: "view-change",
       view: JSON.stringify({
         search: searchTerm,
-        layers: Array.from(layerFilter),
-        kinds: Array.from(kindFilter),
-        relationships: Array.from(relFilter),
+        filters: serializeFilters(filterState),
       }),
     });
-  }, [searchTerm, layerFilter, kindFilter, relFilter]);
+  }, [searchTerm, filterState]);
 
   useEffect(() => {
     return onSetView((view) => {
       const parsed = JSON.parse(view) as {
         search?: string;
-        layers?: LayerId[];
-        kinds?: ElementKind[];
-        relationships?: RelationshipType[];
+        filters?: Record<string, string[]>;
       };
       if (typeof parsed.search === "string") {
         setSearchTerm(parsed.search);
       }
-      if (Array.isArray(parsed.layers)) {
-        setLayerFilter(new Set(parsed.layers));
-      }
-      if (Array.isArray(parsed.kinds)) {
-        setKindFilter(new Set(parsed.kinds));
-      }
-      if (Array.isArray(parsed.relationships)) {
-        setRelFilter(new Set(parsed.relationships));
+      if (parsed.filters) {
+        setFilterState(deserializeFilters(parsed.filters));
       }
     });
   }, []);
+
+  const toggleOption = useCallback((groupId: string, value: string) => {
+    setFilterState((current) => toggleFilterOption(current, groupId, value));
+  }, []);
+
+  const selectAll = useCallback((groupId: string, values: string[]) => {
+    setFilterState((current) => addFilterOptions(current, groupId, values));
+  }, []);
+
+  const toggleCollapse = useCallback(
+    (groupId: string) => {
+      setCollapsed((current) => {
+        const next = { ...current, [groupId]: !current[groupId] };
+        saveCollapsed(src, next);
+        return next;
+      });
+    },
+    [src],
+  );
 
   const connectedNodeIds = useMemo(() => {
     if (!selectedId) {
@@ -570,136 +526,64 @@ function ArchitectureMapInner() {
     setSelectedId(null);
   }, []);
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setSearchTerm("");
-    setLayerFilter(new Set());
-    setKindFilter(new Set());
-    setRelFilter(new Set());
-  };
+    setFilterState(initialFilterState());
+  }, []);
 
   return (
     <div className="architecture-page">
       <section className="workspace">
-        <div className="map-shell">
-          {model ? (
-            <div className="controls-panel">
-              <div className="controls-panel__row">
-                <label className="search-box">
-                  <Search size={16} />
-                  <input
-                    value={searchTerm}
-                    onChange={(event) => setSearchTerm(event.target.value)}
-                    placeholder="Search elements"
-                  />
-                </label>
-                <button
-                  className="icon-text-button"
-                  onClick={clearFilters}
-                  title="Reset filters"
-                  type="button"
-                >
-                  <X size={16} />
-                  Reset Filters
-                </button>
-              </div>
+        {model ? (
+          <FilterRail
+            groups={groups}
+            filterState={filterState}
+            collapsed={collapsed}
+            searchTerm={searchTerm}
+            onSearch={setSearchTerm}
+            onToggleCollapse={toggleCollapse}
+            onToggleOption={toggleOption}
+            onSelectAll={selectAll}
+            onClear={clearFilters}
+          />
+        ) : null}
 
-              <div className="controls-panel__filters">
-                <span className="controls-panel__label">
-                  <Layers size={14} />
-                  Layer
-                </span>
-                {LAYER_IDS.map((layer) => (
-                  <ToggleButton
-                    key={layer}
-                    active={layerFilter.has(layer)}
-                    onClick={() => setLayerFilter((current) => toggle(current, layer))}
-                    title={LAYER_LABELS[layer]}
-                  >
-                    <span
-                      className="toggle-swatch"
-                      style={{ background: LAYER_ACCENT[layer] }}
-                      aria-hidden
-                    />
-                    {LAYER_LABELS[layer]}
-                  </ToggleButton>
-                ))}
-                <span className="controls-panel__break" aria-hidden />
-
-                <span className="controls-panel__label">
-                  <Filter size={14} />
-                  Kind
-                </span>
-                {ELEMENT_KINDS.map((kind) => {
-                  const Icon = KIND_ICON[kind];
-                  return (
-                    <ToggleButton
-                      key={kind}
-                      active={kindFilter.has(kind)}
-                      onClick={() => setKindFilter((current) => toggle(current, kind))}
-                      title={KIND_LABELS[kind]}
-                    >
-                      <Icon size={14} />
-                      {KIND_LABELS[kind]}
-                    </ToggleButton>
-                  );
-                })}
-                <span className="controls-panel__break" aria-hidden />
-
-                <span className="controls-panel__label">
-                  <Cable size={14} />
-                  Relationship
-                </span>
-                {RELATIONSHIP_TYPES.map((rel) => (
-                  <ToggleButton
-                    key={rel}
-                    active={relFilter.has(rel)}
-                    onClick={() => setRelFilter((current) => toggle(current, rel))}
-                    title={RELATIONSHIP_LABELS[rel]}
-                  >
-                    {RELATIONSHIP_LABELS[rel]}
-                  </ToggleButton>
-                ))}
-              </div>
+        <div className="diagram-region" data-testid="architecture-diagram">
+          {error ? (
+            <div className="load-state load-state--error">
+              <TriangleAlert size={22} />
+              <p>Failed to load the architecture manifest.</p>
+              <code>{error.message}</code>
             </div>
-          ) : null}
-
-          <div className="diagram-region" data-testid="architecture-diagram">
-            {error ? (
-              <div className="load-state load-state--error">
-                <TriangleAlert size={22} />
-                <p>Failed to load the architecture manifest.</p>
-                <code>{error.message}</code>
-              </div>
-            ) : !model ? (
-              <div className="load-state">Loading architecture…</div>
-            ) : (
-              <ReactFlow
-                nodes={decoratedNodes}
-                edges={decoratedEdges}
-                nodeTypes={nodeTypes}
-                edgeTypes={edgeTypes}
-                nodesDraggable={false}
-                defaultViewport={{ x: 0, y: 0, zoom: 0.72 }}
-                minZoom={0.24}
-                maxZoom={1.35}
-                onNodeClick={onNodeClick}
-                onNodeMouseEnter={onNodeMouseEnter}
-                onNodeMouseMove={onNodeMouseMove}
-                onNodeMouseLeave={onNodeMouseLeave}
-                onEdgeClick={onEdgeClick}
-                onEdgeMouseEnter={onEdgeMouseEnter}
-                onEdgeMouseMove={onEdgeMouseMove}
-                onEdgeMouseLeave={onEdgeMouseLeave}
-                onPaneClick={onPaneClick}
-                proOptions={{ hideAttribution: true }}
-              >
-                <Background color="#d7d7ce" gap={24} size={1} />
-                <Controls showInteractive={false} />
-              </ReactFlow>
-            )}
-            {tooltip ? <Tooltip tooltip={tooltip} /> : null}
-            {edgeTooltip ? <EdgeTooltip tooltip={edgeTooltip} /> : null}
-          </div>
+          ) : !model ? (
+            <div className="load-state">Loading architecture…</div>
+          ) : (
+            <ReactFlow
+              nodes={decoratedNodes}
+              edges={decoratedEdges}
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
+              nodesDraggable={false}
+              defaultViewport={{ x: 0, y: 0, zoom: 0.72 }}
+              minZoom={0.24}
+              maxZoom={1.35}
+              onNodeClick={onNodeClick}
+              onNodeMouseEnter={onNodeMouseEnter}
+              onNodeMouseMove={onNodeMouseMove}
+              onNodeMouseLeave={onNodeMouseLeave}
+              onEdgeClick={onEdgeClick}
+              onEdgeMouseEnter={onEdgeMouseEnter}
+              onEdgeMouseMove={onEdgeMouseMove}
+              onEdgeMouseLeave={onEdgeMouseLeave}
+              onPaneClick={onPaneClick}
+              proOptions={{ hideAttribution: true }}
+            >
+              <Background color="#d7d7ce" gap={24} size={1} />
+              <Controls showInteractive={false} />
+            </ReactFlow>
+          )}
+          {tooltip ? <Tooltip tooltip={tooltip} /> : null}
+          {edgeTooltip ? <EdgeTooltip tooltip={edgeTooltip} /> : null}
         </div>
       </section>
     </div>
