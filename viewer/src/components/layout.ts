@@ -1,7 +1,7 @@
 import type { Edge, Node } from "@xyflow/react";
 import ELK from "elkjs/lib/elk.bundled.js";
 import { NODE_WIDTH, NODE_HEIGHT, type ArchNodeData, type RelationshipEdgeData } from "../data/model";
-import type { LayerId } from "../generated/vocab";
+import type { ElementKind, LayerId } from "../generated/vocab";
 
 const elk = new ELK();
 
@@ -14,21 +14,58 @@ const elk = new ELK();
 //      structurally important relations (composition, realization, serving) are
 //      drawn short and straight while associations stop dragging the layout.
 
-// Vertical band per layer. The layout flows UP (see elk.direction below), so a
-// higher partition index sits higher on the canvas: strategy on top, technology
-// at the bottom — the conventional ArchiMate stack. Flowing up rather than down
-// is what makes Serving/Realization arrows point upward (provider/realizer at
-// the bottom, consumer/capability above), matching both the ArchiMate layered
-// view and the way an infrastructure stack reads: the most depended-upon
-// element sinks to the bottom. Cross-cutting groupings get the bottom band for
-// now; this ordering is the obvious knob to revisit.
-const LAYER_BAND: Record<LayerId, number> = {
-  strategy: 4,
-  business: 3,
-  application: 2,
-  technology: 1,
-  "cross-cutting": 0,
-};
+// Vertical bands, bottom -> top. The layout flows UP (see elk.direction below),
+// so a higher partition index sits higher on the canvas: strategy on top,
+// technology at the bottom — the conventional ArchiMate stack. Flowing up rather
+// than down is what makes Serving/Realization arrows point upward
+// (provider/realizer at the bottom, consumer/capability above), matching both
+// the ArchiMate layered view and the way an infrastructure stack reads: the most
+// depended-upon element sinks to the bottom.
+//
+// The technology layer is split by kind into a hardware -> system-software ->
+// service -> interface sub-stack, so the infra layer reads as a stack (devices
+// under the software that runs on them, under the services they expose) instead
+// of leaving that order to topology. The other layers stay one band each.
+// Cross-cutting groupings get the bottom band for now.
+const BAND_ORDER = [
+  "cross-cutting",
+  "hardware", // Node, Device
+  "system-software", // SystemSoftware
+  "technology-service", // TechnologyService
+  "technology-interface", // TechnologyInterface
+  "application", // ApplicationComponent / ApplicationService / ApplicationInterface
+  "business", // BusinessService
+  "strategy", // Capability
+] as const;
+
+type BandKey = (typeof BAND_ORDER)[number];
+
+/** The band an element belongs to. Technology kinds get their own sub-band;
+ *  every other kind falls back to its layer (always a band key). */
+function bandKey(kind: ElementKind, layer: LayerId): BandKey {
+  switch (kind) {
+    case "Node":
+    case "Device":
+      return "hardware";
+    case "SystemSoftware":
+      return "system-software";
+    case "TechnologyService":
+      return "technology-service";
+    case "TechnologyInterface":
+      return "technology-interface";
+    default:
+      return layer as BandKey; // application | business | strategy | cross-cutting
+  }
+}
+
+function bandPartition(node: Node): number {
+  const data = node.data as ArchNodeData;
+  const index = BAND_ORDER.indexOf(bandKey(data.kind, data.layer));
+  if (index < 0) {
+    throw new Error(`layout: no band for kind=${data.kind} layer=${data.layer}`);
+  }
+  return index;
+}
 
 // Higher = ELK tries harder to keep the two endpoints close and aligned.
 const RELATION_PRIORITY: Record<string, number> = {
@@ -92,13 +129,12 @@ export async function getDirectedLayout(nodes: Node[], edges: Edge[]) {
       "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
     },
     children: architectureNodes.map((node) => {
-      const layer = (node.data as ArchNodeData).layer;
       return {
         id: node.id,
         width: NODE_WIDTH,
         height: NODE_HEIGHT,
         layoutOptions: {
-          "elk.partitioning.partition": String(LAYER_BAND[layer]),
+          "elk.partitioning.partition": String(bandPartition(node)),
         },
       };
     }),
