@@ -1,0 +1,11 @@
+# Authoritative ordering of the curated views. The viewer renders one tab per
+# id in this order, opens the first (landscape), and appends the synthesised
+# `everything` view last. Adding a view = a file under views/ + an entry here.
+order:
+  - landscape
+  - delivery
+  - infrastructure
+  - application
+  - identity
+  - data
+  - home-automation

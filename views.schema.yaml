@@ -1,0 +1,95 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://architecture.webathome.org/views.schema.yaml
+title: view
+description: |
+  One curated view of the merged architecture model. Views are authored as YAML
+  under views/ (one file per view, ordered by views/_order.yaml), validated and
+  inlined into architecture.json by tooling/collect.py, and surfaced as a tab
+  strip in the viewer.
+
+  Selection algorithm (also documented in the viewer, src/views/scope.ts):
+
+      base   = elements matching predicate (AND across fields, OR within a field)
+      base   = (base ∪ include) − exclude
+      scoped = base ∪ { elements within neighbourDepth relation-hops of base }
+
+  Environment is NOT part of the resolved scope — it is applied by the viewer's
+  live Environment filter, seeded to `defaultEnvironment` (default "prd") on
+  open, so a view can still reveal dev/tst/uat within its scope.
+
+type: object
+additionalProperties: false
+required: [id, label, description]
+properties:
+  id:
+    type: string
+    pattern: ^[a-z][a-z0-9-]*$
+    description: |
+      Stable view id. Kebab-case. Doubles as the ?view= URL value and the key
+      listed in views/_order.yaml. `everything` is reserved for the synthesised
+      escape-hatch view and may not be authored.
+  label:
+    type: string
+    minLength: 1
+    description: Tab label shown in the viewer's view strip.
+  description:
+    type: string
+    minLength: 1
+    description: One-line summary of what the view scopes (tooltip / picker text).
+  predicate:
+    type: object
+    additionalProperties: false
+    description: |
+      Attribute selector over existing dimensions. Within a field the values
+      OR; across fields they AND. An absent or empty predicate matches every
+      element (the Everything view's shape).
+    properties:
+      layers:
+        $ref: "#/$defs/valueList"
+        description: ArchiMate layer ids (technology, application, strategy, business, cross-cutting).
+      kinds:
+        $ref: "#/$defs/valueList"
+        description: ArchiMate kind names (Node, Device, SystemSoftware, ApplicationComponent, …).
+      producers:
+        $ref: "#/$defs/valueList"
+        description: Registered producer ids (must appear in pipeline-producers.yaml).
+      capabilities:
+        $ref: "#/$defs/valueList"
+        description: |
+          Capability ids (from enums/capabilities.yaml). An element matches if it
+          is the capability node itself or realises one of the listed capabilities.
+      lifecycle:
+        $ref: "#/$defs/valueList"
+        description: Lifecycle states (active, deprecated, removed).
+      environments:
+        $ref: "#/$defs/valueList"
+        description: Environment ids (dev, tst, uat, prd). Rarely needed — prefer defaultEnvironment.
+  include:
+    $ref: "#/$defs/valueList"
+    description: |
+      Explicit element ids folded into the base set after the predicate, for
+      sets no predicate cleanly expresses. Every id must resolve in the merged
+      dataset — a dangling include fails the build.
+  exclude:
+    $ref: "#/$defs/valueList"
+    description: |
+      Explicit element ids removed from the base set after include. Every id
+      must resolve in the merged dataset.
+  neighbourDepth:
+    type: integer
+    minimum: 0
+    description: |
+      Relation hops to expand the base set by, following relations undirected.
+      0 = no expansion (just the base set).
+  defaultEnvironment:
+    type: string
+    description: |
+      Environment the viewer seeds its Environment filter to when the view
+      opens. Defaults to "prd" when omitted.
+$defs:
+  valueList:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1

@@ -1,0 +1,6 @@
+id: infrastructure
+label: Infrastructure & network
+description: The physical and host substrate — devices, compute nodes, and the system software that runs on them.
+predicate:
+  kinds: [Node, Device, SystemSoftware]
+neighbourDepth: 0

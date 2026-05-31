@@ -1,0 +1,8 @@
+id: home-automation
+label: Home automation
+description: The home-automation slice — sensor/actuator orchestration over Zigbee/MQTT and its broker.
+predicate:
+  capabilities:
+    - cap:home-automation
+    - cap:pub-sub-broker
+neighbourDepth: 1

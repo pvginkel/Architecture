@@ -1,0 +1,10 @@
+id: delivery
+label: Delivery pipeline
+description: The source-to-deploy chain — SCM, CI, image registry, and configuration management.
+predicate:
+  capabilities:
+    - cap:source-control
+    - cap:continuous-integration
+    - cap:image-registry
+    - cap:configuration-management
+neighbourDepth: 1

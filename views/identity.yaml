@@ -1,0 +1,9 @@
+id: identity
+label: Identity & secrets
+description: Identity, secrets, and PKI services with the workloads that realise and consume them.
+predicate:
+  capabilities:
+    - cap:iam
+    - cap:secrets-management
+    - cap:pki
+neighbourDepth: 1

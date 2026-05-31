@@ -1,0 +1,16 @@
+id: data
+label: Data & storage
+description: Databases, caches, search, object/block/file storage, and messaging — with their consumers.
+predicate:
+  capabilities:
+    - cap:relational-database
+    - cap:document-store
+    - cap:vector-store
+    - cap:full-text-search
+    - cap:cache
+    - cap:message-queue
+    - cap:pub-sub-broker
+    - cap:object-storage
+    - cap:shared-filesystem
+    - cap:block-storage
+neighbourDepth: 1

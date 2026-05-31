@@ -1,0 +1,6 @@
+id: landscape
+label: Landscape
+description: The big picture — capabilities and applications with their immediate technical context.
+predicate:
+  layers: [strategy, application]
+neighbourDepth: 1
