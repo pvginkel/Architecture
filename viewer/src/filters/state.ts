@@ -57,10 +57,13 @@ export function nodeValue(el: ArchElement, groupId: string): string | undefined 
 }
 
 /** Does an element satisfy one node group's selection? Empty/absent selection =
- *  no constraint. An element that doesn't carry the group's attribute (no
- *  environment / no release / no workload — e.g. products, capabilities) is
- *  agnostic to that group and always passes; only elements that *have* the
- *  attribute are constrained by a selection. */
+ *  no constraint.
+ *
+ *  Environment is special: an element with no environment is env-agnostic and
+ *  always passes (a capability survives the prd default). Release and workload
+ *  are strict, by contrast — selecting a release means "show that release", so
+ *  an element that carries no release/workload (a product, a capability) is
+ *  *excluded*, not waved through. */
 export function passesNodeGroup(
   el: ArchElement,
   groupId: string,
@@ -70,10 +73,10 @@ export function passesNodeGroup(
     return true;
   }
   const value = nodeValue(el, groupId);
-  if (value === undefined) {
+  if (groupId === ENVIRONMENT_GROUP && value === undefined) {
     return true;
   }
-  return selection.has(value);
+  return value !== undefined && selection.has(value);
 }
 
 export function matchesSearch(el: ArchElement, term: string): boolean {
