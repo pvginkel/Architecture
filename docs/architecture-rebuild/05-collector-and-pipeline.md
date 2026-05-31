@@ -73,7 +73,8 @@ Concurrent producer completions are coalesced by Jenkins's pending-build merging
 8. **Triple-matrix check.** Every relation's `(source-kind, type, target-kind)` triple must be in the allowed-triples enumeration (already encoded as `x-allowedTriples` in `generated/relations.schema.yaml`). JSON Schema doesn't enforce the matrix on its own — the collector enforces it for both in-artifact and cross-artifact relations.
 9. **Grouping checks.** Groupings are producer-local. A Grouping that aggregates members from a different producer fails the build. A Grouping with zero Aggregation relations sourced from it (empty Grouping) also fails the build — dead data.
 10. **Rollup.** Compute Grouping memberships and Capability-realisation maps; sort and de-duplicate so reruns are byte-identical.
-11. **Emit.** Write `dist/data/v0.1/architecture.yaml`, `architecture.json`, and `validation-report.json` with deterministic key ordering so the image build is reproducible.
+11. **View cross-check.** Validate authored views (schema + `_order.yaml` permutation, done up front) and resolve every `predicate` value against its vocabulary and every `include`/`exclude` id against the merged set. Any violation fails the build. See "Named views" below.
+12. **Emit.** Write `dist/data/v0.1/architecture.yaml`, `architecture.json`, and `validation-report.json` (with the inlined `views`) with deterministic key ordering so the image build is reproducible.
 
 ## Failure modes summary
 
@@ -107,23 +108,37 @@ Producer-side fetch failures (e.g. a producer's Jenkins down) are not a collecto
 
 ## Named views
 
-Saved filter / zoom configurations, committed to this repo as YAML under `views/`:
+Curated, named scopings of the model, committed to this repo as YAML under `views/` (one file per view) and **inlined into `architecture.json`** by the collector — the viewer fetches one document and the views ride along. Schema: `views.schema.yaml` (repo root, beside `pipeline-producers.schema.yaml`).
 
 ```
 views/
-├── portfolio.yaml         # the recruiter-facing default view
-├── data-plane.yaml
-├── identity-flows.yaml
-└── delivery.yaml
+├── _order.yaml            # authoritative tab order (list of view ids)
+├── landscape.yaml         # opens first
+├── delivery.yaml
+├── infrastructure.yaml
+├── application.yaml
+├── identity.yaml
+├── data.yaml
+└── home-automation.yaml
 ```
 
-Each defines initial zoom/pan/centre, active filters (kinds shown, layers shown, lifecycle states shown), pinned UUIDs, and a one-line description for the view picker.
+A view is a **hybrid predicate + overrides**: `{ id, label, description, predicate?, include?, exclude?, neighbourDepth?, defaultEnvironment? }`. The `predicate` selects over existing dimensions (`layers`, `kinds`, `producers`, `capabilities`, `lifecycle`, `environments`) — within a field OR, across fields AND. `include`/`exclude` are explicit id lists for sets no predicate cleanly expresses. `neighbourDepth` pulls in elements within N relation-hops of the base set so a view can show a spine plus its immediate context.
 
-URL state: `architecture.webathome.org/?view=portfolio` loads a named view. Filter changes update a transient URL hash; users can copy and share custom states.
+Resolution (documented in `views.schema.yaml` and the viewer's `src/views/scope.ts`):
 
-The viewer ships with a view picker UI. The portfolio view is the default route.
+```
+base   = elements matching predicate (AND across fields, OR within a field)
+base   = (base ∪ include) − exclude
+scoped = base ∪ { elements within neighbourDepth relation-hops of base }
+```
 
-Named-view authoring is v5 work (after the viewer is repointed at the merged dataset).
+Environment is **not** folded into the scope — it is the one dimension the viewer's live Environment filter owns, seeded to `defaultEnvironment` (default `prd`) on open, so a view can reveal dev/tst/uat within its scope. The predicate builds the scope; the filter rail refines within it.
+
+`views/_order.yaml` carries an `order` list that must be an exact permutation of the authored view ids — explicit and self-documenting. List order is authoritative (**no `default:` flag**): the viewer opens `views[0]` (Landscape). A final **Everything** view (empty predicate → matches all) is **synthesised by the collector** and appended last as the explore-by-filters escape hatch; `everything` is a reserved id.
+
+**Collector responsibilities** (a `views` cross-check phase, fail-loud like dangling relation refs): load + schema-validate each view, order by `_order.yaml`, then verify every `predicate` value is in its vocabulary (layers/kinds from `subset.yaml`, capabilities/lifecycle/environments from the enums, producers from the registry), `defaultEnvironment` is a known environment, and every `include`/`exclude` id resolves in the merged set via the `ResolutionIndex`. The ordered `views` (Everything last) are inlined under a top-level `views:` key after `derived`. `views/` is read directly by the collector (`--views`, default `views`) — it is **not** a producer artifact and does not go through `producer-artifacts/`.
+
+URL state: `architecture.webathome.org/viewer/?view=landscape` opens a named view; an unknown id falls back to `views[0]` with a `console.warn`. The viewer renders the views as a tab strip across the top of the canvas.
 
 ## Performance considerations
 
@@ -131,6 +146,6 @@ At full federation, the merged dataset is maybe a few thousand elements. Python 
 
 ## Open questions
 
-- **Should named-view authoring be lifted earlier than v5?** If the merged dataset is large enough mid-bootstrap that filter presets help, yes. Defer the decision until we have real Ansible + Helm data flowing.
+- ~~**Should named-view authoring be lifted earlier than v5?**~~ **Resolved.** Shipped in the viewer rework (plan 4) — see "Named views" above. Views are predicate-based scopings inlined into `architecture.json`, not the zoom/pan/pinned-UUID presets the v5 sketch imagined.
 - **Should the collector publish a producer-readable index** (`/data/v0.1/index.yaml` enumerating every id with its owning producer and aliasHint)? Useful for producer authors looking up UUIDs without scanning the full merged dataset. Low-cost. Likely yes; finalise when the second producer comes online.
 - ~~**How does the validation report get out of the image** for Jenkins archival?~~ **Resolved (v3 #13).** The Jenkinsfile runs the collector twice: once Jenkins-side in a Python sidecar (output archived via `archiveArtifacts`), once inside the `run-collector` Dockerfile stage (baked into the image at `/data/v0.1/`). Same inputs produce byte-identical outputs by the collector's determinism guarantee, so the archived report matches what the running container serves.
