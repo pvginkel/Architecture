@@ -13,6 +13,7 @@ interface FilterGroupProps {
   onToggleCollapse: () => void;
   onToggleOption: (value: string) => void;
   onSelectAll: (values: string[]) => void;
+  onClearAll: (values: string[]) => void;
   optionIcon?: (value: string) => ReactNode;
 }
 
@@ -48,6 +49,7 @@ export function FilterGroup({
   onToggleCollapse,
   onToggleOption,
   onSelectAll,
+  onClearAll,
   optionIcon,
 }: FilterGroupProps) {
   const [search, setSearch] = useState("");
@@ -60,6 +62,13 @@ export function FilterGroup({
       ? group.options.filter((option) => option.label.toLowerCase().includes(term))
       : group.options;
   const selectedOptions = group.options.filter((option) => selected.has(option.value));
+
+  // Once every currently-visible option is checked, the button has nothing left
+  // to add, so it flips to clearing that same visible set (the search-narrowed
+  // subset when a term is active).
+  const visibleValues = visibleOptions.map((option) => option.value);
+  const allVisibleSelected =
+    visibleOptions.length > 0 && visibleOptions.every((option) => selected.has(option.value));
 
   const renderRow = (option: FilterOption) => (
     <OptionRow
@@ -130,11 +139,13 @@ export function FilterGroup({
 
           <button
             className="filter-group__selectall"
-            onClick={() => onSelectAll(visibleOptions.map((option) => option.value))}
+            onClick={() =>
+              allVisibleSelected ? onClearAll(visibleValues) : onSelectAll(visibleValues)
+            }
             disabled={visibleOptions.length === 0}
             type="button"
           >
-            Select All
+            {allVisibleSelected ? "Clear All" : "Select All"}
           </button>
         </div>
       ) : (

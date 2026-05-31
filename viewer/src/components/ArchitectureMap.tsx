@@ -64,6 +64,7 @@ import {
   addFilterOptions,
   computeVisibleGraph,
   initialFilterState,
+  removeFilterOptions,
   serializeFilters,
   toggleFilterOption,
   type FilterState,
@@ -528,6 +529,10 @@ function ArchitectureMapInner() {
     setFilterState((current) => addFilterOptions(current, groupId, values));
   }, []);
 
+  const clearAll = useCallback((groupId: string, values: string[]) => {
+    setFilterState((current) => removeFilterOptions(current, groupId, values));
+  }, []);
+
   const toggleCollapse = useCallback(
     (groupId: string) => {
       setCollapsed((current) => {
@@ -756,6 +761,7 @@ function ArchitectureMapInner() {
             onToggleCollapse={toggleCollapse}
             onToggleOption={toggleOption}
             onSelectAll={selectAll}
+            onClearAll={clearAll}
             onClear={clearFilters}
           />
         ) : null}

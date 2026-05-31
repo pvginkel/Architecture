@@ -15,6 +15,7 @@ interface FilterRailProps {
   onToggleCollapse: (groupId: string) => void;
   onToggleOption: (groupId: string, value: string) => void;
   onSelectAll: (groupId: string, values: string[]) => void;
+  onClearAll: (groupId: string, values: string[]) => void;
   onClear: () => void;
 }
 
@@ -46,6 +47,7 @@ export function FilterRail({
   onToggleCollapse,
   onToggleOption,
   onSelectAll,
+  onClearAll,
   onClear,
 }: FilterRailProps) {
   return (
@@ -81,6 +83,7 @@ export function FilterRail({
             onToggleCollapse={() => onToggleCollapse(group.id)}
             onToggleOption={(value) => onToggleOption(group.id, value)}
             onSelectAll={(values) => onSelectAll(group.id, values)}
+            onClearAll={(values) => onClearAll(group.id, values)}
             optionIcon={optionIconFor(group.id)}
           />
         ))}

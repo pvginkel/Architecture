@@ -105,11 +105,6 @@ body,
   box-sizing: border-box;
 }
 
-.architecture-page button,
-.architecture-page input {
-  font: inherit;
-}
-
 .architecture-page button {
   cursor: pointer;
 }
@@ -470,7 +465,7 @@ body,
   border: none;
   background: transparent;
   color: var(--muted);
-  font-size: 14px !important;
+  font-size: 14px;
   font-weight: 700;
   white-space: nowrap;
   transition:

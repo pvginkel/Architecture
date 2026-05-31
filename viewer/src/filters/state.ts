@@ -193,6 +193,24 @@ export function addFilterOptions(
   return next;
 }
 
+export function removeFilterOptions(
+  state: FilterState,
+  groupId: string,
+  values: string[],
+): FilterState {
+  const next = new Map(state);
+  const current = new Set(next.get(groupId) ?? []);
+  for (const value of values) {
+    current.delete(value);
+  }
+  if (current.size === 0) {
+    next.delete(groupId);
+  } else {
+    next.set(groupId, current);
+  }
+  return next;
+}
+
 export function serializeFilters(state: FilterState): Record<string, string[]> {
   const out: Record<string, string[]> = {};
   for (const [groupId, values] of state) {
