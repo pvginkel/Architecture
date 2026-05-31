@@ -9,7 +9,7 @@
 //   - Environment defaults to {prd}; elements with no environment are
 //     env-agnostic and always pass.
 
-import { KIND_LABELS } from "../generated/vocab";
+import { KIND_LABELS, RELATIONSHIP_TYPES } from "../generated/vocab";
 import type { ArchElement, ArchModel } from "../data/model";
 import type { ManifestRelation } from "../data/manifest";
 
@@ -34,6 +34,25 @@ export const NODE_GROUP_IDS = [
 ] as const;
 
 export type FilterState = Map<string, Set<string>>;
+
+/** Relationship types kept off the canvas by default. These are the high-volume,
+ *  low-structural-signal edges (a provider served by dozens of consumers; loose
+ *  associations) that turn any non-trivial view into a hairball. The view
+ *  baseline pre-selects every *other* type so these stay hidden until the user
+ *  opts in; switching views or clearing filters restores this. */
+export const HIDDEN_RELATIONSHIP_TYPES: ReadonlySet<string> = new Set([
+  "Serving",
+  "Association",
+]);
+
+/** The relationship-group selection a fresh view seeds to: every type except the
+ *  hidden ones. Deliberately the complement, not an empty set — an empty
+ *  selection means "show all relations" (see computeVisibleGraph), which would
+ *  reveal exactly the edges we mean to hide. A non-empty complement keeps the
+ *  edge filter always active. */
+export function defaultRelationshipSelection(): Set<string> {
+  return new Set(RELATIONSHIP_TYPES.filter((type) => !HIDDEN_RELATIONSHIP_TYPES.has(type)));
+}
 
 /** The attribute a node group tests on an element. `undefined` = the element
  *  doesn't carry that attribute (only meaningful for environment). */
@@ -129,8 +148,13 @@ export function computeVisibleGraph(
 }
 
 export function initialFilterState(): FilterState {
-  // prd default until Plan 4's views own the baseline.
-  return new Map([[ENVIRONMENT_GROUP, new Set(["prd"])]]);
+  // Transient pre-load state, replaced by the view baseline once the manifest's
+  // first view resolves. Mirrors the baseline: prd environment + hidden
+  // relations off.
+  return new Map<string, Set<string>>([
+    [ENVIRONMENT_GROUP, new Set(["prd"])],
+    [RELATIONSHIP_GROUP, defaultRelationshipSelection()],
+  ]);
 }
 
 export function toggleFilterOption(

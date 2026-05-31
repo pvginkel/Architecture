@@ -25,6 +25,8 @@ import type { ArchModel } from "../data/model";
 import type { Manifest, ViewDefinition, ViewPredicate } from "../data/manifest";
 import {
   ENVIRONMENT_GROUP,
+  RELATIONSHIP_GROUP,
+  defaultRelationshipSelection,
   type FilterState,
 } from "../filters/state";
 
@@ -185,12 +187,15 @@ export function resolveViewScope(
 }
 
 /** The filter state a view seeds on open: the Environment group set to the
- *  view's `defaultEnvironment` (default "prd"). All other groups start empty so
- *  the whole scope shows; the user narrows from there. Clearing filters and
- *  switching views both return to this. */
+ *  view's `defaultEnvironment` (default "prd"), and the Relationship group set
+ *  to every type except the noisy ones (see defaultRelationshipSelection), so
+ *  the canvas opens decluttered. All node groups start empty so the whole scope
+ *  shows; the user narrows from there. Clearing filters and switching views both
+ *  return to this. */
 export function viewBaselineFilterState(view: ViewDefinition): FilterState {
-  return new Map([
+  return new Map<string, Set<string>>([
     [ENVIRONMENT_GROUP, new Set([view.defaultEnvironment ?? DEFAULT_ENVIRONMENT])],
+    [RELATIONSHIP_GROUP, defaultRelationshipSelection()],
   ]);
 }
 
