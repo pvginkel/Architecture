@@ -51,7 +51,12 @@ import { ViewTabs } from "./ViewTabs";
 import { emitToParent, onSetView } from "../parent-bridge";
 import { FilterRail } from "../filters/FilterRail";
 import { buildGroups } from "../filters/groups";
-import { loadCollapsed, saveCollapsed } from "../filters/persistence";
+import {
+  loadActiveView,
+  loadCollapsed,
+  saveActiveView,
+  saveCollapsed,
+} from "../filters/persistence";
 import {
   addFilterOptions,
   computeVisibleGraph,
@@ -398,7 +403,9 @@ function ArchitectureMapInner() {
           return;
         }
         setManifest(loaded);
-        const initial = pickInitialView(loaded.views);
+        const storedId = loadActiveView(src);
+        const initial =
+          loaded.views.find((v) => v.id === storedId) ?? pickInitialView(loaded.views);
         if (initial) {
           setActiveViewId(initial.id);
           setFilterState(viewBaselineFilterState(initial));
@@ -462,11 +469,12 @@ function ArchitectureMapInner() {
         return;
       }
       setActiveViewId(viewId);
+      saveActiveView(src, viewId);
       setSearchTerm("");
       setFilterState(viewBaselineFilterState(view));
       setSelectedId(null);
     },
-    [manifest],
+    [manifest, src],
   );
 
   useEffect(() => {
