@@ -17,6 +17,8 @@ export const KIND_GROUP = "kind";
 export const RELATIONSHIP_GROUP = "relationship";
 export const LAYER_GROUP = "layer";
 export const PRODUCER_GROUP = "producer";
+export const RELEASE_GROUP = "release";
+export const WORKLOAD_GROUP = "workload";
 export const ENVIRONMENT_GROUP = "environment";
 
 // The node-filtering groups, in no particular order (group display order lives
@@ -26,6 +28,8 @@ export const NODE_GROUP_IDS = [
   KIND_GROUP,
   LAYER_GROUP,
   PRODUCER_GROUP,
+  RELEASE_GROUP,
+  WORKLOAD_GROUP,
   ENVIRONMENT_GROUP,
 ] as const;
 
@@ -41,6 +45,10 @@ export function nodeValue(el: ArchElement, groupId: string): string | undefined 
       return el.layer;
     case PRODUCER_GROUP:
       return el.producer;
+    case RELEASE_GROUP:
+      return el.stats?.release;
+    case WORKLOAD_GROUP:
+      return el.stats?.workload;
     case ENVIRONMENT_GROUP:
       return el.environment;
     default:
@@ -49,8 +57,10 @@ export function nodeValue(el: ArchElement, groupId: string): string | undefined 
 }
 
 /** Does an element satisfy one node group's selection? Empty/absent selection =
- *  no constraint. Env-agnostic elements (no environment) always pass the
- *  environment group. */
+ *  no constraint. An element that doesn't carry the group's attribute (no
+ *  environment / no release / no workload — e.g. products, capabilities) is
+ *  agnostic to that group and always passes; only elements that *have* the
+ *  attribute are constrained by a selection. */
 export function passesNodeGroup(
   el: ArchElement,
   groupId: string,
@@ -60,10 +70,10 @@ export function passesNodeGroup(
     return true;
   }
   const value = nodeValue(el, groupId);
-  if (groupId === ENVIRONMENT_GROUP && value === undefined) {
+  if (value === undefined) {
     return true;
   }
-  return value !== undefined && selection.has(value);
+  return selection.has(value);
 }
 
 export function matchesSearch(el: ArchElement, term: string): boolean {

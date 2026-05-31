@@ -22,6 +22,8 @@ import {
   KIND_GROUP,
   LAYER_GROUP,
   PRODUCER_GROUP,
+  RELEASE_GROUP,
+  WORKLOAD_GROUP,
   ENVIRONMENT_GROUP,
   RELATIONSHIP_GROUP,
   NODE_GROUP_IDS,
@@ -131,6 +133,8 @@ export function buildGroups(model: ArchModel, filterState: FilterState, searchTe
     relationshipGroup(model, filterState, searchTerm),
     nodeGroup(LAYER_GROUP, "Layer", model, filterState, term, (v) => LAYER_LABELS[v as LayerId]),
     nodeGroup(PRODUCER_GROUP, "Producer", model, filterState, term, (v) => v),
+    nodeGroup(RELEASE_GROUP, "Release", model, filterState, term, (v) => v),
+    nodeGroup(WORKLOAD_GROUP, "Workload", model, filterState, term, (v) => v),
     nodeGroup(ENVIRONMENT_GROUP, "Environment", model, filterState, term, (v) => ENVIRONMENT_LABELS[v as EnvironmentId]),
   ];
   // Drop groups with nothing present in the data.
