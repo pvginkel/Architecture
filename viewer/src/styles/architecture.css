@@ -299,6 +299,13 @@ body,
 
 .filter-group__body--large {
   gap: 6px;
+  /* Wrap the whole searchable group — search box, Selected toggle, list, and
+     Select All — in one frame. Margin keeps the rail's 12px side inset; padding
+     gives the contents breathing room inside the border. */
+  margin: 0 12px 12px;
+  padding: 10px;
+  border: 1px solid var(--input-border);
+  border-radius: 8px;
 }
 
 .filter-option {
