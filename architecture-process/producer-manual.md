@@ -179,6 +179,16 @@ missing ones.
 | `lifecycle` | enum | yes | `active` \| `deprecated` \| `removed` |
 | `retirementBy` | ISO date | optional | Informational target retirement date. No rule attached. |
 | `stats` | string→string map | optional | Non-load-bearing facts (versions, URLs, image tags) |
+| `logo` | enum | optional | Bare logo name from the bundled library, on any element kind |
+
+`logo` is validated against the bundled logo library: reference a file
+in `viewer/public/logos/` by its name **without the extension** (e.g.
+`ubiquiti` for `ubiquiti.svg`, `keycloak` for `keycloak.svg`). A typo, a
+name that isn't in the library, or a name *with* an extension fails
+validation. **To add a new logo:** drop the SVG/PNG into
+`viewer/public/logos/` and regenerate
+(`poetry run python tooling/generate.py`) so the enum picks it up; until
+then, referencing it fails validation.
 
 Per-kind additions:
 
@@ -211,7 +221,6 @@ distinguishing axis (`ss:keycloak-prd,<uuid>`).
 Added attributes:
 
 - `homepage` — URI, optional
-- `logo` — filename under `viewer/public/logos/`, optional
 - `sourceRepository` — free-form string for in-house products, optional
   (convention: `git:<owner>/<repo>`, e.g. `git:pvginkel/Ansible`).
   Informational only — no graph edge is derived from this.
@@ -227,7 +236,6 @@ systemSoftware:
     lifecycle: active
     stereotype: SoftwareProduct
     homepage: https://openbao.org/
-    logo: openbao.svg
 ```
 
 The producer that **publishes** a product emits the catalog entry, and

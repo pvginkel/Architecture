@@ -42,6 +42,7 @@ producer: <PRODUCER-ID>          # bare kebab; must match this repo's entry in p
 #     lifecycle: active
 #     cluster: prd                  # optional, free-form cluster id
 #     environment: prd              # optional: dev | tst | uat | prd
+#     logo: <name>                  # optional, on any kind; bare name from viewer/public/logos/ (no extension)
 
 # systemSoftware:
 #   - id: ss:<hint>,<uuid4>          # composite for running instances
@@ -59,7 +60,6 @@ producer: <PRODUCER-ID>          # bare kebab; must match this repo's entry in p
 #     lifecycle: active
 #     stereotype: SoftwareProduct
 #     homepage: https://...
-#     logo: <name>.svg
 #     sourceRepository: git:<owner>/<repo>    # optional, informational
 
 # applicationComponents:
