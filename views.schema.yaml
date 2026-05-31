@@ -13,9 +13,9 @@ description: |
       base   = (base ∪ include) − exclude
       scoped = base ∪ { elements within neighbourDepth relation-hops of base }
 
-  `excludeInstances: true` first removes runtime instances (elements carrying
-  stats.release) from the universe, so they appear in neither the base nor the
-  expansion — a definitions-only view.
+  `excludeInstances: true` first removes runtime instances (elements carrying an
+  `environment` and/or `stats.release`) from the universe, so they appear in
+  neither the base nor the expansion — a definitions-only view.
 
   Environment is NOT part of the resolved scope — it is applied by the viewer's
   live Environment filter, seeded to `defaultEnvironment` (default "prd") on
@@ -82,10 +82,12 @@ properties:
   excludeInstances:
     type: boolean
     description: |
-      Drop runtime instances — elements carrying a `stats.release` attribute
-      (a Helm release's deployed workloads/containers) — from the view entirely.
-      They appear in neither the base nor the neighbour expansion, so the view
-      shows architectural definitions only and neighbourDepth cannot pull
+      Drop runtime instances — elements carrying an `environment` (they live in
+      dev/tst/uat/prd) and/or a `stats.release` (a Helm release's deployed
+      workloads/containers) — from the view entirely. A definition is
+      environment-agnostic; an instance is a concrete deployed unit. Excluded
+      instances appear in neither the base nor the neighbour expansion, so the
+      view shows architectural definitions only and neighbourDepth cannot pull
       instances back in. Defaults to false.
   neighbourDepth:
     type: integer

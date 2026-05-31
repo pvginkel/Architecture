@@ -7,9 +7,11 @@
 //   base   = (base ∪ include) − exclude
 //   scoped = base ∪ { elements within neighbourDepth relation-hops of base }
 //
-// `excludeInstances: true` removes runtime instances (elements carrying
-// stats.release) from the universe first, so they appear in neither the base
-// nor the neighbour expansion — a definitions-only view that depth can't undo.
+// `excludeInstances: true` removes runtime instances (elements carrying an
+// `environment` and/or `stats.release`) from the universe first, so they appear
+// in neither the base nor the neighbour expansion — a definitions-only view
+// that depth can't undo. The Environment filter is a no-op within such a view:
+// every surviving element is environment-agnostic, so nothing is left to refine.
 //
 // Environment is deliberately NOT folded into the scope: it is the one
 // dimension the live Environment filter owns, seeded to the view's
@@ -150,9 +152,10 @@ export function resolveViewScope(
   manifest: Manifest,
 ): Set<string> {
   const capMembers = capabilityMembers(manifest);
-  // When excludeInstances is set, runtime instances never participate — not in
-  // the base, not as expansion neighbours, not even via explicit include. They
-  // are invisible to the whole resolution, so neighbourDepth can't pull them back.
+  // When excludeInstances is set, runtime instances (env- and/or release-tagged
+  // elements, see model.ts) never participate — not in the base, not as
+  // expansion neighbours, not even via explicit include. They are invisible to
+  // the whole resolution, so neighbourDepth can't pull them back.
   const admits = view.excludeInstances
     ? (id: string) => !model.elementById.get(id)?.isInstance
     : () => true;

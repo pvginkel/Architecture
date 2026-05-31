@@ -22,9 +22,11 @@ export interface ArchElement extends ManifestElement {
   kind: ElementKind;
   layer: LayerId;
   capabilityId?: CapabilityId;
-  // A runtime instance — a concrete deployed unit (a Helm release's workload /
-  // container) rather than an architectural definition. Carries `stats.release`.
-  // Views can drop these wholesale (see ViewDefinition.excludeInstances).
+  // A runtime instance — a concrete deployed unit rather than an architectural
+  // definition. Identified by carrying an `environment` (it lives in dev/tst/
+  // uat/prd) and/or a `stats.release` (a Helm release's workload/container); a
+  // definition is environment-agnostic. Views can drop these wholesale (see
+  // ViewDefinition.excludeInstances).
   isInstance: boolean;
   [key: string]: unknown;
 }
@@ -77,7 +79,7 @@ export function buildModel(manifest: Manifest): ArchModel {
         kind,
         layer,
         capabilityId: elementCapability.get(el.id),
-        isInstance: el.stats?.release !== undefined,
+        isInstance: el.environment !== undefined || el.stats?.release !== undefined,
       });
     }
   }
