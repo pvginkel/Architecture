@@ -29,10 +29,12 @@ import {
   KIND_LABELS,
   LAYER_IDS,
   LAYER_LABELS,
+  LOGO_FILES,
   RELATIONSHIP_TYPES,
   RELATIONSHIP_LABELS,
   type ElementKind,
   type LayerId,
+  type LogoName,
   type RelationshipType,
 } from "../generated/vocab";
 import {
@@ -88,7 +90,13 @@ function ArchitectureNodeCard({ data }: NodeProps<Node<ArchNodeData>>) {
 
   let rightImage: ReactNode = null;
   if (data.logo) {
-    rightImage = <img src={`${import.meta.env.BASE_URL}logos/${data.logo}`} alt="" />;
+    const file = LOGO_FILES[data.logo as LogoName];
+    if (!file) {
+      console.error(`[viewer] unknown logo '${data.logo}' — vocab is stale, rebuild`);
+      rightImage = <span className="arch-node__stale-mark">?</span>;
+    } else {
+      rightImage = <img src={`${import.meta.env.BASE_URL}logos/${file}`} alt="" />;
+    }
   } else if (data.capabilityId) {
     const CapIcon = CAPABILITY_ICON[data.capabilityId];
     if (CapIcon) {

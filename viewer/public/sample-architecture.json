@@ -9,7 +9,7 @@
       "introduced": "2024-04-24",
       "lifecycle": "active",
       "producer": "ansible",
-      "logo": "proxmox.svg",
+      "logo": "proxmox",
       "stats": { "version": "8.x", "hosts": "3" }
     },
     {
@@ -19,7 +19,7 @@
       "introduced": "2024-04-24",
       "lifecycle": "active",
       "producer": "ansible",
-      "logo": "ubuntu.svg",
+      "logo": "ubuntu",
       "stats": { "version": "24.04 noble" }
     },
     {
@@ -31,7 +31,7 @@
       "producer": "ansible",
       "environment": "prd",
       "cluster": "prd",
-      "logo": "kubernetes.svg",
+      "logo": "kubernetes",
       "stats": { "version": "1.35/stable" }
     },
     {
@@ -41,7 +41,7 @@
       "introduced": "2026-04-24",
       "lifecycle": "active",
       "producer": "ansible",
-      "logo": "openbao.svg",
+      "logo": "openbao",
       "stats": { "version": "2.5.4" }
     }
   ],
@@ -53,7 +53,7 @@
       "introduced": "2025-05-28",
       "lifecycle": "active",
       "producer": "ansible",
-      "logo": "ubiquiti.svg"
+      "logo": "ubiquiti"
     }
   ],
   "systemSoftware": [
@@ -66,7 +66,7 @@
       "producer": "helm",
       "stereotype": "SoftwareProduct",
       "environment": "prd",
-      "logo": "keycloak.svg",
+      "logo": "keycloak",
       "homepage": "https://www.keycloak.org",
       "sourceRepository": "git:pvginkel/HelmCharts",
       "stats": { "version": "26.5.1-postgres-health-ispn" }
@@ -80,7 +80,7 @@
       "producer": "helm",
       "stereotype": "SoftwareProduct",
       "environment": "dev",
-      "logo": "keycloak.svg"
+      "logo": "keycloak"
     },
     {
       "id": "ss:postgresql-prd",
@@ -91,7 +91,7 @@
       "producer": "helm",
       "stereotype": "SoftwareProduct",
       "environment": "prd",
-      "logo": "postgresql.svg",
+      "logo": "postgresql",
       "stats": { "version": "17/18" }
     },
     {
@@ -103,7 +103,7 @@
       "producer": "helm",
       "stereotype": "SoftwareProduct",
       "environment": "prd",
-      "logo": "nginx.svg"
+      "logo": "nginx"
     },
     {
       "id": "ss:coredns",
@@ -112,7 +112,7 @@
       "introduced": "2024-07-12",
       "lifecycle": "active",
       "producer": "helm",
-      "logo": "coredns.svg"
+      "logo": "coredns"
     },
     {
       "id": "ss:metallb",
@@ -121,7 +121,7 @@
       "introduced": "2024-07-12",
       "lifecycle": "active",
       "producer": "helm",
-      "logo": "metallb.png"
+      "logo": "metallb"
     },
     {
       "id": "ss:prometheus",
@@ -130,7 +130,7 @@
       "introduced": "2024-10-11",
       "lifecycle": "active",
       "producer": "helm",
-      "logo": "prometheus.svg"
+      "logo": "prometheus"
     },
     {
       "id": "ss:grafana",
@@ -139,7 +139,7 @@
       "introduced": "2024-10-11",
       "lifecycle": "active",
       "producer": "helm",
-      "logo": "grafana.svg"
+      "logo": "grafana"
     },
     {
       "id": "ss:elasticsearch",
@@ -148,7 +148,7 @@
       "introduced": "2024-10-11",
       "lifecycle": "active",
       "producer": "helm",
-      "logo": "elasticsearch.svg"
+      "logo": "elasticsearch"
     },
     {
       "id": "ss:mosquitto",
@@ -157,7 +157,7 @@
       "introduced": "2024-08-18",
       "lifecycle": "active",
       "producer": "helm",
-      "logo": "mosquitto.svg"
+      "logo": "mosquitto"
     },
     {
       "id": "ss:rabbitmq",
@@ -166,7 +166,7 @@
       "introduced": "2026-03-15",
       "lifecycle": "active",
       "producer": "helm",
-      "logo": "rabbitmq.svg",
+      "logo": "rabbitmq",
       "stats": { "version": "4.3" }
     },
     {
@@ -176,7 +176,7 @@
       "introduced": "2024-07-13",
       "lifecycle": "active",
       "producer": "helm",
-      "logo": "docker.svg"
+      "logo": "docker"
     },
     {
       "id": "ss:step-ca",
@@ -185,7 +185,7 @@
       "introduced": "2026-05-17",
       "lifecycle": "active",
       "producer": "helm",
-      "logo": "smallstep.png"
+      "logo": "smallstep"
     },
     {
       "id": "ss:external-secrets",
@@ -194,7 +194,7 @@
       "introduced": "2026-05-23",
       "lifecycle": "active",
       "producer": "helm",
-      "logo": "external-secrets.png"
+      "logo": "external-secrets"
     },
     {
       "id": "ss:github",
@@ -203,7 +203,7 @@
       "introduced": "2011-06-04",
       "lifecycle": "active",
       "producer": "helm",
-      "logo": "github.svg"
+      "logo": "github"
     },
     {
       "id": "ss:jenkins",
@@ -212,7 +212,7 @@
       "introduced": "2024-07-24",
       "lifecycle": "active",
       "producer": "helm",
-      "logo": "jenkins.svg",
+      "logo": "jenkins",
       "stats": { "version": "lts-jdk21" }
     },
     {
@@ -222,7 +222,7 @@
       "introduced": "2025-10-08",
       "lifecycle": "active",
       "producer": "helm",
-      "logo": "gitblit.png"
+      "logo": "gitblit"
     },
     {
       "id": "ss:ansible",
@@ -231,7 +231,7 @@
       "introduced": "2026-04-24",
       "lifecycle": "active",
       "producer": "ansible",
-      "logo": "ansible.svg"
+      "logo": "ansible"
     },
     {
       "id": "ss:terraform",
@@ -240,7 +240,7 @@
       "introduced": "2026-04-24",
       "lifecycle": "active",
       "producer": "ansible",
-      "logo": "terraform.svg"
+      "logo": "terraform"
     },
     {
       "id": "ss:helmcharts",
@@ -249,7 +249,7 @@
       "introduced": "2024-07-12",
       "lifecycle": "active",
       "producer": "helm",
-      "logo": "helm.svg"
+      "logo": "helm"
     }
   ],
   "applicationComponents": [
@@ -273,7 +273,7 @@
       "producer": "helm",
       "stereotype": "SoftwareProduct",
       "environment": "prd",
-      "logo": "iot-support.png",
+      "logo": "iot-support",
       "sourceRepository": "git:pvginkel/IoTSupport"
     },
     {
@@ -285,7 +285,7 @@
       "producer": "helm",
       "stereotype": "SoftwareProduct",
       "environment": "prd",
-      "logo": "electronics-inventory.png",
+      "logo": "electronics-inventory",
       "sourceRepository": "git:pvginkel/ElectronicsInventory"
     },
     {
@@ -297,7 +297,7 @@
       "producer": "helm",
       "stereotype": "SoftwareProduct",
       "environment": "prd",
-      "logo": "zigbee2mqtt.png"
+      "logo": "zigbee2mqtt"
     },
     {
       "id": "app:media",
@@ -307,7 +307,7 @@
       "lifecycle": "active",
       "producer": "helm",
       "stereotype": "SoftwareProduct",
-      "logo": "plex.svg"
+      "logo": "plex"
     },
     {
       "id": "app:guacamole",
@@ -317,7 +317,7 @@
       "lifecycle": "active",
       "producer": "helm",
       "stereotype": "SoftwareProduct",
-      "logo": "guacamole.svg"
+      "logo": "guacamole"
     }
   ],
   "applicationServices": [
