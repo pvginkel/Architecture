@@ -26,6 +26,11 @@ COPY tooling/pyproject.toml tooling/poetry.lock ./tooling/
 RUN cd tooling && poetry install --no-root --without dev
 COPY schema/ ./schema/
 COPY tooling/ ./tooling/
+# generate.py --check reads the logo library (to derive the logoLibrary enum)
+# and the committed viewer vocab module (to detect drift). Both live under
+# viewer/; copy just those two paths rather than the whole viewer tree.
+COPY viewer/public/logos/ ./viewer/public/logos/
+COPY viewer/src/generated/vocab.ts ./viewer/src/generated/vocab.ts
 RUN cd tooling && poetry run python generate.py --check
 
 # ---- stage 2: viewer ----
