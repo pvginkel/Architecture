@@ -68,6 +68,16 @@ properties:
       environments:
         $ref: "#/$defs/valueList"
         description: Environment ids (dev, tst, uat, prd). Rarely needed — prefer defaultEnvironment.
+      releases:
+        $ref: "#/$defs/valueList"
+        description: |
+          Helm release names — the `stats.release` an instance carries (e.g.
+          `design-assistant@prd`, or `scantopdf` for a single-environment
+          release). Selects a deployed system's runtime as one set; with
+          neighbourDepth the definitions those instances specialise are pulled
+          back in. The grouping handle for per-system views, where the release is
+          the real boundary. Validated against the releases present in the merged
+          dataset.
   include:
     $ref: "#/$defs/valueList"
     description: |

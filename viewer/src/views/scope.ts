@@ -57,7 +57,8 @@ function isEmptyPredicate(predicate: ViewPredicate | undefined): boolean {
     !predicate.producers?.length &&
     !predicate.capabilities?.length &&
     !predicate.lifecycle?.length &&
-    !predicate.environments?.length
+    !predicate.environments?.length &&
+    !predicate.releases?.length
   );
 }
 
@@ -80,6 +81,12 @@ function matchesPredicate(
   }
   if (predicate.environments?.length) {
     if (el.environment === undefined || !predicate.environments.includes(el.environment)) {
+      return false;
+    }
+  }
+  if (predicate.releases?.length) {
+    const release = el.stats?.release;
+    if (release === undefined || !predicate.releases.includes(release)) {
       return false;
     }
   }

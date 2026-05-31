@@ -907,7 +907,7 @@ def check_views(
 
     - each `predicate.<field>` value is a member of that field's vocabulary
       (layers/kinds from subset.yaml, capabilities/lifecycle/environments from
-      the enums, producers from the registry);
+      the enums, producers from the registry, releases from the merged data);
     - `defaultEnvironment` is a known environment;
     - every `include`/`exclude` id resolves to an element in the merged set
       (same fail-loud stance as a dangling relation ref).
@@ -921,6 +921,16 @@ def check_views(
         "capabilities": (load_capability_enum(), "enums/capabilities.yaml"),
         "lifecycle": (load_lifecycle_ids(), "enums/lifecycle-states.yaml"),
         "environments": (load_environment_ids(), "enums/environments.yaml"),
+        # Releases have no enum — the vocabulary is the set of stats.release
+        # values present in the merged dataset (a Helm release names itself).
+        "releases": (
+            {
+                (elem.get("stats") or {})["release"]
+                for _, elem, _ in index.by_full_id.values()
+                if "release" in (elem.get("stats") or {})
+            },
+            "stats.release in the merged dataset",
+        ),
     }
     environment_ids = field_vocab["environments"][0]
 

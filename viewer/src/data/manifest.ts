@@ -59,6 +59,7 @@ export interface ViewPredicate {
   capabilities?: string[];
   lifecycle?: string[];
   environments?: string[];
+  releases?: string[];
 }
 
 // A curated view, authored as YAML in the Architecture repo and inlined into

@@ -1,0 +1,6 @@
+id: broken
+label: Broken
+description: References a release that does not exist in the merged set.
+predicate:
+  releases:
+    - release-that-does-not-exist
