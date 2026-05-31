@@ -1,0 +1,24 @@
+schemaVersion: "0.1"
+producer: ansible
+# Exercises normalize_relation_endpoints (collect.py). The elements carry
+# composite ids (kebab + UUID); the relation references them by BARE kebab id.
+# The resolver accepts the bare form (same-producer internal hint), so the build
+# passes — and the collector must rewrite both endpoints to the canonical
+# composite id so an exact-match consumer (the viewer) can connect the edge.
+systemSoftware:
+  - id: ss:microk8s,11111111-1111-4111-8111-111111111111
+    label: MicroK8s
+    summary: MicroK8s Kubernetes distribution.
+    introduced: 2024-01-01
+    lifecycle: active
+  - id: ss:kubernetes,22222222-2222-4222-8222-222222222222
+    label: Kubernetes
+    summary: Kubernetes (catalogue definition).
+    introduced: 2024-01-01
+    lifecycle: active
+relations:
+  # Bare-id endpoints — must be rewritten to the composite ids above.
+  - id: rel:microk8s-spec-kubernetes
+    source: ss:microk8s
+    target: ss:kubernetes
+    type: Specialization

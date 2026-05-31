@@ -808,6 +808,43 @@ def reconcile_alias_hints(
         report["divergences"].append(entry)
 
 
+def normalize_relation_endpoints(
+    docs: dict[str, Any],
+    index: ResolutionIndex,
+) -> int:
+    """Rewrite every relation's source/target to the canonical id of the element
+    it resolves to.
+
+    A producer may reference an element by any accepted form — the owner's
+    composite id, a bare kebab id, or an internal hint — and the resolver
+    (ResolutionIndex) accepts them all, so validation passes either way. But the
+    merged output is consumed downstream (the viewer) by *exact id match*, with
+    no resolver: an edge whose endpoint is `ss:microk8s` finds no node
+    `ss:microk8s,<uuid>` and is silently dropped. Collapsing every endpoint to
+    the owner's canonical id closes that gap once, for every consumer, and makes
+    authored edges consistent with the canonical ids the projection already emits.
+
+    Relation dicts are shared with `merged` (merge_artifacts appends the same
+    objects), so mutating them here lands in the output. Must run AFTER
+    reconcile_alias_hints — that pass reports divergences from the *authored*
+    hints, which this rewrite would otherwise erase. Unresolved refs (tolerated
+    only under --relaxed) are left as authored; strict mode already failed on them.
+    Returns the number of endpoints rewritten.
+    """
+    rewritten = 0
+    for pid in sorted(docs):
+        for rel in docs[pid].get("relations") or []:
+            for field in ("source", "target"):
+                entry, _ = index.resolve(rel[field], pid)
+                if entry is None:
+                    continue
+                canonical = entry[1]["id"]
+                if rel[field] != canonical:
+                    rel[field] = canonical
+                    rewritten += 1
+    return rewritten
+
+
 def new_report() -> dict[str, Any]:
     """Empty validation-report scaffold. Phases append to `warnings` and
     `divergences`; the emit step (item 10) finalises `summary` and writes
@@ -1211,6 +1248,12 @@ def main(
         "Alias-hint reconciliation: "
         + ("hints agree across all observations." if n_div == 0 else
            f"{n_div} element(s) with hint divergence captured in the report.")
+    )
+
+    rewritten = normalize_relation_endpoints(docs, index)
+    click.echo(
+        f"Reference normalisation: {rewritten} relation endpoint(s) rewritten "
+        f"to canonical element ids."
     )
 
     try:
