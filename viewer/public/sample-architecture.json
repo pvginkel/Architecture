@@ -1,0 +1,573 @@
+{
+  "schemaVersion": "0.1",
+  "producers": ["ansible", "helm", "schema"],
+  "nodes": [
+    {
+      "id": "node:proxmox",
+      "label": "Proxmox VE",
+      "summary": "Three-node hypervisor cluster — the virtualisation substrate for the homelab.",
+      "introduced": "2024-04-24",
+      "lifecycle": "active",
+      "producer": "ansible",
+      "logo": "proxmox.svg",
+      "stats": { "version": "8.x", "hosts": "3" }
+    },
+    {
+      "id": "node:ubuntu-vms",
+      "label": "Ubuntu VMs",
+      "summary": "Cloud-init managed Noble VMs provisioned by Terraform and converged by Ansible.",
+      "introduced": "2024-04-24",
+      "lifecycle": "active",
+      "producer": "ansible",
+      "logo": "ubuntu.svg",
+      "stats": { "version": "24.04 noble" }
+    },
+    {
+      "id": "node:k8s-prd",
+      "label": "Kubernetes (prd)",
+      "summary": "Production microk8s cluster — primary runtime for in-cluster workloads.",
+      "introduced": "2024-07-12",
+      "lifecycle": "active",
+      "producer": "ansible",
+      "environment": "prd",
+      "cluster": "prd",
+      "logo": "kubernetes.svg",
+      "stats": { "version": "1.35/stable" }
+    },
+    {
+      "id": "node:openbao",
+      "label": "OpenBao",
+      "summary": "Raft-backed three-node secret store consumed by in-cluster External Secrets.",
+      "introduced": "2026-04-24",
+      "lifecycle": "active",
+      "producer": "ansible",
+      "logo": "openbao.svg",
+      "stats": { "version": "2.5.4" }
+    }
+  ],
+  "devices": [
+    {
+      "id": "device:udm-pro",
+      "label": "UDM Pro",
+      "summary": "Unifi Dream Machine Pro — the home network's edge router, firewall, and Wi-Fi controller.",
+      "introduced": "2025-05-28",
+      "lifecycle": "active",
+      "producer": "ansible",
+      "logo": "ubiquiti.svg"
+    }
+  ],
+  "systemSoftware": [
+    {
+      "id": "ss:keycloak-prd",
+      "label": "Keycloak (prd)",
+      "summary": "Kubernetes-hosted identity provider with a custom image.",
+      "introduced": "2026-01-15",
+      "lifecycle": "active",
+      "producer": "helm",
+      "stereotype": "SoftwareProduct",
+      "environment": "prd",
+      "logo": "keycloak.svg",
+      "homepage": "https://www.keycloak.org",
+      "sourceRepository": "git:pvginkel/HelmCharts",
+      "stats": { "version": "26.5.1-postgres-health-ispn" }
+    },
+    {
+      "id": "ss:keycloak-dev",
+      "label": "Keycloak (dev)",
+      "summary": "Development instance of the identity provider. Hidden under the prd default.",
+      "introduced": "2026-01-15",
+      "lifecycle": "active",
+      "producer": "helm",
+      "stereotype": "SoftwareProduct",
+      "environment": "dev",
+      "logo": "keycloak.svg"
+    },
+    {
+      "id": "ss:postgresql-prd",
+      "label": "PostgreSQL (prd)",
+      "summary": "App-local PostgreSQL (with pgvector where needed).",
+      "introduced": "2024-07-18",
+      "lifecycle": "active",
+      "producer": "helm",
+      "stereotype": "SoftwareProduct",
+      "environment": "prd",
+      "logo": "postgresql.svg",
+      "stats": { "version": "17/18" }
+    },
+    {
+      "id": "ss:nginx-prd",
+      "label": "NGINX Ingress (prd)",
+      "summary": "Custom ingress built from nginx, a configurator, and Certbot.",
+      "introduced": "2024-07-18",
+      "lifecycle": "active",
+      "producer": "helm",
+      "stereotype": "SoftwareProduct",
+      "environment": "prd",
+      "logo": "nginx.svg"
+    },
+    {
+      "id": "ss:coredns",
+      "label": "CoreDNS",
+      "summary": "Authoritative cluster DNS with in-cluster .home overrides.",
+      "introduced": "2024-07-12",
+      "lifecycle": "active",
+      "producer": "helm",
+      "logo": "coredns.svg"
+    },
+    {
+      "id": "ss:metallb",
+      "label": "MetalLB",
+      "summary": "L2 LoadBalancer implementation for services inside microk8s.",
+      "introduced": "2024-07-12",
+      "lifecycle": "active",
+      "producer": "helm",
+      "logo": "metallb.png"
+    },
+    {
+      "id": "ss:prometheus",
+      "label": "Prometheus",
+      "summary": "Scrapes node_exporter and in-cluster targets for metrics.",
+      "introduced": "2024-10-11",
+      "lifecycle": "active",
+      "producer": "helm",
+      "logo": "prometheus.svg"
+    },
+    {
+      "id": "ss:grafana",
+      "label": "Grafana",
+      "summary": "Dashboards served at grafana.home, backed by RBD storage.",
+      "introduced": "2024-10-11",
+      "lifecycle": "active",
+      "producer": "helm",
+      "logo": "grafana.svg"
+    },
+    {
+      "id": "ss:elasticsearch",
+      "label": "Elasticsearch",
+      "summary": "Search and log backend for IoT Support and Filebeat shipping.",
+      "introduced": "2024-10-11",
+      "lifecycle": "active",
+      "producer": "helm",
+      "logo": "elasticsearch.svg"
+    },
+    {
+      "id": "ss:mosquitto",
+      "label": "Mosquitto",
+      "summary": "MQTT broker for Zigbee2MQTT and the IoT fleet, with Keycloak-backed device auth.",
+      "introduced": "2024-08-18",
+      "lifecycle": "active",
+      "producer": "helm",
+      "logo": "mosquitto.svg"
+    },
+    {
+      "id": "ss:rabbitmq",
+      "label": "RabbitMQ",
+      "summary": "AMQP broker used for app-internal job queues.",
+      "introduced": "2026-03-15",
+      "lifecycle": "active",
+      "producer": "helm",
+      "logo": "rabbitmq.svg",
+      "stats": { "version": "4.3" }
+    },
+    {
+      "id": "ss:registry",
+      "label": "Docker Registry",
+      "summary": "HTTP-only private registry consumed by most in-house workloads.",
+      "introduced": "2024-07-13",
+      "lifecycle": "active",
+      "producer": "helm",
+      "logo": "docker.svg"
+    },
+    {
+      "id": "ss:step-ca",
+      "label": "step-ca",
+      "summary": "In-cluster CA used by VMs, nginx ACME, and internal TLS flows.",
+      "introduced": "2026-05-17",
+      "lifecycle": "active",
+      "producer": "helm",
+      "logo": "smallstep.png"
+    },
+    {
+      "id": "ss:external-secrets",
+      "label": "External Secrets",
+      "summary": "Bridges OpenBao secrets into Kubernetes Secret objects.",
+      "introduced": "2026-05-23",
+      "lifecycle": "active",
+      "producer": "helm",
+      "logo": "external-secrets.png"
+    },
+    {
+      "id": "ss:github",
+      "label": "GitHub",
+      "summary": "External Git host that owns every source repo and triggers Jenkins pipelines.",
+      "introduced": "2011-06-04",
+      "lifecycle": "active",
+      "producer": "helm",
+      "logo": "github.svg"
+    },
+    {
+      "id": "ss:jenkins",
+      "label": "Jenkins",
+      "summary": "Central controller for Helm, Ansible, and Docker image pipelines.",
+      "introduced": "2024-07-24",
+      "lifecycle": "active",
+      "producer": "helm",
+      "logo": "jenkins.svg",
+      "stats": { "version": "lts-jdk21" }
+    },
+    {
+      "id": "ss:gitblit",
+      "label": "Gitblit",
+      "summary": "In-cluster Git mirror used as the cross-repo search backend.",
+      "introduced": "2025-10-08",
+      "lifecycle": "active",
+      "producer": "helm",
+      "logo": "gitblit.png"
+    },
+    {
+      "id": "ss:ansible",
+      "label": "Ansible",
+      "summary": "Converges host roles, Kubernetes cluster state, and OpenBao.",
+      "introduced": "2026-04-24",
+      "lifecycle": "active",
+      "producer": "ansible",
+      "logo": "ansible.svg"
+    },
+    {
+      "id": "ss:terraform",
+      "label": "Terraform",
+      "summary": "Provisions Proxmox VMs via the in-house pvginkel/homelab provider.",
+      "introduced": "2026-04-24",
+      "lifecycle": "active",
+      "producer": "ansible",
+      "logo": "terraform.svg"
+    },
+    {
+      "id": "ss:helmcharts",
+      "label": "HelmCharts",
+      "summary": "Deploys all in-cluster workloads through upstream wrappers and in-house charts.",
+      "introduced": "2024-07-12",
+      "lifecycle": "active",
+      "producer": "helm",
+      "logo": "helm.svg"
+    }
+  ],
+  "applicationComponents": [
+    {
+      "id": "app:design-assistant-prd",
+      "label": "Design Assistant (prd)",
+      "summary": "Multi-env Python and TypeScript RAG application stack.",
+      "introduced": "2026-03-12",
+      "lifecycle": "active",
+      "producer": "helm",
+      "stereotype": "SoftwareProduct",
+      "environment": "prd",
+      "sourceRepository": "git:pvginkel/DesignAssistant"
+    },
+    {
+      "id": "app:iot-support-prd",
+      "label": "IoT Support (prd)",
+      "summary": "In-house IoT application and UI writing into Elasticsearch.",
+      "introduced": "2026-01-09",
+      "lifecycle": "active",
+      "producer": "helm",
+      "stereotype": "SoftwareProduct",
+      "environment": "prd",
+      "logo": "iot-support.png",
+      "sourceRepository": "git:pvginkel/IoTSupport"
+    },
+    {
+      "id": "app:electronics-inventory-prd",
+      "label": "Electronics Inventory (prd)",
+      "summary": "Personal electronics inventory backend and UI.",
+      "introduced": "2025-08-22",
+      "lifecycle": "active",
+      "producer": "helm",
+      "stereotype": "SoftwareProduct",
+      "environment": "prd",
+      "logo": "electronics-inventory.png",
+      "sourceRepository": "git:pvginkel/ElectronicsInventory"
+    },
+    {
+      "id": "app:zigbee-control-prd",
+      "label": "Zigbee Control (prd)",
+      "summary": "Zigbee2MQTT device bridge and in-house control surface.",
+      "introduced": "2025-09-23",
+      "lifecycle": "active",
+      "producer": "helm",
+      "stereotype": "SoftwareProduct",
+      "environment": "prd",
+      "logo": "zigbee2mqtt.png"
+    },
+    {
+      "id": "app:media",
+      "label": "Media",
+      "summary": "Media release combining Plex, a VPN sidecar, Samba, and download tooling.",
+      "introduced": "2024-08-14",
+      "lifecycle": "active",
+      "producer": "helm",
+      "stereotype": "SoftwareProduct",
+      "logo": "plex.svg"
+    },
+    {
+      "id": "app:guacamole",
+      "label": "Guacamole",
+      "summary": "Browser-based RDP/SSH gateway for the Ubuntu VMs, fronted by NGINX, authenticated through Keycloak.",
+      "introduced": "2025-02-01",
+      "lifecycle": "active",
+      "producer": "helm",
+      "stereotype": "SoftwareProduct",
+      "logo": "guacamole.svg"
+    }
+  ],
+  "applicationServices": [
+    {
+      "id": "svc:da-api-prd",
+      "label": "Design Assistant API (prd)",
+      "summary": "Internal HTTP API surface of the Design Assistant portal.",
+      "introduced": "2026-03-12",
+      "lifecycle": "active",
+      "producer": "helm",
+      "environment": "prd"
+    }
+  ],
+  "applicationInterfaces": [
+    {
+      "id": "if:da-http",
+      "label": "Design Assistant HTTPS",
+      "summary": "Addressable HTTPS endpoint for the Design Assistant API.",
+      "introduced": "2026-03-12",
+      "lifecycle": "active",
+      "producer": "helm",
+      "environment": "prd"
+    }
+  ],
+  "technologyServices": [
+    {
+      "id": "svc:postgres-5432",
+      "label": "PostgreSQL on 5432",
+      "summary": "Postgres wire-protocol consumption surface. No logo — exercises the capability-fallback icon.",
+      "introduced": "2024-07-18",
+      "lifecycle": "active",
+      "producer": "helm",
+      "environment": "prd"
+    },
+    {
+      "id": "svc:oidc-issuer",
+      "label": "OIDC Issuer",
+      "summary": "OpenID Connect issuer surface of Keycloak. No logo — exercises the capability-fallback icon.",
+      "introduced": "2026-01-15",
+      "lifecycle": "active",
+      "producer": "helm",
+      "environment": "prd"
+    }
+  ],
+  "technologyInterfaces": [
+    {
+      "id": "if:openbao-secret-path",
+      "label": "OpenBao secret path",
+      "summary": "Addressable KV path on the OpenBao secret store.",
+      "introduced": "2026-04-24",
+      "lifecycle": "active",
+      "producer": "ansible"
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "cap:iam",
+      "label": "Identity & Access Management",
+      "summary": "Identity store, authentication, authorisation, SSO realisation.",
+      "introduced": "2024-07-12",
+      "lifecycle": "active",
+      "producer": "schema"
+    },
+    {
+      "id": "cap:secrets-management",
+      "label": "Secrets management",
+      "summary": "Secret storage, retrieval, rotation, lease management.",
+      "introduced": "2024-07-12",
+      "lifecycle": "active",
+      "producer": "schema"
+    },
+    {
+      "id": "cap:pki",
+      "label": "Public Key Infrastructure",
+      "summary": "Certificate issuance, renewal, trust chain management.",
+      "introduced": "2024-07-12",
+      "lifecycle": "active",
+      "producer": "schema"
+    },
+    {
+      "id": "cap:ingress",
+      "label": "Ingress",
+      "summary": "External-facing HTTP/TCP entry into the cluster.",
+      "introduced": "2024-07-12",
+      "lifecycle": "active",
+      "producer": "schema"
+    },
+    {
+      "id": "cap:relational-database",
+      "label": "Relational database",
+      "summary": "SQL-tabular persistence with transactions and joins.",
+      "introduced": "2024-07-12",
+      "lifecycle": "active",
+      "producer": "schema"
+    },
+    {
+      "id": "cap:observability",
+      "label": "Observability",
+      "summary": "Cross-cutting role that aggregates metrics + logging + tracing.",
+      "introduced": "2024-07-12",
+      "lifecycle": "active",
+      "producer": "schema"
+    },
+    {
+      "id": "cap:container-orchestration",
+      "label": "Container orchestration",
+      "summary": "Container scheduling and lifecycle management (Kubernetes).",
+      "introduced": "2024-07-12",
+      "lifecycle": "active",
+      "producer": "schema"
+    },
+    {
+      "id": "cap:home-automation",
+      "label": "Home automation",
+      "summary": "Sensor and actuator orchestration over Zigbee/MQTT.",
+      "introduced": "2024-07-12",
+      "lifecycle": "active",
+      "producer": "schema"
+    },
+    {
+      "id": "cap:remote-access",
+      "label": "Remote access",
+      "summary": "Browser/RDP/SSH gateway into managed environments.",
+      "introduced": "2024-07-12",
+      "lifecycle": "active",
+      "producer": "schema"
+    },
+    {
+      "id": "cap:continuous-integration",
+      "label": "Continuous integration",
+      "summary": "Build and pipeline orchestration.",
+      "introduced": "2024-07-12",
+      "lifecycle": "active",
+      "producer": "schema"
+    },
+    {
+      "id": "cap:source-control",
+      "label": "Source control",
+      "summary": "Git repository hosting and access control.",
+      "introduced": "2024-07-12",
+      "lifecycle": "active",
+      "producer": "schema"
+    },
+    {
+      "id": "cap:configuration-management",
+      "label": "Configuration management",
+      "summary": "Declarative or imperative system-state convergence (Ansible, TF).",
+      "introduced": "2024-07-12",
+      "lifecycle": "active",
+      "producer": "schema"
+    }
+  ],
+  "businessServices": [
+    {
+      "id": "bsvc:single-sign-on",
+      "label": "Single sign-on",
+      "summary": "What the system delivers to humans: one login across every internal app.",
+      "introduced": "2024-07-12",
+      "lifecycle": "active",
+      "producer": "schema"
+    }
+  ],
+  "groupings": [
+    {
+      "id": "grp:identity",
+      "label": "Identity stack",
+      "summary": "Identity, secrets, and PKI services.",
+      "introduced": "2024-07-12",
+      "lifecycle": "active",
+      "producer": "helm"
+    },
+    {
+      "id": "grp:delivery",
+      "label": "Delivery pipeline",
+      "summary": "Source, build, registry, IaC, and deployment path.",
+      "introduced": "2024-07-12",
+      "lifecycle": "active",
+      "producer": "helm"
+    }
+  ],
+  "relations": [
+    { "id": "rel:proxmox-runs-vms", "source": "node:proxmox", "target": "node:ubuntu-vms", "type": "Assignment" },
+    { "id": "rel:vms-run-k8s", "source": "node:ubuntu-vms", "target": "node:k8s-prd", "type": "Assignment" },
+    { "id": "rel:k8s-runs-keycloak", "source": "node:k8s-prd", "target": "ss:keycloak-prd", "type": "Assignment" },
+    { "id": "rel:k8s-runs-postgres", "source": "node:k8s-prd", "target": "ss:postgresql-prd", "type": "Assignment" },
+    { "id": "rel:k8s-runs-nginx", "source": "node:k8s-prd", "target": "ss:nginx-prd", "type": "Assignment" },
+    { "id": "rel:k8s-runs-prometheus", "source": "node:k8s-prd", "target": "ss:prometheus", "type": "Assignment" },
+    { "id": "rel:k8s-runs-grafana", "source": "node:k8s-prd", "target": "ss:grafana", "type": "Assignment" },
+    { "id": "rel:k8s-runs-external-secrets", "source": "node:k8s-prd", "target": "ss:external-secrets", "type": "Assignment" },
+    { "id": "rel:k8s-runs-design", "source": "node:k8s-prd", "target": "app:design-assistant-prd", "type": "Assignment" },
+    { "id": "rel:k8s-runs-iot", "source": "node:k8s-prd", "target": "app:iot-support-prd", "type": "Assignment" },
+    { "id": "rel:k8s-runs-zigbee", "source": "node:k8s-prd", "target": "app:zigbee-control-prd", "type": "Assignment" },
+    { "id": "rel:udm-serves-proxmox", "source": "device:udm-pro", "target": "node:proxmox", "type": "Serving" },
+    { "id": "rel:openbao-serves-external-secrets", "source": "node:openbao", "target": "ss:external-secrets", "type": "Serving" },
+    { "id": "rel:openbao-has-path", "source": "node:openbao", "target": "if:openbao-secret-path", "type": "Composition" },
+    { "id": "rel:keycloak-realises-iam", "source": "ss:keycloak-prd", "target": "cap:iam", "type": "Realization" },
+    { "id": "rel:keycloak-dev-realises-iam", "source": "ss:keycloak-dev", "target": "cap:iam", "type": "Realization" },
+    { "id": "rel:openbao-realises-secrets", "source": "node:openbao", "target": "cap:secrets-management", "type": "Realization" },
+    { "id": "rel:stepca-realises-pki", "source": "ss:step-ca", "target": "cap:pki", "type": "Realization" },
+    { "id": "rel:nginx-realises-ingress", "source": "ss:nginx-prd", "target": "cap:ingress", "type": "Realization" },
+    { "id": "rel:postgres-realises-rdb", "source": "ss:postgresql-prd", "target": "cap:relational-database", "type": "Realization" },
+    { "id": "rel:grafana-realises-observability", "source": "ss:grafana", "target": "cap:observability", "type": "Realization" },
+    { "id": "rel:k8s-realises-orchestration", "source": "node:k8s-prd", "target": "cap:container-orchestration", "type": "Realization" },
+    { "id": "rel:jenkins-realises-ci", "source": "ss:jenkins", "target": "cap:continuous-integration", "type": "Realization" },
+    { "id": "rel:github-realises-scm", "source": "ss:github", "target": "cap:source-control", "type": "Realization" },
+    { "id": "rel:ansible-realises-config", "source": "ss:ansible", "target": "cap:configuration-management", "type": "Realization" },
+    { "id": "rel:guacamole-realises-remote", "source": "app:guacamole", "target": "cap:remote-access", "type": "Realization" },
+    { "id": "rel:zigbee-realises-home", "source": "app:zigbee-control-prd", "target": "cap:home-automation", "type": "Realization" },
+    { "id": "rel:iam-realises-sso", "source": "cap:iam", "target": "bsvc:single-sign-on", "type": "Realization" },
+    { "id": "rel:identity-aggregates-keycloak", "source": "grp:identity", "target": "ss:keycloak-prd", "type": "Aggregation" },
+    { "id": "rel:identity-aggregates-openbao", "source": "grp:identity", "target": "node:openbao", "type": "Aggregation" },
+    { "id": "rel:identity-aggregates-stepca", "source": "grp:identity", "target": "ss:step-ca", "type": "Aggregation" },
+    { "id": "rel:delivery-aggregates-jenkins", "source": "grp:delivery", "target": "ss:jenkins", "type": "Aggregation" },
+    { "id": "rel:delivery-aggregates-github", "source": "grp:delivery", "target": "ss:github", "type": "Aggregation" },
+    { "id": "rel:github-triggers-jenkins", "source": "ss:github", "target": "ss:jenkins", "type": "Triggering" },
+    { "id": "rel:jenkins-triggers-helm", "source": "ss:jenkins", "target": "ss:helmcharts", "type": "Triggering" },
+    { "id": "rel:helm-serves-k8s", "source": "ss:helmcharts", "target": "node:k8s-prd", "type": "Serving" },
+    { "id": "rel:ansible-serves-vms", "source": "ss:ansible", "target": "node:ubuntu-vms", "type": "Serving" },
+    { "id": "rel:terraform-serves-proxmox", "source": "ss:terraform", "target": "node:proxmox", "type": "Serving" },
+    { "id": "rel:postgres-assigned-svc", "source": "ss:postgresql-prd", "target": "svc:postgres-5432", "type": "Assignment" },
+    { "id": "rel:postgres-svc-realises-rdb", "source": "svc:postgres-5432", "target": "cap:relational-database", "type": "Realization" },
+    { "id": "rel:postgres-svc-serves-design", "source": "svc:postgres-5432", "target": "app:design-assistant-prd", "type": "Serving" },
+    { "id": "rel:keycloak-assigned-oidc", "source": "ss:keycloak-prd", "target": "svc:oidc-issuer", "type": "Assignment" },
+    { "id": "rel:oidc-realises-iam", "source": "svc:oidc-issuer", "target": "cap:iam", "type": "Realization" },
+    { "id": "rel:oidc-serves-design", "source": "svc:oidc-issuer", "target": "app:design-assistant-prd", "type": "Serving" },
+    { "id": "rel:design-composes-api", "source": "app:design-assistant-prd", "target": "svc:da-api-prd", "type": "Composition" },
+    { "id": "rel:api-composes-http", "source": "svc:da-api-prd", "target": "if:da-http", "type": "Composition" },
+    { "id": "rel:iot-accesses-elasticsearch", "source": "app:iot-support-prd", "target": "ss:elasticsearch", "type": "Access" },
+    { "id": "rel:zigbee-accesses-mosquitto", "source": "app:zigbee-control-prd", "target": "ss:mosquitto", "type": "Access" },
+    { "id": "rel:design-accesses-postgres", "source": "app:design-assistant-prd", "target": "ss:postgresql-prd", "type": "Access" },
+    { "id": "rel:guacamole-serves-vms", "source": "app:guacamole", "target": "node:ubuntu-vms", "type": "Serving" }
+  ],
+  "derived": {
+    "groupings": {
+      "grp:identity": ["ss:keycloak-prd", "node:openbao", "ss:step-ca"],
+      "grp:delivery": ["ss:jenkins", "ss:github"]
+    },
+    "capabilityRealizations": {
+      "cap:iam": ["ss:keycloak-prd", "ss:keycloak-dev", "svc:oidc-issuer"],
+      "cap:secrets-management": ["node:openbao"],
+      "cap:pki": ["ss:step-ca"],
+      "cap:ingress": ["ss:nginx-prd"],
+      "cap:relational-database": ["ss:postgresql-prd", "svc:postgres-5432"],
+      "cap:observability": ["ss:grafana"],
+      "cap:container-orchestration": ["node:k8s-prd"],
+      "cap:continuous-integration": ["ss:jenkins"],
+      "cap:source-control": ["ss:github"],
+      "cap:configuration-management": ["ss:ansible"],
+      "cap:remote-access": ["app:guacamole"],
+      "cap:home-automation": ["app:zigbee-control-prd"]
+    }
+  }
+}
