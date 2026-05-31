@@ -244,10 +244,13 @@ function RelationshipEdge({
   const baseWidth = 2.2;
   const baseOpacity = 0.62;
   const strokeWidth = data.highlighted ? baseWidth + 1.6 : baseWidth;
-  const strokeOpacity = data.dimmed ? 0.12 : data.highlighted ? 0.98 : baseOpacity;
+  // Opacity rides on the group, not the path's strokeOpacity, so the arrowhead
+  // marker (a separate, shared SVG element that doesn't inherit strokeOpacity)
+  // dims and brightens together with the line.
+  const opacity = data.dimmed ? 0.12 : data.highlighted ? 0.98 : baseOpacity;
 
   return (
-    <g className="relationship-edge">
+    <g className="relationship-edge" style={{ opacity }}>
       <path
         id={id}
         className="relationship-edge__path"
@@ -255,7 +258,6 @@ function RelationshipEdge({
         fill="none"
         markerEnd={markerEnd}
         stroke={data.color}
-        strokeOpacity={strokeOpacity}
         strokeWidth={strokeWidth}
       />
       <path
