@@ -50,4 +50,4 @@ relations:
   - id: rel:scanner-pi-has-scanner
     source: node:scanner-pi,7cb7b613-4049-4a0d-a640-a2fa6d28182d
     target: device:canoscan-lide-400,7474469e-6ab1-45ff-a8ed-fa569512a643
-    type: Association
+    type: Composition
