@@ -1,0 +1,53 @@
+# Architecture repo as self-producer — the document-scanning hardware.
+#
+# A Raspberry Pi runs nothing but SANE (saned), with a Canon CanoScan LiDE 400
+# USB scanner attached. The Pi is NOT monitored and NOT in Ansible, so its only
+# home is here. The ScanToPdf server (its own producer) consumes the SANE network
+# service to let users scan from their phone. Kept deliberately minimal.
+
+schemaVersion: "0.1"
+producer: architecture
+
+nodes:
+  - id: node:scanner-pi,7cb7b613-4049-4a0d-a640-a2fa6d28182d
+    label: Scanner Raspberry Pi
+    summary: Raspberry Pi running only SANE (saned), with the document scanner attached. Not monitored, not in Ansible.
+    introduced: 2026-05-31
+    lifecycle: active
+
+devices:
+  - id: device:canoscan-lide-400,7474469e-6ab1-45ff-a8ed-fa569512a643
+    label: Canon CanoScan LiDE 400
+    summary: USB flatbed document scanner attached to the scanner Raspberry Pi.
+    introduced: 2026-05-31
+    lifecycle: active
+
+systemSoftware:
+  - id: ss:sane,dad94c80-25d2-43cb-87da-fa6a284256db
+    label: SANE (saned)
+    summary: SANE scanner-access daemon on the Raspberry Pi, exposing the attached scanner over the network.
+    introduced: 2026-05-31
+    lifecycle: active
+
+technologyServices:
+  - id: svc:sane,e84330dd-c453-4bd4-a112-f83366de453c
+    label: SANE network scan service
+    summary: Network scanning service (saned) the ScanToPdf server drives to acquire scans from the attached scanner.
+    introduced: 2026-05-31
+    lifecycle: active
+
+relations:
+  - id: rel:scanner-pi-runs-sane
+    source: node:scanner-pi,7cb7b613-4049-4a0d-a640-a2fa6d28182d
+    target: ss:sane,dad94c80-25d2-43cb-87da-fa6a284256db
+    type: Assignment
+
+  - id: rel:sane-realizes-scan-service
+    source: ss:sane,dad94c80-25d2-43cb-87da-fa6a284256db
+    target: svc:sane,e84330dd-c453-4bd4-a112-f83366de453c
+    type: Realization
+
+  - id: rel:scanner-pi-has-scanner
+    source: node:scanner-pi,7cb7b613-4049-4a0d-a640-a2fa6d28182d
+    target: device:canoscan-lide-400,7474469e-6ab1-45ff-a8ed-fa569512a643
+    type: Association

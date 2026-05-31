@@ -1,0 +1,61 @@
+# Architecture repo as self-producer — the architecture viewer SPA.
+#
+# app:architecture-viewer is built FROM this repo (registry:5000/architecture_viewer,
+# served at architecture.webathome.org/viewer/ and iframe-embedded into
+# webathome.org). Its product identity therefore lives here, under the same
+# `architecture` self-producer as infrastructure.yaml / home-automation.yaml,
+# rather than in a separate producer repo.
+#
+# Thin by design (see docs/backfill — open questions for review): the viewer is a
+# static React/ReactFlow/ELK SPA. It exposes no API. It currently reads the
+# architecture model from a bundled local module (src/data/architecture); the
+# federated-dataset fetch (architecture.webathome.org/data/...) is future work and
+# is NOT yet a runtime dependency. Its one notable runtime relationship — being
+# iframe-embedded by webathome.org via a postMessage parent bridge to
+# https://webathome.org — is left unmodeled pending a decision on direction/ownership
+# (webathome-org is a sibling backfill producer, not yet published).
+
+schemaVersion: "0.1"
+producer: architecture
+
+applicationComponents:
+  - id: app:architecture-viewer,3d1d0c4b-ca26-4f22-ac8c-61335617629d
+    label: Architecture viewer
+    summary: >-
+      Static React/ReactFlow/ELK single-page app that renders the federated
+      architecture model. Served at architecture.webathome.org/viewer/ and
+      iframe-embedded into webathome.org.
+    introduced: 2026-05-26
+    lifecycle: active
+    stereotype: SoftwareProduct
+    sourceRepository: git:pvginkel/Architecture
+    stats:
+      homepage: https://architecture.webathome.org/viewer/
+      image: registry:5000/architecture_viewer
+
+applicationServices:
+  - id: svc:architecture-viewer-web,b2d1a577-69a1-4bc1-a56b-06e43fec6dfd
+    label: Architecture viewer site
+    summary: >-
+      The static HTTP surface of the viewer SPA, served at
+      architecture.webathome.org/viewer/ and iframe-embedded by webathome.org.
+    introduced: 2026-05-26
+    lifecycle: active
+
+applicationInterfaces:
+  - id: if:architecture-viewer-browser,cedc110a-7f10-4157-9d0b-1be66fea483e
+    label: Browser consumer surface
+    summary: The viewer page loaded in the browser (directly and via the webathome.org iframe embed).
+    introduced: 2026-05-26
+    lifecycle: active
+
+relations:
+  - id: rel:architecture-viewer-realizes-web
+    source: app:architecture-viewer,3d1d0c4b-ca26-4f22-ac8c-61335617629d
+    target: svc:architecture-viewer-web,b2d1a577-69a1-4bc1-a56b-06e43fec6dfd
+    type: Realization
+
+  - id: rel:architecture-viewer-browser-if
+    source: if:architecture-viewer-browser,cedc110a-7f10-4157-9d0b-1be66fea483e
+    target: svc:architecture-viewer-web,b2d1a577-69a1-4bc1-a56b-06e43fec6dfd
+    type: Assignment
