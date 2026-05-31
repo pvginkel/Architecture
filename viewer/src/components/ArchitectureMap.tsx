@@ -678,7 +678,7 @@ function ArchitectureMapInner() {
               onPaneClick={onPaneClick}
               proOptions={{ hideAttribution: true }}
             >
-              <Background color="#d7d7ce" gap={24} size={1} />
+              <Background gap={24} size={1} />
               <Controls showInteractive={false} />
             </ReactFlow>
           )}
