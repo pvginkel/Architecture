@@ -334,6 +334,37 @@ account — is still a legitimate consumption edge; it simply carries no
 `boundBy` (no `env:` recipe exists) and never resolves to a concrete
 `Serving` edge. Model it when it documents a real dependency.
 
+**`boundByDefaultValue` — the recipe's fallback value.** When the edge is
+real but no deployed container sets the env var, because the consumer's
+application code defaults the connection target (a colocated sidecar
+reached on `localhost`, e.g. `SSE_GATEWAY_URL=http://localhost:3402` or
+`RABBITMQ_URL=amqp://guest:guest@localhost:5672/`), the deployer has
+nothing to read and the edge would fail to resolve. Carry the code default
+on the recipe as `boundByDefaultValue` and the resolver treats it as though
+it had been read off the container — loopback hosts still resolve to the
+same-pod provider:
+
+```yaml
+  - id: rel:design-assistant-consumes-sse-gateway
+    source: app:design-assistant
+    target: svc:ssegateway
+    type: Association
+    boundBy: "env:SSE_GATEWAY_URL"
+    boundByDefaultValue: "http://localhost:3402"
+```
+
+It is a **fallback, never an override**: a rendered env value always wins;
+`boundByDefaultValue` only fills in when no container sets the var. It
+belongs **on the recipe, not in the chart** — the default is a property of
+the application, not of any deployment, and restating it across every chart
+and stage duplicates it and inverts ownership. Author it on the consumer's
+own product edge (the same producer that owns the `boundBy`), mirroring the
+app's own `config.py` default. Omit it when a chart genuinely sets the var,
+or when the edge legitimately has no concrete connection target. Without
+either a setter or a `boundByDefaultValue`, an unresolved `boundBy` still
+fails loudly — that genuinely is a stale recipe or a chart that must surface
+the var, and the breakage remains the signal.
+
 **Who resolves it.** The producer that *renders the deployment* (it is
 the only one that sees the env value, which is runtime state and stays
 unpublished). For each deployed instance that specialises the consumer

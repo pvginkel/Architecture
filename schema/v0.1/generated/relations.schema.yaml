@@ -49,6 +49,18 @@ properties:
       '
     type: string
     pattern: ^env:[A-Za-z_][A-Za-z0-9_]*$
+  boundByDefaultValue:
+    description: 'Fallback connection value for a `boundBy` edge when no deployed container sets the named env var: the value
+      the consumer''s application code defaults to (e.g. a colocated sidecar reached on `localhost`). The resolving producer
+      treats it as though it had been read off the container, so loopback/colocated hosts still resolve to the same-pod provider.
+      A rendered env value always wins; this is a fallback, never an override. Authored by the consumer''s producer (it owns
+      the recipe and mirrors the app''s own code default), consumed by the producer that renders the deployment. Without it,
+      an unresolved `boundBy` still fails loudly: that remains the signal for a stale recipe or a chart that must surface
+      the var.
+
+      '
+    type: string
+    minLength: 1
 x-allowedTriples:
 - source: ApplicationComponent
   type: Access
