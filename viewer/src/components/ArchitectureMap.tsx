@@ -156,9 +156,11 @@ function ArchitectureNodeCard({ data }: NodeProps<Node<ArchNodeData>>) {
         </span>
         <span className="arch-node__top-right">
           {stage ? <span className="arch-node__stage">{stage}</span> : null}
-          <span className="arch-node__logo" aria-hidden="true">
-            {rightImage}
-          </span>
+          {rightImage ? (
+            <span className="arch-node__logo" aria-hidden="true">
+              {rightImage}
+            </span>
+          ) : null}
         </span>
       </div>
       {isInstance ? (
@@ -319,7 +321,7 @@ function Tooltip({ tooltip }: { tooltip: TooltipState }) {
         ) : null}
         {Object.entries(stats).map(([key, value]) => (
           <Fragment key={key}>
-            <dt>{key}</dt>
+            <dt>{key.charAt(0).toUpperCase() + key.slice(1)}</dt>
             <dd>{value}</dd>
           </Fragment>
         ))}

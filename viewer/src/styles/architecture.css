@@ -350,29 +350,37 @@ body,
 .view-tabs {
   flex-shrink: 0;
   display: flex;
-  gap: 2px;
-  padding: 8px 12px 0;
+  gap: 0;
+  padding: 0 8px;
   overflow-x: auto;
+  scrollbar-width: none; /* Firefox: no persistent horizontal track */
   border-bottom: 1px solid var(--line);
   background: rgba(251, 251, 248, 0.92);
   backdrop-filter: blur(16px);
+}
+
+.view-tabs::-webkit-scrollbar {
+  display: none; /* WebKit/Blink: no persistent horizontal track */
 }
 
 .view-tab {
   flex-shrink: 0;
   min-height: 34px;
   padding: 0 14px;
-  border: 1px solid transparent;
-  border-bottom: none;
-  border-radius: 8px 8px 0 0;
+  border: none;
   background: transparent;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
   transition:
     color 0.12s ease,
     background 0.12s ease;
+}
+
+/* Divider between adjacent tabs only — no outer or horizontal (top) lines. */
+.view-tab + .view-tab {
+  border-left: 1px solid var(--line);
 }
 
 .view-tab:hover {
@@ -383,8 +391,6 @@ body,
 .view-tab--active {
   color: #3b3976;
   background: #fff;
-  border-color: var(--line);
-  margin-bottom: -1px;
 }
 
 .canvas-region {
@@ -571,14 +577,14 @@ body,
 .arch-node__top-right {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 0;
 }
 
 /* Deployment stage, shown small-caps just left of the logo (replaces the old
    " (prd)" label postfix). */
 .arch-node__stage {
   font-variant: all-small-caps;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 800;
   letter-spacing: 0.06em;
   line-height: 1;
