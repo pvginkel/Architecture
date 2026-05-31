@@ -33,6 +33,8 @@ SCHEMA_DIR = REPO_ROOT / "schema" / "v0.1"
 ARCHIMATE_DIR = SCHEMA_DIR / "archimate"
 GENERATED_DIR = SCHEMA_DIR / "generated"
 VOCAB_TS_PATH = REPO_ROOT / "viewer" / "src" / "generated" / "vocab.ts"
+LOGOS_DIR = REPO_ROOT / "viewer" / "public" / "logos"
+LOGO_EXTENSIONS = (".svg", ".png")
 
 # Kind name → manifest array key. Mirror of collect.py's ELEMENT_KIND_ARRAYS /
 # ARRAY_TO_ARCHIMATE (kind names == ArchiMate concept names in v0.1). The viewer
@@ -242,6 +244,10 @@ def attribute_to_json_schema(
         out["type"] = "string"
         if "enumValues" in spec:
             out["enum"] = list(spec["enumValues"])
+        elif "enumSource" in spec:
+            # enumSource — values are derived from a live source (e.g. a
+            # directory of assets) rather than a curated enum file.
+            out["enum"] = resolve_enum_source(spec["enumSource"])
         else:
             # enumRef — we expand the values inline so the generated schema
             # is self-contained. The generator resolves the reference once.
@@ -289,6 +295,43 @@ def resolve_enum_ref(rel_path: str) -> list[str]:
         )
     data = load_yaml(abs_path)
     return [entry["id"] for entry in data["entries"]]
+
+
+def scan_logo_library() -> dict[str, str]:
+    """List viewer/public/logos/, returning a sorted bare-name → filename map.
+
+    Only .svg/.png files are logos; titles.json and anything else is skipped.
+    Strips the extension to form the bare name producers reference. A bare name
+    present under two extensions (e.g. both foo.svg and foo.png) is ambiguous —
+    raise rather than silently pick one. Fail loudly on a missing or empty
+    directory; there is no fallback. The single source for both the
+    `logoLibrary` enum and the viewer's name→file map, so the two can never
+    disagree about which logos exist.
+    """
+    if not LOGOS_DIR.is_dir():
+        raise FileNotFoundError(f"logo library directory missing: {LOGOS_DIR}")
+    mapping: dict[str, str] = {}
+    for entry in sorted(LOGOS_DIR.iterdir()):
+        if entry.suffix not in LOGO_EXTENSIONS:
+            continue
+        name = entry.stem
+        if name in mapping:
+            raise ValueError(
+                f"logo library name collision: '{name}' exists as both "
+                f"'{mapping[name]}' and '{entry.name}' — a bare-name reference "
+                f"would be ambiguous. Remove one of the two files."
+            )
+        mapping[name] = entry.name
+    if not mapping:
+        raise ValueError(f"logo library is empty: {LOGOS_DIR}")
+    return dict(sorted(mapping.items()))
+
+
+def resolve_enum_source(source: str) -> list[str]:
+    """Resolve an `enumSource` discriminator to its enum value list."""
+    if source == "logoLibrary":
+        return list(scan_logo_library().keys())
+    raise ValueError(f"Unknown enumSource '{source}'")
 
 
 def emit_per_kind_schema(
@@ -508,6 +551,14 @@ def _ts_record(name: str, key_type: str, value_type: str, mapping: dict[str, str
     )
 
 
+def _ts_logo_files(mapping: dict[str, str]) -> str:
+    body = "".join(f"  {json.dumps(k)}: {json.dumps(v)},\n" for k, v in mapping.items())
+    return (
+        f"export const LOGO_FILES = {{\n{body}}} as const;\n"
+        f"export type LogoName = keyof typeof LOGO_FILES;\n\n"
+    )
+
+
 def emit_vocab_ts(subset: Mapping[str, Any], relationship_types: set[str]) -> str:
     """Build the generated TypeScript vocab module the viewer types against.
 
@@ -552,6 +603,11 @@ def emit_vocab_ts(subset: Mapping[str, Any], relationship_types: set[str]) -> st
     out.append(_ts_record("CAPABILITY_SUMMARIES", "CapabilityId", "string", {c["id"]: c["summary"] for c in caps}))
     out.append(_ts_record("LIFECYCLE_LABELS", "LifecycleState", "string", {s["id"]: s["label"] for s in lifecycles}))
     out.append(_ts_record("ENVIRONMENT_LABELS", "EnvironmentId", "string", {e["id"]: e["label"] for e in environments}))
+    # Logo name → actual filename. Built from the same directory scan as the
+    # `logoLibrary` enum, so its key set is identical to the enum: the schema
+    # and the viewer can never disagree about which logos exist. The viewer
+    # resolves a bare `logo` name through this map to a real asset path.
+    out.append(_ts_logo_files(scan_logo_library()))
     return "".join(out)
 
 

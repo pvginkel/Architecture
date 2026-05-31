@@ -81,6 +81,7 @@ $defs:
         type: string
         description: Optional regex constraint for `string`-typed attributes.
       enumRef: { type: string }
+      enumSource: { type: string }
       enumValues:
         type: array
         items: { type: string }

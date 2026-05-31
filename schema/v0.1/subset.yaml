@@ -85,6 +85,14 @@ commonAttributes:
     required: false
     description: Non-load-bearing facts (versions, URLs, image tags).
                  Render hints. Free-form string→string.
+  logo:
+    type: enum
+    enumSource: logoLibrary
+    required: false
+    description: >
+      Name of a logo from the bundled library (viewer/public/logos/),
+      without the file extension (e.g. `ubiquiti`). Picked from the curated
+      set; validated against it. Optional, on any kind.
 
 # Custom profile attributes on relations (edges). ArchiMate relations carry
 # no attributes of their own; these are profile extensions, optional on every
@@ -134,10 +142,6 @@ stereotypes:
         type: uri
         required: false
         description: Upstream product homepage, if applicable.
-      logo:
-        type: string
-        required: false
-        description: Filename under viewer/public/logos/.
       sourceRepository:
         type: string
         required: false
