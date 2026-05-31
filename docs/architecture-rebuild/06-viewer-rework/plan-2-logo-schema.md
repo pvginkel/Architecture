@@ -14,9 +14,12 @@ the set of extension-stripped basenames, and the viewer resolves the actual
 asset extension at render time. Sync the producer docs both ways per the
 CLAUDE.md `architecture-process/` ↔ `~/.claude/` rule.
 
-**Prerequisites:** none. Standalone — schema + generator + docs. Independent of
-the viewer plans (the viewer reads `element.logo` regardless of where the schema
-declares it).
+**Prerequisites:** Plan 1 (delivered) — its logo renderer
+(`viewer/src/components/ArchitectureMap.tsx`) assumed `logo` was a full filename,
+so switching producers to bare names requires touching the viewer here. Scope is
+schema + generator + a small viewer change + docs. Not independent of the viewer
+anymore: bare names need the generator-emitted name→file map (Step 2b) and the
+viewer lookup (Step 2c).
 
 ---
 
@@ -71,27 +74,106 @@ In `tooling/generate.py`:
       out["enum"] = resolve_enum_source(spec["enumSource"])
   ```
 
-- Add `resolve_enum_source("logoLibrary")`: list `viewer/public/logos/`, strip
-  each file's extension (both `.svg` and `.png`), and return the **sorted,
-  de-duplicated** set of basenames. So `ubiquiti.svg` → `ubiquiti`; if a name
-  exists as both `.svg` and `.png` it collapses to one enum entry. Fail loudly
-  (raise) if the directory is missing or empty — no fallback. Define the logos
-  path relative to `REPO_ROOT`.
+- Add `resolve_enum_source("logoLibrary")`: list `viewer/public/logos/` (only
+  `.svg`/`.png`; skip `titles.json`), strip each file's extension, and return the
+  **sorted, de-duplicated** set of basenames. So `ubiquiti.svg` → `ubiquiti`.
+  Fail loudly (raise) if the directory is missing or empty — no fallback. Define
+  the logos path relative to `REPO_ROOT`. Reuse this same scan in Step 2b so the
+  enum and the name→file map are built from one directory listing.
 
-Determinism: sort the basenames so reruns are byte-identical. The viewer is
-responsible for resolving a bare name back to a concrete asset (prefer `.svg`,
-fall back to `.png`) — out of scope for this plan, noted for the viewer work.
+  **Collision is an error, not a silent collapse.** The library is genuinely
+  mixed (~57 `.svg`, ~14 `.png`: calico, gitblit, metallb, kaniko, rust, xaml,
+  zigbee2mqtt, …). If a bare name exists as *both* `ubiquiti.svg` and
+  `ubiquiti.png`, raise — we can't know which the producer meant, and the
+  name→file map (Step 2b) would be ambiguous. Today there's no such collision;
+  fail loud if one is ever introduced rather than picking one extension.
+
+Determinism: sort the basenames so reruns are byte-identical.
+
+## Step 2b — Generator: emit a name→file map the viewer resolves against
+
+**Why this exists:** Plan 1 already shipped the logo renderer
+(`viewer/src/components/ArchitectureMap.tsx:91`), and it interpolates the value
+straight into the URL with no extension:
+
+```jsx
+rightImage = <img src={`${import.meta.env.BASE_URL}logos/${data.logo}`} alt="" />;
+```
+
+So a bare `logo: ubiquiti` would request `logos/ubiquiti` → 404. Since the library
+is mixed `.svg`/`.png`, the viewer can't hardcode an extension, and a
+try-`.svg`-then-`.png` fallback is exactly the kind of guess-on-404 hedge the repo
+forbids. Instead the generator — which already lists the directory for the enum —
+emits the authoritative mapping, and the viewer looks the name up. A missing entry
+is a build-time/type error, not a runtime surprise, mirroring how `vocab.ts`
+already makes a stale vocabulary a type error.
+
+- Extend `emit_vocab_ts` (`generate.py:511`) — or add a sibling emitter writing
+  the same `viewer/src/generated/` module — to also emit a `LOGO_FILES` map from
+  bare name to actual filename, built from the **same** directory scan as the
+  enum:
+
+  ```ts
+  export const LOGO_FILES = {
+    "ubiquiti": "ubiquiti.svg",
+    "proxmox": "proxmox.svg",
+    "calico": "calico.png",
+    // …
+  } as const;
+  export type LogoName = keyof typeof LOGO_FILES;
+  ```
+
+  Keep keys **sorted** for byte-identical reruns. The map's key set is identical
+  to the `logoLibrary` enum, so the schema and the viewer can never disagree about
+  which logos exist — same scan, two outputs.
+
+- If you add a new generated module instead of extending `vocab.ts`, wire its path
+  the way `VOCAB_TS_PATH` is (`generate.py:35`) and write it next to the
+  `vocab.ts` write (`generate.py:602`). Don't route it through the
+  `schema/v0.1/generated/` orphan-detection logic — that's for schema files, and
+  `vocab.ts` already lives outside it.
+
+## Step 2c — Viewer: resolve the bare name through the map
+
+In `viewer/src/components/ArchitectureMap.tsx:90-91`, resolve `data.logo` through
+`LOGO_FILES` instead of using it as a filename:
+
+```jsx
+if (data.logo) {
+  const file = LOGO_FILES[data.logo as LogoName];
+  if (!file) {
+    console.error(`[viewer] unknown logo '${data.logo}' — vocab is stale, rebuild`);
+    rightImage = <span className="arch-node__stale-mark">?</span>;
+  } else {
+    rightImage = <img src={`${import.meta.env.BASE_URL}logos/${file}`} alt="" />;
+  }
+}
+```
+
+This mirrors the existing stale-capability branch right below it
+(`ArchitectureMap.tsx:92-101`) — same "vocab is stale, rebuild" failure mode, same
+`arch-node__stale-mark` fallback. Note the data model already types `logo?: string`
+(`viewer/src/data/manifest.ts:30`); the validated artifacts only ever carry a name
+that's in the enum, so the map lookup succeeds for real data — the guard exists
+only to surface a stale generated module.
+
+Also update the sample fixture `viewer/public/sample-architecture.json`: it
+currently uses extension-bearing values (`"logo": "proxmox.svg"`, `"ubuntu.svg"`,
+`"kubernetes.svg"`, `"openbao.svg"`, `"ubiquiti.svg"`, `"keycloak.svg"`,
+`"postgresql.svg"`). Strip the extensions so the fixture matches the new schema and
+exercises the map lookup.
 
 ## Step 3 — Regenerate and verify
 
 ```
 cd tooling
-poetry run python generate.py            # rewrites schema/v0.1/generated/*.schema.yaml
+poetry run python generate.py            # rewrites schema/v0.1/generated/*.schema.yaml + viewer/src/generated/
 poetry run python generate.py --check    # clean
 ```
 
 Every per-kind generated schema now carries `logo` as an optional enum-typed
-property (e.g. `device.schema.yaml`, `node.schema.yaml` gain it). Confirm:
+property (e.g. `device.schema.yaml`, `node.schema.yaml` gain it), and the viewer's
+generated module gains the `LOGO_FILES` map (Step 2b). Confirm:
 
 - A `Device` with `logo: ubiquiti` validates.
 - A `logo: ubiquiti.svg` (with extension) fails validation — the enum holds
@@ -99,11 +181,18 @@ property (e.g. `device.schema.yaml`, `node.schema.yaml` gain it). Confirm:
 - A `logo: not-in-library` fails validation.
 - `SystemSoftware`/`ApplicationComponent` still validate with `logo` set, now
   without needing `stereotype: SoftwareProduct`.
+- `LOGO_FILES` keys exactly match the `logoLibrary` enum, and each value is a real
+  file in `viewer/public/logos/` (e.g. `calico` → `calico.png`, `ubiquiti` →
+  `ubiquiti.svg`).
 
 Validation runs through the shared `_arch.validate_doc` used by both
 `tooling/validate.py` and `tooling/collect.py`, so producer CI and the pipeline
 pick up the change automatically. Run the collector over the test fixtures /
 real `docs/architecture/*.yaml` to confirm a clean build.
+
+Viewer check: `cd viewer && pnpm build` (or the project's typecheck) — the
+`LogoName` lookup must compile, and the updated `sample-architecture.json` should
+render every logo (bare names resolved through `LOGO_FILES`), no broken images.
 
 ## Step 4 — Producer manual sync (both directions)
 
@@ -141,13 +230,21 @@ for which element had which logo.
 - A Device/Node with a library `logo` (bare name, no extension) validates; an
   unknown name or a name with an extension fails.
 - `logo` no longer requires `stereotype: SoftwareProduct`.
+- Generator emits `LOGO_FILES` (name→filename) into `viewer/src/generated/`, keys
+  identical to the `logoLibrary` enum; a name present as both `.svg` and `.png`
+  fails the build rather than collapsing silently.
+- Viewer resolves `data.logo` through `LOGO_FILES`; bare names render, and the
+  updated `sample-architecture.json` shows no broken images. `pnpm build`/typecheck
+  passes.
 - Producer manual updated and mirrored to `~/.claude/…`, with the
   "how to add a logo" note; no undisclosed drift between the two copies.
 
 ## Suggested commits
 
 1. `subset.yaml` + `subset.schema.yaml` + `generate.py`: widen `logo`, add
-   `enumSource: logoLibrary`.
-2. Regenerated `schema/v0.1/generated/*.schema.yaml`.
-3. Producer manual update + `~/.claude` mirror.
-4. (optional) backfill logos on real producer artifacts.
+   `enumSource: logoLibrary`, emit the `LOGO_FILES` map.
+2. Regenerated `schema/v0.1/generated/*.schema.yaml` + `viewer/src/generated/`.
+3. Viewer: resolve `data.logo` via `LOGO_FILES` in `ArchitectureMap.tsx`; strip
+   extensions in `sample-architecture.json`.
+4. Producer manual update + `~/.claude` mirror.
+5. (optional) backfill logos on real producer artifacts.
