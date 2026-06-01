@@ -104,7 +104,6 @@ Every schema is served at both `.yaml` (the canonical authoring form) and
 | `/schema/v0.1/enums/capabilities.yaml` | curated capability catalogue |
 | `/schema/v0.1/enums/lifecycle-states.yaml` | lifecycle enum |
 | `/schema/v0.1/enums/environments.yaml` | environment enum |
-| `/schema/v0.1/enums/producer-profiles.yaml` | producer-profile catalogue |
 | `/schema/v0.1/archimate/archimate3_Model.xsd` | vendored ArchiMate 3.2 XSD |
 | `/schema/v0.1/archimate/relationships.xml` | Archi relationship matrix (source) |
 
@@ -116,18 +115,14 @@ All responses set `Access-Control-Allow-Origin: *` and
 ```bash
 cat > artifact.yaml <<'EOF'
 schemaVersion: "0.1"
-producer: art:my-repo
+producer: my-repo
 
-artifacts:
-  - id: art:my-repo
-    label: My repo
-    summary: Producer artifact for my repo.
+systemSoftware:
+  - id: ss:my-daemon,3f1b9c40-0e2a-4d11-9f7a-2c6b1e8a4d90
+    label: My daemon
+    summary: Long-running service owned by my-repo.
     introduced: 2026-05-27
     lifecycle: active
-    stereotype: Producer
-    url: https://github.com/example/my-repo
-    role: source
-    owner: Example Owner
 EOF
 
 curl -sS \
@@ -174,7 +169,7 @@ artifact:
 ```yaml
 # yaml-language-server: $schema=https://architecture.webathome.org/schema/v0.1/architecture.schema.json
 schemaVersion: "0.1"
-producer: art:my-repo
+producer: my-repo
 # …
 ```
 
@@ -188,7 +183,6 @@ extension: open a PR against this repo
 the relevant file under `schema/v0.1/`:
 
 - New capability → `schema/v0.1/enums/capabilities.yaml`
-- New producer profile → `schema/v0.1/enums/producer-profiles.yaml`
 - New element kind / new attribute on an existing kind → `schema/v0.1/subset.yaml`
   (the generator rebuilds `schema/v0.1/generated/*.yaml`)
 - New allowed relation triple → adjust `schema/v0.1/subset.yaml`'s subset of
