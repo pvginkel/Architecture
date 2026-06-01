@@ -681,8 +681,8 @@ body,
 }
 
 .arch-node__icon {
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -694,7 +694,7 @@ body,
 .arch-node__top-right {
   display: inline-flex;
   align-items: center;
-  gap: 0;
+  gap: 6px;
 }
 
 /* Deployment stage, shown small-caps just left of the logo (replaces the old
@@ -709,8 +709,8 @@ body,
 }
 
 .arch-node__logo {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;

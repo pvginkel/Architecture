@@ -156,7 +156,7 @@ function ArchitectureNodeCard({ data }: NodeProps<Node<ArchNodeData>>) {
   } else if (data.capabilityId) {
     const CapIcon = CAPABILITY_ICON[data.capabilityId];
     if (CapIcon) {
-      rightImage = <CapIcon size={18} strokeWidth={2} />;
+      rightImage = <CapIcon size={20} strokeWidth={2} />;
     } else {
       console.error(
         `[viewer] unknown capability '${data.capabilityId}' — vocab is stale, rebuild`,
@@ -192,7 +192,7 @@ function ArchitectureNodeCard({ data }: NodeProps<Node<ArchNodeData>>) {
       <NodeHandles />
       <div className="arch-node__top">
         <span className="arch-node__icon" aria-hidden="true">
-          <Icon size={16} strokeWidth={2.2} />
+          <Icon size={20} strokeWidth={2.2} />
         </span>
         <span className="arch-node__top-right">
           {stage ? <span className="arch-node__stage">{stage}</span> : null}
