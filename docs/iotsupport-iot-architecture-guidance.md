@@ -181,10 +181,11 @@ are new (self-producer / `intercom-server`); they resolve once those producers n
 
 ## 7. Background
 
-- Realization-model decision and the batch-2 onboarding record: the (gitignored, local)
-  `tmp/backfill/REVIEW-2.md` §2a, and the saved memory `iot-device-edge-realization.md`.
-- Per-firmware modeling notes are committed in each repo at
-  `docs/architecture/SEED-NOTES.md`.
+- This doc stands alone: §3 is the full realization spec, not a digest — no external file
+  is needed. (Its batch-2 working record lived in the gitignored `tmp/backfill/REVIEW-2.md`,
+  now superseded by this doc.)
+- Per-firmware modeling notes are committed inside each firmware repo at
+  `docs/architecture/SEED-NOTES.md` (durable, not part of any backfill scratch folder).
 - Trello card #25 ("Model the IoT device fleet that depends on iotsupport-app") is the
   umbrella this generator closes.
 - The image→product mapping file is a stopgap for a v0.1 gap: build artifacts (container
