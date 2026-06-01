@@ -71,6 +71,10 @@ export function buildModel(manifest: Manifest): ArchModel {
   const elements: ArchElement[] = [];
 
   for (const kind of ELEMENT_KINDS) {
+    // Grouping nodes are pruned from the loaded manifest: the viewer doesn't
+    // render them, so we drop the elements (and below, any relation touching
+    // one) rather than carrying them through the pipeline.
+    if (kind === "Grouping") continue;
     const arrayKey = KIND_TO_ARRAY[kind];
     const layer = KIND_TO_LAYER[kind];
     for (const el of manifest[arrayKey]) {
@@ -85,7 +89,10 @@ export function buildModel(manifest: Manifest): ArchModel {
   }
 
   const elementById = new Map(elements.map((el) => [el.id, el]));
-  return { elements, relations: manifest.relations, elementById };
+  const relations = manifest.relations.filter(
+    (rel) => elementById.has(rel.source) && elementById.has(rel.target),
+  );
+  return { elements, relations, elementById };
 }
 
 export function toFlowNode(el: ArchElement): Node<ArchNodeData> {
