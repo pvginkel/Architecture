@@ -1,6 +1,6 @@
 # todo
 
-Deferred decisions captured during v0. Revisit when each phase becomes relevant.
+Deferred decisions. Each is parked behind a concrete trigger; none blocks the live system.
 
 ## Logos: dedupe vs. page-load performance
 
@@ -10,13 +10,13 @@ Revisit when: someone adds or removes a logo and has to remember to keep both re
 
 ## Logos: producer-supplied logos in the build artifact
 
-Today the viewer reads logos from `viewer/public/logos/` at build time and they end up baked into the nginx image. Once federated producers (later phases — see `docs/architecture-rebuild/04-producer-protocol.md` and `05-collector-and-pipeline.md`) start contributing nodes, their logos will not live in this repo. Need a story for how producer-supplied logos land in the container image:
+Today the viewer reads logos from `viewer/public/logos/` at build time and they end up baked into the container image, validated against the `logoLibrary` enum generated from that directory. Federated producers now contribute elements, but their logos still have to exist in *this* repo for a producer to reference one. Need a story for how producer-supplied logos land in the container image:
 
 - Ingestion at build time (collector pulls them and the Dockerfile copies them in)?
 - Sidecar volume mounted by K8s?
 - Signed bundles fetched at runtime?
 
-Decide before federation lands.
+Revisit when: a producer needs a logo the bundled library doesn't have.
 
 ## Service↔interface: two valid idioms across producers
 
