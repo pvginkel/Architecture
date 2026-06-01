@@ -1,6 +1,6 @@
 id: scanner
 label: Scanner
-description: The ScanToPdf application (its scantopdf release runtime and components) and the SANE scanner station it drives.
+description: The ScanToPdf application - my scanning infrastructure from device to app.
 icon: ScanLine
 # The release is the grouping handle. `releases: [scantopdf]` selects the app's
 # deployed runtime as one set — scan-server, scanned-image-processing, the

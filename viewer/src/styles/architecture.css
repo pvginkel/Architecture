@@ -179,6 +179,32 @@ body,
   border-bottom: 1px solid var(--line);
 }
 
+.filter-rail__description {
+  flex-shrink: 0;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.filter-rail__description-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--ink);
+}
+
+.filter-rail__description-label {
+  font-size: 13px;
+  font-weight: 740;
+}
+
+.filter-rail__description-text {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
 .filter-rail__groups {
   flex: 1;
   min-height: 0;

@@ -1,6 +1,6 @@
 id: design-assistant
 label: Design Assistant
-description: The Design Assistant application — its prd runtime, components, and everything it consumes.
+description: The Design Assistant application — an AI drive tool for marketing copy writing and authoring.
 icon: Sparkles
 # The release is the grouping handle. `releases: [design-assistant@prd]` selects
 # the prd deployed runtime as one set — no instance ids to chase, and it scopes

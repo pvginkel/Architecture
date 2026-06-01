@@ -757,6 +757,7 @@ function ArchitectureMapInner() {
             filterState={filterState}
             collapsed={collapsed}
             searchTerm={searchTerm}
+            activeView={activeView}
             onSearch={setSearchTerm}
             onToggleCollapse={toggleCollapse}
             onToggleOption={toggleOption}
