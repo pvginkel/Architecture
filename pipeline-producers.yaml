@@ -47,3 +47,28 @@ producers:
     jenkinsJob: AaC/GitblitMCPServer
   - id: gitblit-initializer
     jenkinsJob: AaC/GitblitMCPSupportPlugin
+  # ── batch 2: ESP32 firmware, Android clients, kiosk, intercom server ──
+  - id: calendar-display
+    jenkinsJob: AaC/CalendarDisplay
+  - id: doorbell-receiver
+    jenkinsJob: AaC/DoorbellReceiver
+  - id: gesture-device
+    jenkinsJob: AaC/GestureDevice
+  - id: underfloor-heating-controller
+    jenkinsJob: AaC/UnderfloorHeatingController
+  - id: somfy-remote
+    jenkinsJob: AaC/SomfyRemote
+  - id: paper-clock
+    jenkinsJob: AaC/PaperClock
+  - id: intercom
+    jenkinsJob: AaC/Intercom
+  - id: infra-statistics-display
+    jenkinsJob: AaC/InfraStatisticsDisplay
+  - id: intercom-server
+    jenkinsJob: AaC/IntercomServer
+  - id: scantopdf-client
+    jenkinsJob: AaC/ScanToPdfClient
+  - id: mydownloads-client
+    jenkinsJob: AaC/MyDownloadsClient
+  - id: kitchen-display
+    jenkinsJob: AaC/KitchenDisplay

@@ -100,6 +100,17 @@ technologyServices:
     lifecycle: active
     environment: prd
 
+  - id: svc:home-assistant-mqtt,23572189-9185-4a6d-a073-2b2820578e11
+    label: Home Assistant MQTT integration
+    summary: >-
+      Home Assistant's MQTT integration over the home broker (mosquitto): it
+      ingests devices that publish MQTT discovery (surfacing them as HA entities,
+      with commands flowing back), and it publishes automation/AppDaemon-derived
+      data that other MQTT clients consume. The in-house ESP32 devices integrate
+      here. environment unset — a logical type-level surface.
+    introduced: 2026-06-01
+    lifecycle: active
+
 technologyInterfaces:
   - id: if:home-assistant-api,e1606bc9-faf0-4723-b616-63d7c8f9ec6d
     label: Home Assistant external API endpoint
@@ -109,6 +120,15 @@ technologyInterfaces:
     environment: prd
     stats:
       url: https://homeassistant.webathome.org
+
+  - id: if:home-assistant-mqtt,3bf22cab-ee4c-442a-b2dd-1d7361ac6683
+    label: Home Assistant MQTT topics
+    summary: >-
+      The MQTT topic surface of the integration on the home broker — the
+      `homeassistant/...` discovery topics plus the per-entity state/command
+      topics — that the ESP32 devices publish to and read from.
+    introduced: 2026-06-01
+    lifecycle: active
 
 # Capabilities are not declared by producers — the enum
 # (schema/v0.1/enums/capabilities.yaml) is the catalogue, and the collector
@@ -167,3 +187,16 @@ relations:
     source: ss:home-assistant-prd,398e32ec-cbe7-40e4-8a66-094029653650
     target: cap:home-automation
     type: Realization
+
+  # MQTT integration: HA realises the service and composes its topic interface.
+  # The in-house ESP32 devices reference svc:home-assistant-mqtt by UUID from
+  # their own producers (DoorbellReceiver, GestureDevice, UnderfloorHeating,
+  # SomfyRemote, Intercom publish discovery; PaperClock consumes AppDaemon data).
+  - id: rel:home-assistant-prd-realizes-mqtt
+    source: ss:home-assistant-prd,398e32ec-cbe7-40e4-8a66-094029653650
+    target: svc:home-assistant-mqtt,23572189-9185-4a6d-a073-2b2820578e11
+    type: Realization
+  - id: rel:home-assistant-prd-composes-mqtt-if
+    source: ss:home-assistant-prd,398e32ec-cbe7-40e4-8a66-094029653650
+    target: if:home-assistant-mqtt,3bf22cab-ee4c-442a-b2dd-1d7361ac6683
+    type: Composition

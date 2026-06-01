@@ -257,9 +257,11 @@ producer and look for the same hint across producers.)
   + `pipeline-producers.yaml` registration. Commit directly (no PR) — but only when
   the operator says so; they may want to handle these manually.
 - **Registration**: add each producer to `pipeline-producers.yaml`
-  (`id` + `jenkinsJob: "<RepoJob> Architecture"`). The architecture Jenkins jobs
-  (pointing at each `Jenkinsfile.architecture`) must be **created in Jenkins** before
-  registration does anything — operator's CI glue.
+  (`id` + `jenkinsJob: AaC/<RepoName>`). The architecture jobs live under the **`AaC/`**
+  Jenkins folder, one per repo, named for the repo (PascalCase, e.g.
+  `AaC/CalendarDisplay`, `AaC/IntercomServer`) — not the kebab producer id. Each job
+  points at that repo's `Jenkinsfile.architecture` and must be **created in Jenkins**
+  before registration does anything — operator's CI glue.
 - File any deferred modeling as **Trello backlog cards** (e.g. Keycloak management
   interface; device fleets; client-app producers).
 
