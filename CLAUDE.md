@@ -2,7 +2,7 @@
 
 ## What this repo is
 
-React + ReactFlow + ELK viewer for [webathome.org](https://webathome.org), built with Vite, served from a container at `architecture.webathome.org/viewer/` and iframe-embedded into webathome.org. Growing into a federated architecture system — see `docs/architecture-rebuild/`.
+A federated Architecture-as-Code system for [webathome.org](https://webathome.org) and the homelab behind it: producer repos emit `architecture.yaml`, a pipeline merges them, and a React + ReactFlow + ELK viewer (Vite, served from a container at `architecture.webathome.org/viewer/` and iframe-embedded into webathome.org) renders the result. See `README.md` for the full picture.
 
 **Public repo.** No secrets, credentials, internal hostnames/IPs, or non-public names. Assume world-readable.
 
