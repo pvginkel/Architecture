@@ -76,7 +76,10 @@ Why firmware edges are realized differently from Helm app edges:
 
 The generator, per registered device:
 
-1. Resolve the device's **firmware** (from the registry: which firmware image it runs).
+1. Resolve the device's **firmware product** from the registry's firmware **image name**
+   (the CMake `project()` name, snake_case, e.g. `calendar_display`) via the IoT Support
+   **image→product mapping file** (§5). The model has no artifact/image element, so the
+   image name is not an element identity — this mapping is a required generator input.
 2. Read that firmware «SoftwareProduct»'s logical edges from the published dataset.
 3. For each logical edge, resolve the **concrete provider instance** and emit a `Serving`
    edge to this device.
@@ -136,9 +139,15 @@ Pick one and apply it uniformly.)
 
 ## 5. Data sources & determinism
 
-- **Device registry** (IoT Support's own data): MAC → firmware, and the provisioned
-  `mqtt_url` / `token_url` / `base_url` per device. This is the generator's primary input
-  and the source for `cap:` resolution.
+- **Device registry** (IoT Support's own data): MAC → firmware image name, and the
+  provisioned `mqtt_url` / `token_url` / `base_url` per device. This is the generator's
+  primary input and the source for `cap:` resolution.
+- **Image→product mapping** (a single IoT Support annotation file): maps each firmware
+  **image name** (`calendar_display`, `doorbell_receiver`, …) → the firmware
+  «SoftwareProduct» (`ss:<hint>`). v0.1 has no artifact/image element, so this side-channel
+  is how device→product resolves — the same shape HelmCharts uses for container images
+  (`charts/<chart>/architecture.yaml` `images:`). Stopgap until the v0.2 Artifact element
+  lands (§7).
 - **Published dataset** (`https://architecture.webathome.org/data/v0.1/architecture.yaml`):
   resolve the firmware «SoftwareProduct»s, their logical edges, and the concrete provider
   instances (`hint`+kind → uuid, read-only). Overlay any not-yet-published sibling producer
@@ -178,3 +187,8 @@ are new (self-producer / `intercom-server`); they resolve once those producers n
   `docs/architecture/SEED-NOTES.md`.
 - Trello card #25 ("Model the IoT device fleet that depends on iotsupport-app") is the
   umbrella this generator closes.
+- The image→product mapping file is a stopgap for a v0.1 gap: build artifacts (container
+  images, firmware binaries) have no element kind, so name→product is a side-channel in both
+  HelmCharts and IoT Support. Proper fix tracked as a Trello backlog card: a v0.2 ArchiMate
+  «Artifact» element (build-name identity + `Artifact —Realization→ «SoftwareProduct»`),
+  after which both side-channels resolve through the model.
