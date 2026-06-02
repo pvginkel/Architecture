@@ -347,17 +347,25 @@ function useVisibleGraph(
       searchTerm,
     );
 
+    // A node is shown only once the current layout has placed it. Newly-visible
+    // nodes (a filter/view change introduced them) have no position yet, so
+    // they would otherwise paint at (0,0) until the worker returns — a visible
+    // pile in the top-left. Hide them until positioned; the relayout reveals
+    // them (under the veil, when it's slow enough to raise one).
     const nodes = toFlowNodes(visibleElements).map((node) => {
       const position = directedPositions?.get(node.id);
-      return position ? { ...node, position } : node;
+      return position ? { ...node, position } : { ...node, hidden: true };
     });
     const edges = toFlowEdges(visibleRelations, model.elementById).map((edge) => {
       const source = directedPositions?.get(edge.source);
       const target = directedPositions?.get(edge.target);
+      if (!source || !target) {
+        return { ...edge, hidden: true };
+      }
       // Upward edge: the target sits higher (smaller y) than the source. Route
       // it between the facing sides — out the source's top, into the target's
       // bottom. Otherwise (downward or same row) keep the default bottom→top.
-      const upward = source && target && target.y < source.y;
+      const upward = target.y < source.y;
       return upward
         ? { ...edge, sourceHandle: HANDLE.sourceTop, targetHandle: HANDLE.targetBottom }
         : { ...edge, sourceHandle: HANDLE.sourceBottom, targetHandle: HANDLE.targetTop };
@@ -610,6 +618,10 @@ function ArchitectureMapInner() {
     let maxX = -Infinity;
     const extents = new Map<LayerId, { minY: number; maxY: number }>();
     for (const node of nodes) {
+      // Skip not-yet-positioned nodes so the bands don't stretch to (0,0).
+      if (node.hidden) {
+        continue;
+      }
       const { x, y } = node.position;
       minX = Math.min(minX, x);
       maxX = Math.max(maxX, x + NODE_WIDTH);
