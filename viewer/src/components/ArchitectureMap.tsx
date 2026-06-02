@@ -1,4 +1,4 @@
-import { Spline, TriangleAlert } from "lucide-react";
+import { LoaderCircle, Spline, TriangleAlert } from "lucide-react";
 import {
   Fragment,
   useCallback,
@@ -420,6 +420,10 @@ function ArchitectureMapInner() {
     string,
     { x: number; y: number }
   > | null>(null);
+  // Layout-progress overlay. A fast layout shows nothing; a slow one mutes the
+  // canvas, and a very slow one adds a spinner. Thresholds are measured from
+  // the start of each layout run (see the layout effect).
+  const [layoutOverlay, setLayoutOverlay] = useState<"none" | "muted" | "spinner">("none");
 
   useEffect(() => {
     let cancelled = false;
@@ -653,10 +657,25 @@ function ArchitectureMapInner() {
       return;
     }
     let cancelled = false;
+    // Escalate the overlay the longer the layout runs; never downgrade, so a
+    // run that follows a still-spinning one doesn't flicker spinner→muted.
+    const muteTimer = window.setTimeout(() => {
+      if (!cancelled) {
+        setLayoutOverlay((current) => (current === "spinner" ? "spinner" : "muted"));
+      }
+    }, 600);
+    const spinnerTimer = window.setTimeout(() => {
+      if (!cancelled) {
+        setLayoutOverlay("spinner");
+      }
+    }, 2000);
     getDirectedLayout(nodes, edges).then((laidOut) => {
       if (cancelled) {
         return;
       }
+      window.clearTimeout(muteTimer);
+      window.clearTimeout(spinnerTimer);
+      setLayoutOverlay("none");
       setDirectedPositions(new Map(laidOut.map((item) => [item.id, item.position])));
       window.requestAnimationFrame(() => {
         window.requestAnimationFrame(() => {
@@ -670,6 +689,8 @@ function ArchitectureMapInner() {
     });
     return () => {
       cancelled = true;
+      window.clearTimeout(muteTimer);
+      window.clearTimeout(spinnerTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutKey, fitView]);
@@ -787,6 +808,7 @@ function ArchitectureMapInner() {
             <div className="load-state">Loading architecture…</div>
           ) : (
             <ReactFlow
+              className={layoutOverlay !== "none" ? "is-laying-out" : undefined}
               nodes={canvasNodes}
               edges={decoratedEdges}
               nodeTypes={nodeTypes}
@@ -810,6 +832,11 @@ function ArchitectureMapInner() {
               <Controls showInteractive={false} />
             </ReactFlow>
           )}
+          {layoutOverlay === "spinner" ? (
+            <div className="layout-spinner" role="status" aria-label="Laying out diagram">
+              <LoaderCircle size={32} />
+            </div>
+          ) : null}
           {tooltip ? <Tooltip tooltip={tooltip} /> : null}
           {edgeTooltip ? <EdgeTooltip tooltip={edgeTooltip} /> : null}
           </div>

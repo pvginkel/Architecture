@@ -525,6 +525,37 @@ body,
   display: none;
 }
 
+/* While a slow layout runs, mute the canvas (and lock interaction) so the
+   pre-layout node pile isn't shown as if it were the result. */
+.react-flow.is-laying-out {
+  opacity: 0.45;
+  filter: grayscale(0.5);
+  pointer-events: none;
+  transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+/* Spinner for a very slow layout (shown ~1.4s after the canvas mutes). */
+.layout-spinner {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  color: var(--brand-strong);
+}
+
+.layout-spinner svg {
+  animation: layout-spin 0.9s linear infinite;
+}
+
+@keyframes layout-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .load-state {
   position: absolute;
   inset: 0;
