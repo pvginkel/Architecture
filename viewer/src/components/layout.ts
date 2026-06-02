@@ -1,9 +1,15 @@
 import type { Edge, Node } from "@xyflow/react";
-import ELK from "elkjs/lib/elk.bundled.js";
+import ELK from "elkjs/lib/elk-api.js";
+import ElkWorker from "elkjs/lib/elk-worker.min.js?worker";
 import { NODE_WIDTH, NODE_HEIGHT, type ArchNodeData, type RelationshipEdgeData } from "../data/model";
 import type { ElementKind, LayerId } from "../generated/vocab";
 
-const elk = new ELK();
+// Run ELK in a Web Worker, not the elk.bundled.js in-thread build. The
+// everything-view layout takes seconds (see layout perf notes); on the main
+// thread that locks the tab. The graph fed to layout() and the positions
+// returned are both plain JSON, so the postMessage hop is cheap relative to
+// the compute. Vite's `?worker` import gives a Worker constructor.
+const elk = new ELK({ workerFactory: () => new ElkWorker() });
 
 // --- Tier 1 layout semantics --------------------------------------------------
 // ELK gets fed the architecture meaning it was previously starved of:
