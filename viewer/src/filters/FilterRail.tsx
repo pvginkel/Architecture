@@ -144,7 +144,7 @@ export function FilterRail({
       <div className="filter-rail__footer">
         <button className="filter-rail__clear" onClick={onClear} type="button">
           <X size={16} />
-          Clear filters
+          Reset filters
         </button>
       </div>
     </aside>
