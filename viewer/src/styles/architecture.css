@@ -525,13 +525,17 @@ body,
   display: none;
 }
 
-/* While a slow layout runs, mute the canvas (and lock interaction) so the
-   pre-layout node pile isn't shown as if it were the result. */
-.react-flow.is-laying-out {
-  opacity: 0.45;
-  filter: grayscale(0.5);
-  pointer-events: none;
-  transition: opacity 0.2s ease, filter 0.2s ease;
+/* While a slow layout runs, lay a veil over the canvas region (and swallow
+   pointer events) so the pre-layout node pile isn't shown as if it were the
+   result. A separate overlay rather than fading the canvas's own opacity, so
+   the wash reads evenly regardless of what's underneath. */
+.canvas-veil {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: var(--canvas);
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
 }
 
 /* Spinner for a very slow layout (shown ~1.4s after the canvas mutes). */

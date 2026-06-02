@@ -808,7 +808,6 @@ function ArchitectureMapInner() {
             <div className="load-state">Loading architecture…</div>
           ) : (
             <ReactFlow
-              className={layoutOverlay !== "none" ? "is-laying-out" : undefined}
               nodes={canvasNodes}
               edges={decoratedEdges}
               nodeTypes={nodeTypes}
@@ -832,6 +831,7 @@ function ArchitectureMapInner() {
               <Controls showInteractive={false} />
             </ReactFlow>
           )}
+          {layoutOverlay !== "none" ? <div className="canvas-veil" /> : null}
           {layoutOverlay === "spinner" ? (
             <div className="layout-spinner" role="status" aria-label="Laying out diagram">
               <LoaderCircle size={32} />
