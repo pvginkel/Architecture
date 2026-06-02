@@ -1,5 +1,5 @@
 import { Search, X, type LucideProps } from "lucide-react";
-import type { ComponentType, ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { KIND_ICON, LAYER_ACCENT, VIEW_ICON } from "../theme";
 import type { ElementKind, LayerId } from "../generated/vocab";
 import type { ViewDefinition } from "../data/manifest";
@@ -40,6 +40,11 @@ function optionIconFor(groupId: string): ((value: string) => ReactNode) | undefi
 
 const EMPTY_SELECTION = new Set<string>();
 
+// Element search drives a full relayout, so propagation is debounced hard:
+// the input reflects keystrokes instantly, but the searchTerm that recomputes
+// the graph only fires after the user pauses.
+const SEARCH_DEBOUNCE_MS = 1000;
+
 export function FilterRail({
   groups,
   filterState,
@@ -53,6 +58,31 @@ export function FilterRail({
   onClearAll,
   onClear,
 }: FilterRailProps) {
+  // Local, instantly-updated mirror of the search box; the debounced timer
+  // propagates it to onSearch (which drives the relayout).
+  const [localSearch, setLocalSearch] = useState(searchTerm);
+  const searchTimer = useRef<number | undefined>(undefined);
+
+  // Re-sync when searchTerm changes from outside this box (clear-all, view
+  // switch) rather than from typing.
+  useEffect(() => {
+    setLocalSearch(searchTerm);
+  }, [searchTerm]);
+
+  useEffect(() => () => window.clearTimeout(searchTimer.current), []);
+
+  const handleSearchChange = (value: string) => {
+    setLocalSearch(value);
+    window.clearTimeout(searchTimer.current);
+    searchTimer.current = window.setTimeout(() => onSearch(value), SEARCH_DEBOUNCE_MS);
+  };
+
+  const handleSearchClear = () => {
+    window.clearTimeout(searchTimer.current);
+    setLocalSearch("");
+    onSearch("");
+  };
+
   // Mirror ViewTabs' icon resolution: the name is schema-validated data, but an
   // unrecognised one fails loudly here rather than rendering a blank panel.
   const ViewIcon = activeView ? VIEW_ICON[activeView.icon] : undefined;
@@ -68,15 +98,15 @@ export function FilterRail({
         <label className="search-box">
           <Search size={16} />
           <input
-            value={searchTerm}
-            onChange={(event) => onSearch(event.target.value)}
+            value={localSearch}
+            onChange={(event) => handleSearchChange(event.target.value)}
             placeholder="Search elements"
           />
-          {searchTerm ? (
+          {localSearch ? (
             <button
               type="button"
               className="search-box__clear"
-              onClick={() => onSearch("")}
+              onClick={handleSearchClear}
               aria-label="Clear search"
             >
               <X size={14} />
