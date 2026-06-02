@@ -21,6 +21,9 @@ body,
   --panel: #fbfbf8;
   --panel-strong: #ffffff;
   --canvas: #f8f8f4;
+  /* Wash laid over the canvas while a slow layout runs. A light translucent
+     scrim in both themes — in dark mode it lightens rather than darkens. */
+  --veil: rgba(248, 248, 244, 0.6);
   --bar-bg: rgba(251, 251, 248, 0.92);
   --hover-neutral: #f4f4ef;
   --eyebrow-bg: #f0f0ea;
@@ -533,9 +536,7 @@ body,
   position: absolute;
   inset: 0;
   z-index: 4;
-  background: var(--canvas);
-  opacity: 0.6;
-  transition: opacity 0.2s ease;
+  background: var(--veil);
 }
 
 /* Spinner for a very slow layout (shown ~1.4s after the canvas mutes). */
@@ -1178,6 +1179,7 @@ body,
     --panel: #1b1d1a;
     --panel-strong: #232622;
     --canvas: #121311;
+    --veil: rgba(255, 255, 255, 0.14);
     --bar-bg: rgba(24, 26, 22, 0.92);
     --hover-neutral: #272a25;
     --eyebrow-bg: #2a2d27;
