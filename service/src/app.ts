@@ -2,6 +2,7 @@ import express, { type Express } from "express";
 import { loadSchemas, SchemaLoadError, type SchemaBundle } from "./schema-loader.js";
 import { mountStatic, resolveViewerRoot, resolveDataRoot } from "./static.js";
 import { mountValidate } from "./validate.js";
+import { mountLayoutProxy } from "./layout-proxy.js";
 import { createMetrics, mountMetrics, type Metrics } from "./metrics.js";
 import { mountUsage } from "./usage.js";
 
@@ -16,6 +17,8 @@ export interface AppOptions {
   metrics?: Metrics;
   /** Filesystem path to USAGE.md. Defaults to the repo root copy. */
   usagePath?: string;
+  /** Base URL of the elk-layout-service. Defaults to LAYOUT_SERVICE_URL. */
+  layoutServiceUrl?: string;
 }
 
 export function createApp(opts: AppOptions = {}): Express {
@@ -32,6 +35,7 @@ export function createApp(opts: AppOptions = {}): Express {
   app.use(mountUsage({ usagePath: opts.usagePath }));
   app.use(mountStatic({ viewerRoot, bundle, dataRoot }));
   app.use(mountValidate({ bundle, metrics }));
+  app.use(mountLayoutProxy({ target: opts.layoutServiceUrl }));
   app.use(mountMetrics(metrics));
 
   return app;
