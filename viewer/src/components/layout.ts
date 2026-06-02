@@ -121,7 +121,14 @@ export async function getDirectedLayout(nodes: Node[], edges: Edge[]) {
       "elk.layered.spacing.edgeNodeBetweenLayers": "0",
       "elk.layered.spacing.edgeEdgeBetweenLayers": "0",
       "elk.spacing.nodeNode": "64",
-      "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
+      // BRANDES_KOEPF, not NETWORK_SIMPLEX. Network simplex gives the most
+      // balanced/compact placement, but it dominates layout cost: on the real
+      // everything view (~540 nodes / ~990 edges) it ran ~20s vs ~2.2s for
+      // Brandes–Köpf — a 9x difference, and 20s on the main thread is the
+      // everything-view lockup. Brandes–Köpf keeps the same banded structure
+      // with slightly less column balancing, which is an acceptable trade for
+      // the firehose view.
+      "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
     },
     children: architectureNodes.map((node) => {
       return {
