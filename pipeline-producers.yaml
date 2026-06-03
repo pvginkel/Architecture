@@ -41,8 +41,8 @@ producers:
     jenkinsJob: AaC/ScanToPdf
   - id: webathome-org
     jenkinsJob: AaC/Webathome
-  - id: mydownloads
-    jenkinsJob: AaC/MyDownloads
+  - id: mydownloads-server
+    jenkinsJob: AaC/MyDownloadsServer
   - id: gitblit-mcp-server
     jenkinsJob: AaC/GitblitMCPServer
   - id: gitblit-initializer
