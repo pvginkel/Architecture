@@ -29,7 +29,7 @@
 //     wires them via the next Jenkinsfile execution.
 //   - Manual "Build Now" in the Jenkins UI is always available.
 
-library('JenkinsPipelineUtils') _
+library identifier: 'JenkinsPipelineUtils', changelog: false
 
 podTemplate(inheritFrom: 'jenkins-agent kaniko', containers: [
     containerTemplates.python('python')
