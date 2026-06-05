@@ -17,7 +17,7 @@
 //
 // To wire this up in Jenkins:
 //   - New Pipeline job (e.g. AaC/HomeAutomationFleet), "Pipeline script from SCM",
-//     repo = this one, Script Path = tools/ha-fleet/Jenkinsfile.
+//     repo = this one, Script Path = Jenkinsfile.ha-fleet.
 //   - Credentials (Secret text): `ha-url` (e.g. https://homeassistant.webathome.org)
 //     and `ha-token` (a HA long-lived access token — do NOT reuse a firmware
 //     MQTT user; those are ACL-scoped and don't see DSMR/Ecowitt/SLZB/WiFi).
