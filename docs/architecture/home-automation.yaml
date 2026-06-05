@@ -16,35 +16,16 @@ schemaVersion: "0.1"
 producer: architecture
 
 devices:
-  - id: device:zigbee-slzb-06m,9665cdf2-5852-4856-9c76-c8396febcd03
-    label: ZigBee bridge (SLZB-06M)
-    summary: SMLight SLZB-06M ZigBee-to-Ethernet bridge. Network-attached, PoE-powered via the rack switch. Visible at 10.1.0.30.
-    introduced: 2026-05-28
-    lifecycle: active
-    stats:
-      model: SLZB-06M
+  # Both SLZB-06M ZigBee coordinators migrated to the home-automation-fleet
+  # generator — HA's smlight integration surfaces them live (areas CV +
+  # Meterkast). Their rack-switch PoE links stay hand-authored below (physical
+  # wiring HA can't know), repointed to the generated UUIDs.
 
-  - id: device:zigbee-slzb-06m-2,1f1d0595-325a-4e73-948f-c264867c92b7
-    label: ZigBee bridge (SLZB-06M, 2nd floor)
-    summary: Second SMLight SLZB-06M ZigBee-to-Ethernet bridge placed on the 2nd floor to overcome 1st-to-2nd-floor coverage gaps. Network-attached, PoE-powered via the rack switch.
-    introduced: 2026-05-28
-    lifecycle: active
-    stats:
-      model: SLZB-06M
-
-  - id: device:slimmelezer,c79eaa71-6cb1-4b52-92b7-937195c82f5a
-    label: SlimmeLezer (P1 reader)
-    summary: TrueNAS-branded ESP-based reader of the Dutch smart-meter P1 port. Wi-Fi-connected at 10.1.0.31.
-    introduced: 2026-05-28
-    lifecycle: active
-
-  - id: device:ecowitt-gw1200a,10dcad0c-c4a3-485b-b107-bc3c7b24fc8b
-    label: Ecowitt GW1200A
-    summary: Ecowitt GW1200A weather-station gateway. Wi-Fi-connected; relays data from the outdoor WN32 sensor over 868 MHz radio.
-    introduced: 2026-05-28
-    lifecycle: active
-    stats:
-      model: GW1200A
+  # SlimmeLezer (P1 reader) and the Ecowitt GW1200A gateway migrated to the
+  # home-automation-fleet generator — HA surfaces them live (SlimmeLezer as the
+  # Gas + Electricity dsmr meters; the GW1200A via the ecowitt integration).
+  # The WN32 below stays hand-authored: it is NOT a separate HA device (HA folds
+  # it into entities under the gateway), so the generator never emits it.
 
   - id: device:ecowitt-wn32,117cb247-a113-48de-847b-92c43c20d96b
     label: Ecowitt WN32 (outdoor sensor)
@@ -139,13 +120,16 @@ relations:
   # ─── PoE wiring of home-automation devices off the rack switch ──────
   # device:switch-rack lives in infrastructure.yaml; the relations live
   # here because the home-automation device is the more-specific end.
-  - id: rel:switch-rack-link-zigbee-slzb-06m
+  # Repointed to the generated SLZB coordinators (home-automation-fleet, by
+  # UUID) now that the hand-authored devices migrated out. -cv = mac 20:43:…:1c:48
+  # (area CV); -meterkast = mac 84:1f:…:25:38 (area Meterkast).
+  - id: rel:switch-rack-link-slzb-cv
     source: device:switch-rack,a5466336-3d04-43f8-b4b5-f37e41cefa26
-    target: device:zigbee-slzb-06m,9665cdf2-5852-4856-9c76-c8396febcd03
+    target: device:smlight-slzb-06m-272b85,272b854a-f7d3-5c5e-b0da-f7a8d4409ba2
     type: Association
-  - id: rel:switch-rack-link-zigbee-slzb-06m-2
+  - id: rel:switch-rack-link-slzb-meterkast
     source: device:switch-rack,a5466336-3d04-43f8-b4b5-f37e41cefa26
-    target: device:zigbee-slzb-06m-2,1f1d0595-325a-4e73-948f-c264867c92b7
+    target: device:smlight-slzb-06m-c63809,c6380974-5298-5fce-a876-133e5642209a
     type: Association
   - id: rel:switch-rack-link-sure-petcare-hub
     source: device:switch-rack,a5466336-3d04-43f8-b4b5-f37e41cefa26
@@ -168,9 +152,11 @@ relations:
     source: device:sure-petcare-hub,4d4b7243-61b3-4c67-9bcb-91e79e742a2d
     target: ss:home-assistant-prd,398e32ec-cbe7-40e4-8a66-094029653650
     type: Serving
+  # Repointed to the generated GW1200A (home-automation-fleet producer, resolved
+  # by UUID) now that the hand-authored gateway has migrated out.
   - id: rel:ecowitt-wn32-link-gw1200a
     source: device:ecowitt-wn32,117cb247-a113-48de-847b-92c43c20d96b
-    target: device:ecowitt-gw1200a,10dcad0c-c4a3-485b-b107-bc3c7b24fc8b
+    target: device:ecowitt-gw1200a-d47af3,d47af3fc-6e3a-583f-86de-8a9aa8bc1415
     type: Association
 
   # ─── Home Assistant bundle ──────────────────────────────────────────
