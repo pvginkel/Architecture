@@ -125,6 +125,7 @@ export const VIEW_ICON: Record<string, LucideIcon> = {
   KeyRound,
   Database,
   House,
+  Cpu,
   Sparkles,
   ScanLine,
   Globe,
