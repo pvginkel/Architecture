@@ -69,22 +69,22 @@ Runtime deps: `pyyaml`, `websocket-client` (the latter only for the live path).
 Output is gitignored (a build output). The run is deterministic given a fixed HA
 state; the gap report goes to stderr.
 
-## Scheduled Jenkins job (operator-owned)
+## Scheduled Jenkins job
 
-A **daily-cron** job, separate from the main AaC pipeline, that:
+The pipeline is `Jenkinsfile` (next to this README): a standalone daily-cron job,
+separate from the main AaC pipeline, that runs the generator, validates the
+output against the validation service (`scripts/arch-validate.py` — fails without
+publishing on a non-zero exit), and archives
+`out/architecture/home-automation-fleet.yaml` (under an `architecture/` path so
+the main pipeline's `copyArtifacts` filter `**/architecture/**/*.yaml` picks it
+up — same contract as every other producer; no commit-back).
 
-1. has `HA_TOKEN` as a credential + `HA_URL` + network reach to HA;
-2. runs `gen-ha-fleet.py`;
-3. **validates** the output (`scripts/arch-validate.py out/architecture/*.yaml`)
-   and **fails without publishing** on a non-zero exit;
-4. **archives `out/architecture/home-automation-fleet.yaml`** as the build
-   artifact (under an `architecture/` path so the main pipeline's
-   `copyArtifacts` filter `**/architecture/**/*.yaml` picks it up — same contract
-   as every other producer; no commit-back).
-
-The firmware repos' MQTT users are ACL-scoped — do **not** reuse one. `HA_TOKEN`
-is the sanctioned source (and the only one that sees DSMR/Ecowitt/SLZB/WiFi, not
-just Zigbee).
+To wire it up: new Jenkins Pipeline job (e.g. `AaC/HomeAutomationFleet`),
+*Pipeline script from SCM*, repo = this one, **Script Path =
+`tools/ha-fleet/Jenkinsfile`**. It needs two *Secret text* credentials:
+`ha-url` and `ha-token`. The firmware repos' MQTT users are ACL-scoped — do
+**not** reuse one; `ha-token` is a HA long-lived token (the only source that sees
+DSMR/Ecowitt/SLZB/WiFi, not just Zigbee).
 
 Registering the producer in `pipeline-producers.yaml` and migrating the
 hand-authored HA devices out of `docs/architecture/home-automation.yaml` are

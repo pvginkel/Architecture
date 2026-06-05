@@ -1,0 +1,76 @@
+// home-automation-fleet — scheduled producer pipeline.
+//
+// A STANDALONE, daily-scheduled job (separate from the main Architecture-rebuild
+// pipeline). It is the only job that touches Home Assistant. It:
+//
+//   1. Checks out this repo (the generator lives in tools/ha-fleet/).
+//   2. Runs gen-ha-fleet.py against the live HA WebSocket API, using the
+//      HA_URL + HA_TOKEN credentials, to emit
+//      tools/ha-fleet/out/architecture/home-automation-fleet.yaml.
+//   3. Validates that artifact against the validation service (arch-validate.py);
+//      a non-zero exit fails the build BEFORE the archive stage, so a bad
+//      snapshot is never published.
+//   4. Archives the artifact. The main pipeline's `copyArtifacts` (filter
+//      **/architecture/**/*.yaml) pulls it into producer-artifacts/
+//      home-automation-fleet/ on its next run — same contract as every other
+//      producer; no commit-back.
+//
+// To wire this up in Jenkins:
+//   - New Pipeline job (e.g. AaC/HomeAutomationFleet), "Pipeline script from SCM",
+//     repo = this one, Script Path = tools/ha-fleet/Jenkinsfile.
+//   - Credentials (Secret text): `ha-url` (e.g. https://homeassistant.webathome.org)
+//     and `ha-token` (a HA long-lived access token — do NOT reuse a firmware
+//     MQTT user; those are ACL-scoped and don't see DSMR/Ecowitt/SLZB/WiFi).
+//   - The cron trigger below schedules it daily; "Build Now" stays available.
+//   - After this job has one successful build, register the producer in
+//     pipeline-producers.yaml and run the device migration (see
+//     tools/ha-fleet/README.md and the activation handoff).
+
+library('JenkinsPipelineUtils') _
+
+podTemplate(inheritFrom: 'jenkins-agent', containers: [
+    containerTemplates.python('python')
+]) {
+    node(POD_LABEL) {
+        // Daily, with the hash spreading the exact minute across the hour to
+        // avoid a thundering herd. "Build Now" remains available.
+        properties([pipelineTriggers([cron('H 4 * * *')])])
+
+        stage('Checkout') {
+            checkout scm
+        }
+
+        stage('Generate HA fleet snapshot') {
+            container('python') {
+                withCredentials([
+                    string(credentialsId: 'ha-url', variable: 'HA_URL'),
+                    string(credentialsId: 'ha-token', variable: 'HA_TOKEN')
+                ]) {
+                    sh '''
+                        set -eu
+                        pip install --quiet --no-cache-dir websocket-client pyyaml
+                        python3 tools/ha-fleet/gen-ha-fleet.py
+                    '''
+                }
+            }
+        }
+
+        stage('Validate') {
+            container('python') {
+                // arch-validate.py is stdlib-only and submits to the validation
+                // service. Exit 1 = invalid model, 2 = transport/server error;
+                // either fails the build here, before the archive stage, so an
+                // invalid snapshot is never published.
+                sh 'python3 scripts/arch-validate.py tools/ha-fleet/out/architecture/home-automation-fleet.yaml'
+            }
+        }
+
+        stage('Archive artifact') {
+            archiveArtifacts(
+                artifacts: 'tools/ha-fleet/out/architecture/home-automation-fleet.yaml',
+                fingerprint: true,
+                allowEmptyArchive: false
+            )
+        }
+    }
+}
