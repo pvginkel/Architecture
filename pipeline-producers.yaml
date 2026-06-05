@@ -9,6 +9,11 @@ producers:
   - id: ansible
     jenkinsJob: AaC/Ansible
   - id: architecture
+  - id: home-automation-fleet
+    # Daily HA-fleet snapshot — its own scheduled job (Jenkinsfile.ha-fleet),
+    # not build-triggered. Job name has spaces; rename the job + this value to
+    # AaC/HomeAutomationFleet if the upstream-trigger join is ever fussy.
+    jenkinsJob: AaC/Home Assistant Fleet
   - id: helm-charts
     jenkinsJob: AaC/HelmCharts
   - id: docker-images
