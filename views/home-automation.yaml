@@ -1,9 +1,18 @@
 id: home-automation
 label: Home automation
-description: The home-automation slice — sensor/actuator orchestration over Zigbee/MQTT and its broker.
+description: The home-automation slice — Home Assistant, Zigbee2MQTT, the broker, and the physical device fleet integrated into it.
 icon: House
 predicate:
   capabilities:
     - cap:home-automation
-    - cap:pub-sub-broker
+include:
+  # The shared broker (cap:pub-sub-broker was dropped from the predicate — it
+  # dragged in every MQTT consumer + the iotsupport setup/rotation cronjobs).
+  # Mosquitto is not reachable from cap:home-automation at depth-1 on its own,
+  # so name it explicitly to keep the broker in the slice.
+  - ss:mosquitto,9a6db5ed-3ea0-5448-b44c-fdd820046ac8
+  # SURE Petcare hub: cloud-only, never in HA over MQTT, so the Phase-3 HA-fleet
+  # generator never emits it — it stays hand-authored here. In the base (not just
+  # a depth-1 neighbour) so the catflap, which hangs off it, arrives at depth-1.
+  - device:sure-petcare-hub,4d4b7243-61b3-4c67-9bcb-91e79e742a2d
 neighbourDepth: 1

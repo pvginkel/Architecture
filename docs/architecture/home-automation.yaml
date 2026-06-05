@@ -157,6 +157,17 @@ relations:
     source: device:microchip-pet-door,29a65540-b55e-4908-94b8-499b81b6e142
     target: device:sure-petcare-hub,4d4b7243-61b3-4c67-9bcb-91e79e742a2d
     type: Association
+
+  # The hub's pet-door telemetry reaches Home Assistant — not over the local
+  # MQTT broker (SURE Petcare is cloud-only and absent from HA's MQTT/registry,
+  # which is why the Phase-3 HA-fleet generator never sees it) but through HA's
+  # cloud-polling SURE Petcare integration. Modeled as a Serving edge so the
+  # hand-authored pet-care pair joins the home-automation slice rather than
+  # floating off the rack switch alone.
+  - id: rel:sure-petcare-hub-serves-home-assistant
+    source: device:sure-petcare-hub,4d4b7243-61b3-4c67-9bcb-91e79e742a2d
+    target: ss:home-assistant-prd,398e32ec-cbe7-40e4-8a66-094029653650
+    type: Serving
   - id: rel:ecowitt-wn32-link-gw1200a
     source: device:ecowitt-wn32,117cb247-a113-48de-847b-92c43c20d96b
     target: device:ecowitt-gw1200a,10dcad0c-c4a3-485b-b107-bc3c7b24fc8b
