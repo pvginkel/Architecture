@@ -71,8 +71,8 @@ state; the gap report goes to stderr.
 
 ## Scheduled Jenkins job
 
-The pipeline is `Jenkinsfile.ha-fleet` (at the repo root): a standalone daily-cron
-job, separate from the main AaC pipeline, that runs the generator, validates the
+The pipeline is `Jenkinsfile.ha-fleet` (at the repo root): a standalone job,
+separate from the main AaC pipeline, that runs the generator, validates the
 output against the validation service (`scripts/arch-validate.py` — fails without
 publishing on a non-zero exit), and archives
 `out/architecture/home-automation-fleet.yaml` (under an `architecture/` path so
@@ -81,10 +81,11 @@ up — same contract as every other producer; no commit-back).
 
 To wire it up: new Jenkins Pipeline job (e.g. `AaC/HomeAutomationFleet`),
 *Pipeline script from SCM*, repo = this one, **Script Path =
-`Jenkinsfile.ha-fleet`**. It needs two *Secret text* credentials:
-`ha-url` and `ha-token`. The firmware repos' MQTT users are ACL-scoped — do
-**not** reuse one; `ha-token` is a HA long-lived token (the only source that sees
-DSMR/Ecowitt/SLZB/WiFi, not just Zigbee).
+`Jenkinsfile.ha-fleet`**. The pipeline declares **no trigger** — set the daily
+schedule in the job config (Build Triggers → Build periodically). It needs two
+*Secret text* credentials: `ha-url` and `ha-token`. The firmware repos' MQTT
+users are ACL-scoped — do **not** reuse one; `ha-token` is a HA long-lived token
+(the only source that sees DSMR/Ecowitt/SLZB/WiFi, not just Zigbee).
 
 Registering the producer in `pipeline-producers.yaml` and migrating the
 hand-authored HA devices out of `docs/architecture/home-automation.yaml` are

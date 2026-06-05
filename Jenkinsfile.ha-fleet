@@ -21,7 +21,8 @@
 //   - Credentials (Secret text): `ha-url` (e.g. https://homeassistant.webathome.org)
 //     and `ha-token` (a HA long-lived access token — do NOT reuse a firmware
 //     MQTT user; those are ACL-scoped and don't see DSMR/Ecowitt/SLZB/WiFi).
-//   - The cron trigger below schedules it daily; "Build Now" stays available.
+//   - Define the schedule in the Jenkins job config (Build Triggers → Build
+//     periodically), not here. This pipeline declares no trigger.
 //   - After this job has one successful build, register the producer in
 //     pipeline-producers.yaml and run the device migration (see
 //     tools/ha-fleet/README.md and the activation handoff).
@@ -32,9 +33,8 @@ podTemplate(inheritFrom: 'jenkins-agent', containers: [
     containerTemplates.python('python')
 ]) {
     node(POD_LABEL) {
-        // Daily, with the hash spreading the exact minute across the hour to
-        // avoid a thundering herd. "Build Now" remains available.
-        properties([pipelineTriggers([cron('H 4 * * *')])])
+        // No trigger declared here — the schedule is owned by the Jenkins job
+        // config (Build Triggers → Build periodically).
 
         stage('Checkout') {
             checkout scm
