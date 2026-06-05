@@ -1,0 +1,30 @@
+# Operator-owned annotation layer for the home-automation-fleet generator.
+# The generator merges these over the live HA snapshot. Unknown top-level keys
+# fail loudly. Keys are seed_keys (see the generator docstring): zigbee leaves
+# are "zigbee:0x<ieee>", others "<domain>:<id>" or "mac:<mac>".
+
+# Maps each Zigbee2MQTT *bridge* (by its bridge IEEE) to the Z2M *instance*
+# element id (helm-charts producer) the leaves under it should Serve. This is
+# what puts each leaf within depth-1 of cap:home-automation in the view.
+#
+# NOTE TO OPERATOR — VERIFY THE FLOOR ASSIGNMENT. HA does not expose which
+# physical coordinator (1st vs 2nd floor) a bridge is, so the assignment below
+# is by sorted bridge-IEEE -> sorted instance and is functionally harmless to
+# the view (every leaf reaches cap:home-automation either way); swap the two
+# targets if a leaf should hang off the other coordinator.
+zigbee_bridges:
+  "0x187a3efffefa873f": ss:zigbee2mqtt-zigbee2mqtt1-zigbee2mqtt,30978e51-1594-5c38-9f85-13dc43f9d328
+  "0x449fdafffe205e11": ss:zigbee2mqtt-zigbee2mqtt2-zigbee2mqtt,43ac1818-deb9-548a-afc6-8b2da5c96a4e
+
+# Operator exclusion set — seed_keys the live data shouldn't surface (noise,
+# decommissioned-but-still-registered, devices modeled elsewhere). Empty today.
+exclude: []
+
+# Per-device overrides (friendly label, lifecycle: deprecated for a retired
+# device, a sourced introduced date, a sharper summary). Keyed by seed_key.
+# Allowed keys: label, summary, introduced, lifecycle, retirementBy. Empty today.
+overrides: {}
+
+# Optional: override the Serving target per non-Zigbee integration domain
+# (default: ss:home-assistant-prd). e.g. point smlight at a Z2M instance instead.
+integration_serving: {}

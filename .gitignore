@@ -6,3 +6,6 @@ dist
 /tmp
 __pycache__/
 *.pyc
+
+# home-automation-fleet generated artifact (build output)
+/tools/ha-fleet/out/
