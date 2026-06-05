@@ -101,6 +101,7 @@ export const CAPABILITY_IDS = [
   "cap:vpn",
   "cap:media-streaming",
   "cap:home-automation",
+  "cap:iot-device",
 ] as const;
 export type CapabilityId = (typeof CAPABILITY_IDS)[number];
 
@@ -189,6 +190,7 @@ export const CAPABILITY_LABELS = {
   "cap:vpn": "VPN",
   "cap:media-streaming": "Media streaming",
   "cap:home-automation": "Home automation",
+  "cap:iot-device": "IoT device",
 } as const satisfies Record<CapabilityId, string>;
 
 export const CAPABILITY_SUMMARIES = {
@@ -223,6 +225,7 @@ export const CAPABILITY_SUMMARIES = {
   "cap:vpn": "Encrypted network tunnel terminating at a remote endpoint.",
   "cap:media-streaming": "Audio/video catalogue, transcoding, client delivery.",
   "cap:home-automation": "Sensor and actuator orchestration over Zigbee/MQTT.",
+  "cap:iot-device": "In-house ESP32 hardware/firmware device managed by IoTSupport and integrated via MQTT discovery.",
 } as const satisfies Record<CapabilityId, string>;
 
 export const LIFECYCLE_LABELS = {

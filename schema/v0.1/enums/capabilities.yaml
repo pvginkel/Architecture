@@ -194,3 +194,9 @@ entries:
     summary: Sensor and actuator orchestration over Zigbee/MQTT.
     lifecycle: active
     introduced: 2024-07-12
+
+  - id: cap:iot-device
+    label: IoT device
+    summary: In-house ESP32 hardware/firmware device managed by IoTSupport and integrated via MQTT discovery.
+    lifecycle: active
+    introduced: 2026-06-05
