@@ -1,0 +1,30 @@
+id: iot
+label: IoT devices
+description: In-house firmware devices and the platform that supports them — IoTSupport, the broker, MQTT discovery, and the log sink.
+icon: Cpu
+predicate:
+  capabilities:
+    - cap:iot-device
+include:
+  # Supporting cast (NOT firmware — they don't realize cap:iot-device).
+  - app:iotsupport-app,bbc500fd-ef66-4d82-846c-cd0357cb03f7   # IoTSupport / MDM
+  - ss:mosquitto,9a6db5ed-3ea0-5448-b44c-fdd820046ac8         # broker
+  - svc:home-assistant-mqtt,23572189-9185-4a6d-a073-2b2820578e11
+  - ss:elasticsearch,2785b71a-323e-5e7c-9930-77e2cc6d91b9     # device log sink
+  - app:intercom-server,c313fb20-b8df-4f6c-be1b-23af65e26705  # Intercom companion app
+  - app:calendar-support,f719ff37-e984-46d8-9723-1b5a5c58eebc # Calendar Display companion app
+  # Service hubs that bridge firmware ↔ platform at the definition level. The
+  # firmware→IoTSupport/companion edges live at the *instance* level (derived
+  # Serving), so they're invisible to a definitions-only depth-0 scope. These
+  # three services are the definition-level join: every firmware Associates to
+  # the IoTSupport API; intercom/calendar firmware Associate to their companion's
+  # API, which the companion Realizes. Including them keeps the view connected
+  # without the depth-1 expansion that drags in keycloak/postgres/microk8s/jenkins.
+  - svc:iotsupport-api,b7c5b5ba-36eb-47b8-bf7e-5c50fa1a3656   # firmware ↔ IoTSupport
+  - svc:calendar-support,e469b02a-13b8-480c-b1c6-db17a3783210 # Calendar fw ↔ Calendar Support
+  - svc:intercom,5914e568-7f39-461a-91fe-9981d5275fe1         # Intercom fw ↔ Intercom Server
+# Depth 0: deterministic, zero-bleed. The includes name the full supporting cast,
+# and the firmware reach it through the in-scope service hubs above. Depth 1 here
+# would pull cluster plumbing (keycloak/postgres/microk8s/jenkins/ceph) in via the
+# derived Serving edges onto IoTSupport and the broker.
+neighbourDepth: 0
