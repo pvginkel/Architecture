@@ -523,6 +523,12 @@ capability's id, label, summary, and lifecycle, and the collector
 materializes one shared node per *referenced* capability straight from it.
 Declaring your own copy duplicates the enum and is rejected at review.
 
+**In-house firmware Realizes `cap:iot-device`.** If your repo is one of the
+in-house ESP32 firmware devices (managed by IoTSupport, integrated via MQTT
+discovery), add a `Realization` from your firmware `ss:` element to
+`cap:iot-device`. That single edge is the selection axis for the IoT view —
+it is how your device shows up in it.
+
 ```
 cap:iam                       Identity & Access Management
 cap:secrets-management        Secrets storage / rotation / lease management
@@ -555,6 +561,7 @@ cap:remote-access             Browser/RDP/SSH gateway into managed environments
 cap:vpn                       Encrypted network tunnel
 cap:media-streaming           Audio/video catalogue, transcoding, client delivery
 cap:home-automation           Sensor/actuator orchestration over Zigbee/MQTT
+cap:iot-device                IoT device (in-house ESP32 firmware; MQTT-discovery, managed by IoTSupport)
 ```
 
 If a needed capability isn't listed, raise it with Pieter — adding
