@@ -82,10 +82,17 @@ up — same contract as every other producer; no commit-back).
 To wire it up: new Jenkins Pipeline job (e.g. `AaC/HomeAutomationFleet`),
 *Pipeline script from SCM*, repo = this one, **Script Path =
 `Jenkinsfile.ha-fleet`**. The pipeline declares **no trigger** — set the daily
-schedule in the job config (Build Triggers → Build periodically). It needs two
-*Secret text* credentials: `ha-url` and `ha-token`. The firmware repos' MQTT
-users are ACL-scoped — do **not** reuse one; `ha-token` is a HA long-lived token
-(the only source that sees DSMR/Ecowitt/SLZB/WiFi, not just Zigbee).
+schedule in the job config (Build Triggers → Build periodically).
+
+Secrets:
+- **`HA_TOKEN`** comes from OpenBao via `withVault` (same pattern as the other
+  Vault-backed pipelines). Store it at **KV-v2 path `kv/jenkins/home-automation-fleet`,
+  key `ha_token`** — a HA long-lived access token. The firmware repos' MQTT users
+  are ACL-scoped, do **not** reuse one; the HA token is the only source that sees
+  DSMR/Ecowitt/SLZB/WiFi, not just Zigbee. The controller-level Vault config
+  supplies the address + auth.
+- **`HA_URL`** is read from the ambient global Jenkins environment (already set),
+  forwarded into the build container by the Jenkinsfile.
 
 Registering the producer in `pipeline-producers.yaml` and migrating the
 hand-authored HA devices out of `docs/architecture/home-automation.yaml` are
