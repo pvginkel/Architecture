@@ -24,9 +24,7 @@ INCLUSION RULE (explicit allowlist; everything else is dropped and logged):
 EXCLUSION (dropped, with a logged reason):
   - `manufacturer == "Pieter"`: in-house esp-mdm firmware, modeled by the
     firmware producers + `cap:iot-device` (Phase 1). DOUBLE-MODELING is the main
-    hazard — this dedupes against the firmware producers by intent. (This also
-    drops the unowned "Humble Remote" Zigbee device, manufacturer Pieter, per
-    operator instruction to ignore it.)
+    hazard — this dedupes against the firmware producers by intent.
   - HACS virtual helpers ("Dimmer from Switches"), the two Z2M Bridge
     pseudo-devices, and everything outside the allowlist (AV/media/companion/
     HA-internal: sonos, samsungtv, cast, mobile_app, sun, backup, sql, …).
