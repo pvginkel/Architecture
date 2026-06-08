@@ -100,10 +100,14 @@ export interface Manifest {
 }
 
 /**
- * Resolve the manifest URL. `?src=` wins when present. In dev there is no
- * /data/ server, so we default to the committed sample under public/. In a
- * production build the viewer is served at /viewer/ and the manifest at
- * /data/v0.1/ — the BASE_URL-relative path normalises to /data/v0.1/.
+ * Resolve the manifest URL. `?src=` wins when present. In dev we default to the
+ * dev server's /dev/architecture.json endpoint (see vite.config.ts), which is
+ * the live production manifest with its views replaced by the ones authored in
+ * this checkout — so dev always shows current data against the views being
+ * edited. (`?src=sample-architecture.json` falls back to the committed static
+ * sample when offline.) In a production build the viewer is served at /viewer/
+ * and the manifest at /data/v0.1/ — the BASE_URL-relative path normalises to
+ * /data/v0.1/.
  */
 export function resolveSrc(): string {
   const param = new URLSearchParams(window.location.search).get("src");
@@ -111,7 +115,7 @@ export function resolveSrc(): string {
     return param;
   }
   if (import.meta.env.DEV) {
-    return `${import.meta.env.BASE_URL}sample-architecture.json`;
+    return "/dev/architecture.json";
   }
   return `${import.meta.env.BASE_URL}../data/v0.1/architecture.json`;
 }
