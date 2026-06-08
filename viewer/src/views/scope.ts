@@ -158,6 +158,15 @@ function expandNeighbours(
   return result;
 }
 
+/** An include entry wrapped in slashes (`/pattern/` or `/pattern/flags`) is a
+ *  regular expression matched against element ids; anything else is a literal
+ *  id. Returns the compiled RegExp, or null for a literal entry. Element ids
+ *  never start with `/`, so the two cases never collide. */
+function asRegExp(entry: string): RegExp | null {
+  const match = /^\/(.+)\/([a-z]*)$/.exec(entry);
+  return match ? new RegExp(match[1], match[2]) : null;
+}
+
 /** The set of element ids a view scopes (predicate ∪ include − exclude, then
  *  neighbour-expanded). Environment is applied later by the filter layer. */
 export function resolveViewScope(
@@ -208,14 +217,24 @@ export function resolveViewScope(
       }
     }
   }
-  for (const id of view.include ?? []) {
-    // include is an explicit override: a named element joins the base even if a
-    // universe gate would reject it (e.g. the Landscape anchors the IoT Support
-    // app while excludeProducers strips that producer's noisy deployment
-    // software from the *expansion*). The gates still apply to every other
-    // element, so the named hub appears without its fan-out.
-    if (model.elementById.has(id)) {
-      base.add(id);
+  for (const entry of view.include ?? []) {
+    // An include entry is either an exact element id or a /regex/ over element
+    // ids, so a view can name a stable family (e.g. "/^device:intercom-v/" for
+    // every intercom unit) instead of pinning volatile deployment-hash ids.
+    // Either way include is an explicit override: matched elements join the base
+    // even if a universe gate would reject them (e.g. the Landscape anchors the
+    // IoT Support app while excludeProducers strips that producer's noisy
+    // deployment software from the *expansion*). The gates still apply to every
+    // other element, so a named hub appears without its fan-out.
+    const pattern = asRegExp(entry);
+    if (pattern) {
+      for (const el of model.elements) {
+        if (pattern.test(el.id)) {
+          base.add(el.id);
+        }
+      }
+    } else if (model.elementById.has(entry)) {
+      base.add(entry);
     }
   }
   for (const id of view.exclude ?? []) {

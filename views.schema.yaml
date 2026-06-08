@@ -91,15 +91,20 @@ properties:
   include:
     $ref: "#/$defs/valueList"
     description: |
-      Explicit element ids folded into the base set after the predicate, for
-      sets no predicate cleanly expresses. Every id must resolve in the merged
-      dataset — a dangling include fails the build. With no predicate, the
-      include list IS the base (an include-only curated view); with a predicate
-      it augments the matched set. An include also overrides the exclude*
-      universe gates: a named element always joins the base even if a gate would
-      reject it, while the gates still filter its expansion neighbours — so you
-      can anchor a hub (e.g. the IoT Support app) without pulling in the noisy
-      fan-out its producer emits.
+      Element ids folded into the base set after the predicate, for sets no
+      predicate cleanly expresses. An entry is either a literal id or a regular
+      expression matched against element ids, written `/pattern/` (or
+      `/pattern/flags`) — so a view can name a stable family, e.g.
+      `/^device:intercom-v/` for every intercom unit, instead of pinning
+      volatile deployment-hash ids. A literal id must resolve and a regex must
+      match at least one element in the merged dataset — a dangling include or a
+      dead pattern fails the build. With no predicate, the include set IS the
+      base (an include-only curated view); with a predicate it augments the
+      matched set. An include also overrides the exclude* universe gates: matched
+      elements always join the base even if a gate would reject them, while the
+      gates still filter their expansion neighbours — so you can anchor a hub
+      (e.g. the IoT Support app) without pulling in the noisy fan-out its
+      producer emits.
   exclude:
     $ref: "#/$defs/valueList"
     description: |

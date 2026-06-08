@@ -18,6 +18,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import re
 import sys
 import uuid
 from pathlib import Path
@@ -936,6 +937,20 @@ def load_views(views_dir: Path) -> list[dict]:
     return [by_id[vid] for vid in order]
 
 
+def _view_include_regex(entry: str) -> str | None:
+    """If `entry` is a `/regex/` (or `/regex/flags`) include entry, return a
+    Python pattern string with any i/m/s flag folded in as an inline group;
+    otherwise None for a literal id. Mirrors asRegExp() in the viewer's
+    scope.ts. Element ids never start with `/`, so the two cases never collide.
+    """
+    match = re.fullmatch(r"/(.+)/([a-z]*)", entry)
+    if match is None:
+        return None
+    pattern, flags = match.group(1), match.group(2)
+    inline = "".join(f for f in flags if f in "ims")
+    return f"(?{inline}){pattern}" if inline else pattern
+
+
 def check_views(
     views: list[dict],
     index: ResolutionIndex,
@@ -1007,17 +1022,43 @@ def check_views(
                 f"not in enums/environments.yaml"
             )
 
-        for field in ("include", "exclude"):
-            for ref in view.get(field) or []:
-                # Views are repo-level, not a producer; hint-only references
-                # would need an owning producer to resolve, so pass "" and
-                # require full/uuid ids (matches cross-producer ref rules).
-                entry, _ = index.resolve(ref, "")
-                if entry is None:
+        # An include entry may be a literal id or a /regex/ over element ids (see
+        # the schema). A literal must resolve; a regex must compile and match at
+        # least one element — a dead pattern is as much a bug as a dangling id.
+        for ref in view.get("include") or []:
+            pattern = _view_include_regex(ref)
+            if pattern is not None:
+                try:
+                    rx = re.compile(pattern)
+                except re.error as exc:
                     messages.append(
-                        f"view {vid!r}: {field} id {ref!r} resolves to no "
+                        f"view {vid!r}: include pattern {ref!r} is not a valid "
+                        f"regex: {exc}"
+                    )
+                    continue
+                if not any(rx.search(eid) for eid in index.by_full_id):
+                    messages.append(
+                        f"view {vid!r}: include pattern {ref!r} matches no "
                         f"element in the merged dataset"
                     )
+                continue
+            # Views are repo-level, not a producer; hint-only references would
+            # need an owning producer to resolve, so pass "" and require
+            # full/uuid ids (matches cross-producer ref rules).
+            entry, _ = index.resolve(ref, "")
+            if entry is None:
+                messages.append(
+                    f"view {vid!r}: include id {ref!r} resolves to no "
+                    f"element in the merged dataset"
+                )
+
+        for ref in view.get("exclude") or []:
+            entry, _ = index.resolve(ref, "")
+            if entry is None:
+                messages.append(
+                    f"view {vid!r}: exclude id {ref!r} resolves to no "
+                    f"element in the merged dataset"
+                )
 
     if messages:
         raise CollectorError("views", messages)
