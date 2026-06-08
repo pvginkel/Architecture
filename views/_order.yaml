@@ -4,6 +4,7 @@
 order:
   - landscape
   - design-assistant
+  - intercom
   - scanner
   - delivery
   - infrastructure

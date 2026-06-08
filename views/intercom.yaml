@@ -1,0 +1,20 @@
+id: intercom
+label: Intercom
+description: The Intercom — a voice intercom backed by OpenAI and a fleet of MCP servers (Home Assistant, Telegram, Gitblit, Trello).
+icon: Radio
+# Same shape as the Design Assistant view: the release is the grouping handle and
+# the one named definition is the anchor that carries the consumes-* edges, so
+# depth 1 lands OpenAI and every MCP server it talks to. The release `intercom`
+# is single-environment (no @env suffix).
+#
+# excludeProducers drops the iotsupport-app fan-out: the 12 deployed intercom
+# units are emitted as cryptic `intercom-vN @ <hash>` SystemSoftware (plus their
+# Device twins) that would bury the integration story. The anchor is the
+# intercom-server producer, so it is unaffected; the physical fleet lives in the
+# IoT view.
+predicate:
+  releases: [intercom]
+include:
+  - app:intercom-server,c313fb20-b8df-4f6c-be1b-23af65e26705
+excludeProducers: [iotsupport-app]
+neighbourDepth: 1

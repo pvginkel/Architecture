@@ -128,6 +128,7 @@ export const VIEW_ICON: Record<string, LucideIcon> = {
   House,
   Cpu,
   Sparkles,
+  Radio,
   ScanLine,
   Globe,
 };
