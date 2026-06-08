@@ -5,4 +5,9 @@ icon: Map
 predicate:
   kinds: [Capability, ApplicationComponent, SystemSoftware]
 excludeInstances: true
+# The physical Device fleet (IoT sensors, switches, the catflap, …) is not the
+# "immediate technical context" this view is about — at depth 1 it dragged ~95
+# devices into the landscape. Compute Nodes (hosts/clusters) stay: they are the
+# substrate the software runs on. See the home-automation/iot views for devices.
+excludeKinds: [Device]
 neighbourDepth: 1

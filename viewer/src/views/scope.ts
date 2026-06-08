@@ -161,13 +161,26 @@ export function resolveViewScope(
   manifest: Manifest,
 ): Set<string> {
   const capMembers = capabilityMembers(manifest);
-  // When excludeInstances is set, runtime instances (env- and/or release-tagged
-  // elements, see model.ts) never participate — not in the base, not as
-  // expansion neighbours, not even via explicit include. They are invisible to
-  // the whole resolution, so neighbourDepth can't pull them back.
-  const admits = view.excludeInstances
-    ? (id: string) => !model.elementById.get(id)?.isInstance
-    : () => true;
+  // Universe gates: excludeInstances (env-/release-tagged runtime instances, see
+  // model.ts) and excludeKinds (whole kinds, e.g. the physical Device fleet) drop
+  // matching elements from the entire resolution — not the base, not as expansion
+  // neighbours, not via explicit include — and they aren't traversed, so
+  // neighbourDepth can't pull them back. With neither gate set, admits is a
+  // cheap pass-through.
+  const excludedKinds = new Set(view.excludeKinds ?? []);
+  const admits =
+    view.excludeInstances || excludedKinds.size > 0
+      ? (id: string) => {
+          const el = model.elementById.get(id);
+          if (!el) {
+            return true;
+          }
+          if (view.excludeInstances && el.isInstance) {
+            return false;
+          }
+          return !excludedKinds.has(el.kind);
+        }
+      : () => true;
   const base = new Set<string>();
   if (isEmptyPredicate(view.predicate)) {
     for (const el of model.elements) {

@@ -107,6 +107,15 @@ properties:
       instances appear in neither the base nor the neighbour expansion, so the
       view shows architectural definitions only and neighbourDepth cannot pull
       instances back in. Defaults to false.
+  excludeKinds:
+    $ref: "#/$defs/valueList"
+    description: |
+      ArchiMate kind names (Node, Device, …) dropped from the view entirely —
+      the same universe gate as `excludeInstances`, keyed on kind. An excluded
+      kind appears in neither the base nor the neighbour expansion and is not
+      traversed, so neighbourDepth cannot pull it back. Use to keep a class of
+      element out of an otherwise-broad view, e.g. the physical Device fleet out
+      of the application Landscape.
   neighbourDepth:
     type: integer
     minimum: 0

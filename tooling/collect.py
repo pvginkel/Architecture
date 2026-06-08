@@ -984,6 +984,14 @@ def check_views(
                         f"not in {source}"
                     )
 
+        kind_vocab, kind_source = field_vocab["kinds"]
+        for value in view.get("excludeKinds") or []:
+            if value not in kind_vocab:
+                messages.append(
+                    f"view {vid!r}: excludeKinds value {value!r} "
+                    f"not in {kind_source}"
+                )
+
         default_env = view.get("defaultEnvironment")
         if default_env is not None and default_env not in environment_ids:
             messages.append(

@@ -75,6 +75,7 @@ export interface ViewDefinition {
   include?: string[];
   exclude?: string[];
   excludeInstances?: boolean;
+  excludeKinds?: string[];
   neighbourDepth?: number;
   defaultEnvironment?: string;
 }
