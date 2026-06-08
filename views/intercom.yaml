@@ -1,20 +1,34 @@
 id: intercom
 label: Intercom
-description: The Intercom — a voice intercom backed by OpenAI and a fleet of MCP servers (Home Assistant, Telegram, Gitblit, Trello).
+description: The Intercom — a voice intercom backed by OpenAI and a fleet of MCP servers (Home Assistant, Telegram, Gitblit, Trello), serving 12 units around the house.
 icon: Radio
 # Same shape as the Design Assistant view: the release is the grouping handle and
-# the one named definition is the anchor that carries the consumes-* edges, so
-# depth 1 lands OpenAI and every MCP server it talks to. The release `intercom`
-# is single-environment (no @env suffix).
+# the named definition is the anchor that carries the consumes-* edges, so depth 1
+# lands OpenAI and every MCP server it talks to. The release `intercom` is
+# single-environment (no @env suffix).
 #
-# excludeProducers drops the iotsupport-app fan-out: the 12 deployed intercom
-# units are emitted as cryptic `intercom-vN @ <hash>` SystemSoftware (plus their
-# Device twins) that would bury the integration story. The anchor is the
-# intercom-server producer, so it is unaffected; the physical fleet lives in the
-# IoT view.
+# excludeProducers drops the iotsupport-app fan-out — the per-unit firmware is
+# emitted as cryptic `intercom-vN @ <hash>` SystemSoftware that would bury the
+# story. The 12 physical units are pulled back in explicitly (include overrides
+# the gate); their only edge is to that hidden firmware, so they read as the unit
+# fleet rather than a wired-up chain. cap:mcp is included so the Model Context
+# Protocol capability the MCP servers realise shows as their shared anchor.
 predicate:
   releases: [intercom]
 include:
-  - app:intercom-server,c313fb20-b8df-4f6c-be1b-23af65e26705
+  - app:intercom-server,c313fb20-b8df-4f6c-be1b-23af65e26705 # Intercom Server (anchor)
+  - cap:mcp # Model Context Protocol server capability
+  - device:intercom-v1-udwtgldy,f56b4852-3fcd-5462-8866-c382525bf6fa # Intercom 1
+  - device:intercom-v1-gt6e7bob,ddcf2a24-7e3d-52c1-9816-9bdcef21564d # Intercom 2
+  - device:intercom-v2-wg2itlvs,3bfcaefc-3011-5e57-8b8b-e210d06bf84f # Intercom 3
+  - device:intercom-v2-zod3wseb,be976048-de2b-5c79-b3f3-75c1ad015467 # Intercom 4
+  - device:intercom-v2-inihfozx,b640577e-a81c-52fd-bdf2-a6991940820f # Intercom 5
+  - device:intercom-v2-q6xjwyvu,c73082ee-2224-534e-a9a0-40e44995161f # Intercom 6
+  - device:intercom-v2-ngznbgbh,433cdad7-3a98-5825-9f35-3eae09977d6e # Intercom 7
+  - device:intercom-v2-wr6solaa,4642853e-e6ae-5e0c-8ab3-816e2b6da31e # Intercom 8
+  - device:intercom-v2-lvjqje3f,004fb0fd-3287-50a0-b1e0-95340738c0fd # Intercom 9
+  - device:intercom-v2-rxb7fe5b,a51f26a5-ad1d-5068-965d-64f00bbaf9b3 # Intercom 10
+  - device:intercom-v2-sj2m2mbr,b1c47cce-8169-5d18-9065-af0aecf6c470 # Intercom 11
+  - device:intercom-v2-5kxx3m7b,f46ce0f5-4884-590d-9e2c-3a0bb0fc0f2c # Intercom 12
 excludeProducers: [iotsupport-app]
 neighbourDepth: 1
