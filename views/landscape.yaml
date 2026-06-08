@@ -1,12 +1,19 @@
 id: landscape
 label: Landscape
-description: A curated tour of the systems I build and self-host — one card per flagship. Use the other tabs to drill into the detail.
+description: The flagship in-house systems and the platform they run on — a one-screen tour. The other tabs drill into the detail.
 icon: Map
-# The landing page. A full capabilities/apps/software landscape is ~200 nodes and
-# unreadable, so this is a hand-picked set of flagship in-house systems instead,
-# one representative card each, no neighbour expansion. An empty predicate with an
-# include list is an include-only view (see src/views/scope.ts): it shows exactly
-# these elements and nothing else — the rest of the model lives in the other tabs.
+# The landing page. The full capabilities/apps/software landscape is ~200 nodes
+# and unreadable, so this anchors a hand-picked set of flagship in-house systems
+# and expands one hop to the platform they sit on (databases, identity, the
+# broker, Kubernetes, CI, storage). ~33 elements.
+#
+# The gates keep that hop clean: excludeKinds drops the intermediate
+# service/interface plumbing and the device fleet; excludeProducers drops the
+# iotsupport-app producer's cryptic per-deployment software (modelled as
+# SystemSoftware, not tagged as instances, so excludeInstances misses it) that
+# otherwise fans out of the IoT Support / Intercom hubs. The anchors are
+# include-listed, so they survive those gates (include overrides them) while the
+# fan-out does not.
 include:
   - app:design-assistant-portal,a7ca11ae-6279-4b7b-86b5-c7f137fd352b # Design Assistant
   - app:webathome-org,e0e6bf35-4c35-4e0e-a8f2-16f3eb019741 # webathome.org
@@ -19,4 +26,7 @@ include:
   - app:kitchen-display,bfd7ec88-4f20-47d7-9008-60de4f84e250 # Kitchen Display
   - app:mydownloads,a07b6286-8f2b-4efe-81bd-d31ce13165df # MyDownloads
   - app:ginbov-nl,6b6931d3-c79c-4057-a792-ad6b4ef6353e # Ginbov.nl
-neighbourDepth: 0
+excludeInstances: true
+excludeKinds: [ApplicationService, ApplicationInterface, Device]
+excludeProducers: [iotsupport-app]
+neighbourDepth: 1

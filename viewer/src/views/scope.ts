@@ -169,10 +169,10 @@ export function resolveViewScope(
   // Universe gates: excludeInstances (env-/release-tagged runtime instances, see
   // model.ts), excludeKinds (whole kinds, e.g. the physical Device fleet) and
   // excludeProducers (everything from a producer, e.g. the home-automation /
-  // helm-charts fleets) drop matching elements from the entire resolution — not
-  // the base, not as expansion neighbours, not via explicit include — and they
-  // aren't traversed, so neighbourDepth can't pull them back. With no gate set,
-  // admits is a cheap pass-through.
+  // helm-charts fleets) drop matching elements from the predicate base and the
+  // neighbour expansion, and they aren't traversed, so neighbourDepth can't pull
+  // them back. An explicit `include` overrides them (see below). With no gate
+  // set, admits is a cheap pass-through.
   const excludedKinds = new Set(view.excludeKinds ?? []);
   const excludedProducers = new Set(view.excludeProducers ?? []);
   const admits =
@@ -209,7 +209,12 @@ export function resolveViewScope(
     }
   }
   for (const id of view.include ?? []) {
-    if (model.elementById.has(id) && admits(id)) {
+    // include is an explicit override: a named element joins the base even if a
+    // universe gate would reject it (e.g. the Landscape anchors the IoT Support
+    // app while excludeProducers strips that producer's noisy deployment
+    // software from the *expansion*). The gates still apply to every other
+    // element, so the named hub appears without its fan-out.
+    if (model.elementById.has(id)) {
       base.add(id);
     }
   }

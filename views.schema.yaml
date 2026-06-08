@@ -95,7 +95,11 @@ properties:
       sets no predicate cleanly expresses. Every id must resolve in the merged
       dataset — a dangling include fails the build. With no predicate, the
       include list IS the base (an include-only curated view); with a predicate
-      it augments the matched set.
+      it augments the matched set. An include also overrides the exclude*
+      universe gates: a named element always joins the base even if a gate would
+      reject it, while the gates still filter its expansion neighbours — so you
+      can anchor a hub (e.g. the IoT Support app) without pulling in the noisy
+      fan-out its producer emits.
   exclude:
     $ref: "#/$defs/valueList"
     description: |
