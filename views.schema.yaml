@@ -54,7 +54,9 @@ properties:
     description: |
       Attribute selector over existing dimensions. Within a field the values
       OR; across fields they AND. An absent or empty predicate matches every
-      element (the Everything view's shape).
+      element (the Everything view's shape) — unless an `include` list is also
+      given, in which case the view is include-only and shows exactly the listed
+      elements (a curated view, e.g. the Landscape landing page).
     properties:
       layers:
         $ref: "#/$defs/valueList"
@@ -91,7 +93,9 @@ properties:
     description: |
       Explicit element ids folded into the base set after the predicate, for
       sets no predicate cleanly expresses. Every id must resolve in the merged
-      dataset — a dangling include fails the build.
+      dataset — a dangling include fails the build. With no predicate, the
+      include list IS the base (an include-only curated view); with a predicate
+      it augments the matched set.
   exclude:
     $ref: "#/$defs/valueList"
     description: |

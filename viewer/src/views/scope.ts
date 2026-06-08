@@ -7,6 +7,11 @@
 //   base   = (base ∪ include) − exclude
 //   scoped = base ∪ { elements within neighbourDepth relation-hops of base }
 //
+// An empty predicate normally matches the whole model (the Everything view). The
+// one exception: an empty predicate paired with an `include` list is an
+// include-only view — base starts empty and `include` alone fills it, so the
+// view shows exactly the curated elements (e.g. the Landscape landing page).
+//
 // `excludeInstances: true` removes runtime instances (elements carrying an
 // `environment` and/or `stats.release`) from the universe first, so they appear
 // in neither the base nor the neighbour expansion — a definitions-only view
@@ -187,15 +192,18 @@ export function resolveViewScope(
         }
       : () => true;
   const base = new Set<string>();
-  if (isEmptyPredicate(view.predicate)) {
+  if (!isEmptyPredicate(view.predicate)) {
     for (const el of model.elements) {
-      if (admits(el.id)) {
+      if (admits(el.id) && matchesPredicate(el, view.predicate!, capMembers)) {
         base.add(el.id);
       }
     }
-  } else {
+  } else if (!view.include?.length) {
+    // Empty predicate and no include = the whole model (the Everything view).
+    // With an include list it is an include-only view: base stays empty here and
+    // the include loop below is the only thing that fills it.
     for (const el of model.elements) {
-      if (admits(el.id) && matchesPredicate(el, view.predicate!, capMembers)) {
+      if (admits(el.id)) {
         base.add(el.id);
       }
     }

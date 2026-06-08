@@ -1,13 +1,22 @@
 id: landscape
 label: Landscape
-description: The big picture — capabilities and applications with their immediate technical context.
+description: A curated tour of the systems I build and self-host — one card per flagship. Use the other tabs to drill into the detail.
 icon: Map
-predicate:
-  kinds: [Capability, ApplicationComponent, SystemSoftware]
-excludeInstances: true
-# The physical Device fleet (IoT sensors, switches, the catflap, …) is not the
-# "immediate technical context" this view is about — at depth 1 it dragged ~95
-# devices into the landscape. Compute Nodes (hosts/clusters) stay: they are the
-# substrate the software runs on. See the home-automation/iot views for devices.
-excludeKinds: [Device]
-neighbourDepth: 1
+# The landing page. A full capabilities/apps/software landscape is ~200 nodes and
+# unreadable, so this is a hand-picked set of flagship in-house systems instead,
+# one representative card each, no neighbour expansion. An empty predicate with an
+# include list is an include-only view (see src/views/scope.ts): it shows exactly
+# these elements and nothing else — the rest of the model lives in the other tabs.
+include:
+  - app:design-assistant-portal,a7ca11ae-6279-4b7b-86b5-c7f137fd352b # Design Assistant
+  - app:webathome-org,e0e6bf35-4c35-4e0e-a8f2-16f3eb019741 # webathome.org
+  - app:electronics-inventory,9a37e1d4-5b2c-4f6a-8e3d-1c0b9a8f7e6d # Electronics Inventory
+  - app:iotsupport-app,bbc500fd-ef66-4d82-846c-cd0357cb03f7 # IoT Support
+  - app:intercom-server,c313fb20-b8df-4f6c-be1b-23af65e26705 # Intercom
+  - app:zigbee-control,c7890844-dbf2-4ea2-a468-c3280176d646 # Zigbee Control
+  - app:scantopdf-server,3a9b1929-7c0d-4dbf-b725-42549c12bc31 # ScanToPdf
+  - app:newsfilter,22a90359-073c-4b89-a80f-87b4f1adb4b5 # NewsFilter
+  - app:kitchen-display,bfd7ec88-4f20-47d7-9008-60de4f84e250 # Kitchen Display
+  - app:mydownloads,a07b6286-8f2b-4efe-81bd-d31ce13165df # MyDownloads
+  - app:ginbov-nl,6b6931d3-c79c-4057-a792-ad6b4ef6353e # Ginbov.nl
+neighbourDepth: 0
