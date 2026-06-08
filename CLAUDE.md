@@ -43,6 +43,20 @@ Filename map:
 Diff both sides before editing — if they've drifted, surface the drift
 to the user rather than silently picking a side.
 
+## Adding a capability to the enum
+
+A new `cap:` entry in `schema/v0.1/enums/capabilities.yaml` touches **three**
+places — only two are wired together:
+
+1. Add the entry to `capabilities.yaml`.
+2. Regenerate `viewer/src/generated/vocab.ts` via `tooling/generate.py`
+   (`--check` enforces it in CI).
+3. **Hand-add an icon** to `CAPABILITY_ICON` in `viewer/src/theme.ts`. This map
+   is *not* generated; it's typed `Record<CapabilityId, LucideIcon>`, so a
+   missing key fails only at the viewer's `tsc` step — a separate Jenkins job
+   from the enum change. Easy to forget; it has bitten us. Do it in the same
+   commit as the enum entry.
+
 ## Deployment context
 
 Self-hosted stack: Kubernetes, Jenkins, Kaniko, Ansible. Don't propose hosting alternatives or redesign CI/CD. Focus on the container artifact; K8s/Jenkins glue is the user's.
