@@ -163,8 +163,80 @@ export async function getDirectedLayout(nodes: Node[], edges: Edge[]) {
     layout.children?.map((node) => [node.id, { x: node.x ?? 0, y: node.y ?? 0 }]) ?? [],
   );
 
+  wrapWideRows(positions);
+
   return architectureNodes.map((node) => ({
     id: node.id,
     position: positions.get(node.id) ?? node.position,
   }));
+}
+
+// --- Row wrapping --------------------------------------------------------------
+// ELK's layered algorithm has no knob to cap how wide a single layer gets: a band
+// of sibling leaves with no edges among them (the home-automation view's ~76
+// Zigbee/Home-Assistant devices, all fanning UP to the broker/bridges) lands in
+// one layer and lays out as a single ~28000px-wide row — a useless smear. The
+// built-in wrapping.strategy cuts the *sequence of layers* for long-thin graphs;
+// it can't subdivide one over-full layer, so it doesn't help here.
+//
+// We fix it after the fact. ELK's edge geometry is already discarded (ReactFlow
+// redraws every edge between handles), so a node's position is the only ELK
+// output that matters — repositioning nodes post-layout is free of side effects.
+// We group the laid-out nodes into rows by shared Y (one ELK layer = one Y under
+// the UP flow), and any row whose nodes would exceed MAX_ROW_WIDTH is reflowed
+// into a centred grid. Rows below the wrapped one (larger Y) shift down by the
+// height the extra grid rows consume. A row that fits is untouched, so multi-row
+// bands whose layers are each narrow (e.g. the topology-ordered technology band)
+// are unaffected — only genuine over-wide fans wrap.
+const PITCH_X = NODE_WIDTH + 64; // node box + elk.spacing.nodeNode
+const PITCH_Y = NODE_HEIGHT + 56; // node box + a tight inter-sub-row gap
+// ~16 columns. Wide enough that no scoped view's normal band wraps, narrow
+// enough that the device fan folds into ~5 readable rows instead of one smear.
+const MAX_ROW_WIDTH = 6000;
+
+function wrapWideRows(positions: Map<string, { x: number; y: number }>): void {
+  // Group node ids by their row (shared Y). Round to absorb float noise; ELK
+  // gives every node in a layer the same Y, so members of a row collapse onto
+  // one key.
+  const rows = new Map<number, string[]>();
+  for (const [id, pos] of positions) {
+    const key = Math.round(pos.y);
+    const members = rows.get(key);
+    if (members) {
+      members.push(id);
+    } else {
+      rows.set(key, [id]);
+    }
+  }
+
+  const cols = Math.max(1, Math.floor(MAX_ROW_WIDTH / PITCH_X));
+  // Walk rows top-to-bottom, accumulating the vertical shift each wrap injects so
+  // every lower row drops by the room the rows above it grew into.
+  let shift = 0;
+  for (const key of [...rows.keys()].sort((a, b) => a - b)) {
+    const ids = rows.get(key)!;
+    const baseY = key + shift;
+    if (ids.length <= cols) {
+      // Fits in one row: just carry the running shift.
+      for (const id of ids) {
+        positions.get(id)!.y = baseY;
+      }
+      continue;
+    }
+    // Reflow into a grid, ordered left-to-right by the X ELK already assigned
+    // (which clusters each hub's children), centred on the row's original span.
+    ids.sort((a, b) => positions.get(a)!.x - positions.get(b)!.x);
+    const minX = Math.min(...ids.map((id) => positions.get(id)!.x));
+    const maxX = Math.max(...ids.map((id) => positions.get(id)!.x));
+    const centerX = (minX + maxX + NODE_WIDTH) / 2;
+    const gridWidth = cols * NODE_WIDTH + (cols - 1) * (PITCH_X - NODE_WIDTH);
+    const startX = centerX - gridWidth / 2;
+    ids.forEach((id, i) => {
+      const pos = positions.get(id)!;
+      pos.x = startX + (i % cols) * PITCH_X;
+      pos.y = baseY + Math.floor(i / cols) * PITCH_Y;
+    });
+    const usedRows = Math.ceil(ids.length / cols);
+    shift += (usedRows - 1) * PITCH_Y;
+  }
 }
