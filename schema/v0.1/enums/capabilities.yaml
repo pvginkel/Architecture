@@ -200,3 +200,9 @@ entries:
     summary: In-house ESP32 hardware/firmware device managed by IoTSupport and integrated via MQTT discovery.
     lifecycle: active
     introduced: 2026-06-05
+
+  - id: cap:mcp
+    label: Model Context Protocol server
+    summary: Exposes tools and resources to LLM agents over the Model Context Protocol (MCP).
+    lifecycle: active
+    introduced: 2026-06-08
