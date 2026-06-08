@@ -7,12 +7,16 @@ icon: Radio
 # lands OpenAI and every MCP server it talks to. The release `intercom` is
 # single-environment (no @env suffix).
 #
-# excludeProducers drops the iotsupport-app fan-out — the per-unit firmware is
-# emitted as cryptic `intercom-vN @ <hash>` SystemSoftware that would bury the
-# story. The 12 physical units are pulled back in explicitly (include overrides
-# the gate); their only edge is to that hidden firmware, so they read as the unit
-# fleet rather than a wired-up chain. cap:mcp is included so the Model Context
-# Protocol capability the MCP servers realise shows as their shared anchor.
+# The 12 physical units are included explicitly because they sit two hops out
+# (unit -> firmware -> server), past neighbourDepth 1. Their per-unit firmware
+# (the iotsupport-app `intercom-vN @ <hash>` SystemSoftware) is the bridge that
+# carries the Mosquitto / Keycloak / Home Assistant / server connections, so it
+# is left in — without it the units float unconnected. iotsupport-app is not
+# excluded here: the intercom subgraph is self-contained, so depth 1 pulls in
+# only the intercom firmware, none of that producer's other gadgets.
+#
+# cap:mcp is included so the Model Context Protocol capability the MCP servers
+# realise shows as their shared anchor (it sits at depth 2 otherwise).
 predicate:
   releases: [intercom]
 include:
@@ -30,5 +34,4 @@ include:
   - device:intercom-v2-rxb7fe5b,a51f26a5-ad1d-5068-965d-64f00bbaf9b3 # Intercom 10
   - device:intercom-v2-sj2m2mbr,b1c47cce-8169-5d18-9065-af0aecf6c470 # Intercom 11
   - device:intercom-v2-5kxx3m7b,f46ce0f5-4884-590d-9e2c-3a0bb0fc0f2c # Intercom 12
-excludeProducers: [iotsupport-app]
 neighbourDepth: 1
