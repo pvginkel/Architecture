@@ -473,15 +473,54 @@ body,
   flex-shrink: 0;
   display: flex;
   gap: 0;
-  overflow-x: auto;
-  scrollbar-width: none; /* Firefox: no persistent horizontal track */
   border-bottom: 1px solid var(--line);
   background: var(--bar-bg);
   backdrop-filter: blur(16px);
 }
 
-.view-tabs::-webkit-scrollbar {
+/* The actual scroll container: the tab strip never wraps, it scrolls. The
+   chevron buttons sit outside it (flex siblings) and nudge its scrollLeft. */
+.view-tabs__strip {
+  display: flex;
+  gap: 0;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox: no persistent horizontal track */
+}
+
+.view-tabs__strip::-webkit-scrollbar {
   display: none; /* WebKit/Blink: no persistent horizontal track */
+}
+
+/* End chevrons — shown only when the strip can scroll that way (see ViewTabs).
+   Flush to the strip with a divider, matching the inter-tab seam. */
+.view-tabs__scroll {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  border: none;
+  background: var(--bar-bg);
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease;
+}
+
+.view-tabs__scroll:hover {
+  color: var(--ink);
+  background: var(--brand-tint);
+}
+
+.view-tabs__scroll--left {
+  border-right: 1px solid var(--line);
+}
+
+.view-tabs__scroll--right {
+  border-left: 1px solid var(--line);
 }
 
 .view-tab {
