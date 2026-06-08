@@ -91,6 +91,43 @@ function relationPriority(edge: Edge): number {
   return RELATION_PRIORITY[type] ?? DEFAULT_PRIORITY;
 }
 
+const LAYOUT_OPTIONS = {
+  "elk.algorithm": "layered",
+  // UP, not DOWN: ArchiMate Serving/Realization point from provider to
+  // consumer (edge source = the lower-layer provider). Flowing up places the
+  // source below the target, so dependencies point upward and the most
+  // depended-upon element settles at the bottom — the conventional layered
+  // view. With UP, partition 0 is the bottom band (see LAYER_BAND).
+  "elk.direction": "UP",
+  "elk.edgeRouting": "ORTHOGONAL",
+  "elk.partitioning.activate": "true",
+  // Lay every node out in one shared coordinate system. With this on by
+  // default, ELK packs each disconnected component independently and resets
+  // their Y, which lets a fragment of (say) technology nodes float above the
+  // strategy band — partitioning only orders within a component. Forcing a
+  // single component makes the layer bands global and strict. The cost is a
+  // wider canvas on dense views; that's acceptable — dense views are the
+  // firehose, and the answer there is to scope, not to lay out.
+  "elk.separateConnectedComponents": "false",
+  "elk.layered.spacing.nodeNodeBetweenLayers": "96",
+  // ReactFlow redraws every edge between handles, so ELK's edge geometry is
+  // discarded. Reserving per-edge channels between layers is therefore pure
+  // wasted vertical space — and with >1000 edges it dominates the layout
+  // (gaps of ~1500px). Zero it out so the inter-row gap is just the node
+  // height plus nodeNodeBetweenLayers.
+  "elk.layered.spacing.edgeNodeBetweenLayers": "0",
+  "elk.layered.spacing.edgeEdgeBetweenLayers": "0",
+  "elk.spacing.nodeNode": "64",
+  // BRANDES_KOEPF, not NETWORK_SIMPLEX. Network simplex gives the most
+  // balanced/compact placement, but it dominates layout cost: on the real
+  // everything view (~540 nodes / ~990 edges) it ran ~20s vs ~2.2s for
+  // Brandes-Koepf — a 9x difference, and 20s on the main thread is the
+  // everything-view lockup. Brandes-Koepf keeps the same banded structure
+  // with slightly less column balancing, which is an acceptable trade for
+  // the firehose view.
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+} as const;
+
 export async function getDirectedLayout(nodes: Node[], edges: Edge[]) {
   const architectureNodes = nodes.filter((node) => node.type === "architecture");
   const visibleIds = new Set(architectureNodes.map((node) => node.id));
@@ -98,72 +135,51 @@ export async function getDirectedLayout(nodes: Node[], edges: Edge[]) {
     (edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target),
   );
 
-  const graph = {
-    id: "root",
-    layoutOptions: {
-      "elk.algorithm": "layered",
-      // UP, not DOWN: ArchiMate Serving/Realization point from provider to
-      // consumer (edge source = the lower-layer provider). Flowing up places the
-      // source below the target, so dependencies point upward and the most
-      // depended-upon element settles at the bottom — the conventional layered
-      // view. With UP, partition 0 is the bottom band (see LAYER_BAND).
-      "elk.direction": "UP",
-      "elk.edgeRouting": "ORTHOGONAL",
-      "elk.partitioning.activate": "true",
-      // Lay every node out in one shared coordinate system. With this on by
-      // default, ELK packs each disconnected component independently and resets
-      // their Y, which lets a fragment of (say) technology nodes float above the
-      // strategy band — partitioning only orders within a component. Forcing a
-      // single component makes the layer bands global and strict. The cost is a
-      // wider canvas on dense views; that's acceptable — dense views are the
-      // firehose, and the answer there is to scope, not to lay out.
-      "elk.separateConnectedComponents": "false",
-      "elk.layered.spacing.nodeNodeBetweenLayers": "96",
-      // ReactFlow redraws every edge between handles, so ELK's edge geometry is
-      // discarded. Reserving per-edge channels between layers is therefore pure
-      // wasted vertical space — and with >1000 edges it dominates the layout
-      // (gaps of ~1500px). Zero it out so the inter-row gap is just the node
-      // height plus nodeNodeBetweenLayers.
-      "elk.layered.spacing.edgeNodeBetweenLayers": "0",
-      "elk.layered.spacing.edgeEdgeBetweenLayers": "0",
-      "elk.spacing.nodeNode": "64",
-      // BRANDES_KOEPF, not NETWORK_SIMPLEX. Network simplex gives the most
-      // balanced/compact placement, but it dominates layout cost: on the real
-      // everything view (~540 nodes / ~990 edges) it ran ~20s vs ~2.2s for
-      // Brandes–Köpf — a 9x difference, and 20s on the main thread is the
-      // everything-view lockup. Brandes–Köpf keeps the same banded structure
-      // with slightly less column balancing, which is an acceptable trade for
-      // the firehose view.
-      "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
-    },
-    children: architectureNodes.map((node) => {
-      return {
-        id: node.id,
-        width: NODE_WIDTH,
-        height: NODE_HEIGHT,
-        layoutOptions: {
-          "elk.partitioning.partition": String(bandPartition(node)),
-        },
-      };
-    }),
-    edges: architectureEdges.map((edge) => {
-      return {
-        id: edge.id,
-        sources: [edge.source],
-        targets: [edge.target],
-        layoutOptions: {
-          "elk.priority": String(relationPriority(edge)),
-        },
-      };
-    }),
-  };
-
-  const layout = await elk.layout(graph);
-  const positions = new Map(
-    layout.children?.map((node) => [node.id, { x: node.x ?? 0, y: node.y ?? 0 }]) ?? [],
+  // Pass 1: lay the whole graph out. This gives the final positions for views
+  // with no over-wide rows (the common case — one pass, no extra cost) and, when
+  // a row is too wide, reveals exactly which nodes share that row.
+  const first = await layoutNodes(
+    architectureNodes.map((node) => ({
+      id: node.id,
+      width: NODE_WIDTH,
+      height: NODE_HEIGHT,
+      layoutOptions: { "elk.partitioning.partition": String(bandPartition(node)) },
+    })),
+    architectureEdges.map((edge) => ({
+      id: edge.id,
+      sources: [edge.source],
+      targets: [edge.target],
+      layoutOptions: { "elk.priority": String(relationPriority(edge)) },
+    })),
   );
 
-  wrapWideRows(positions);
+  const fans = discoverWideRowFans(architectureNodes, first);
+  if (fans.length === 0) {
+    return architectureNodes.map((node) => ({
+      id: node.id,
+      position: first.get(node.id) ?? node.position,
+    }));
+  }
+
+  // Pass 2: replace each wide row with a single super-node sized to the grid its
+  // members will occupy, so ELK lays a compact backbone around the boxes instead
+  // of stretching everything across a smeared row. Then expand the boxes back
+  // into grids (which fit exactly — the super-node reserved their footprint).
+  const collapsed = buildCollapsedGraph(architectureNodes, architectureEdges, fans);
+  const second = await layoutNodes(collapsed.children, collapsed.edges);
+
+  const positions = new Map<string, { x: number; y: number }>();
+  for (const node of architectureNodes) {
+    if (!collapsed.memberFan.has(node.id)) {
+      positions.set(node.id, second.get(node.id) ?? node.position);
+    }
+  }
+  for (const fan of fans) {
+    const origin = second.get(fan.id);
+    if (origin) {
+      expandFan(fan, origin, positions);
+    }
+  }
 
   return architectureNodes.map((node) => ({
     id: node.id,
@@ -171,72 +187,201 @@ export async function getDirectedLayout(nodes: Node[], edges: Edge[]) {
   }));
 }
 
-// --- Row wrapping --------------------------------------------------------------
-// ELK's layered algorithm has no knob to cap how wide a single layer gets: a band
-// of sibling leaves with no edges among them (the home-automation view's ~76
-// Zigbee/Home-Assistant devices, all fanning UP to the broker/bridges) lands in
-// one layer and lays out as a single ~28000px-wide row — a useless smear. The
-// built-in wrapping.strategy cuts the *sequence of layers* for long-thin graphs;
-// it can't subdivide one over-full layer, so it doesn't help here.
+/** Run the shared ELK config over a child/edge set and return id -> position. */
+async function layoutNodes(
+  children: CollapsedGraph["children"],
+  elkEdges: CollapsedGraph["edges"],
+): Promise<Map<string, { x: number; y: number }>> {
+  const layout = await elk.layout({
+    id: "root",
+    layoutOptions: { ...LAYOUT_OPTIONS },
+    children,
+    edges: elkEdges,
+  });
+  return new Map(
+    layout.children?.map((node) => [node.id, { x: node.x ?? 0, y: node.y ?? 0 }]) ?? [],
+  );
+}
+
+// --- Wide-row collapse ---------------------------------------------------------
+// ELK's layered algorithm sizes the whole drawing to its widest layer and has no
+// knob to cap a layer's width. A band of many sibling leaves with no edges among
+// them — the home-automation view's device fleet, dozens of sensors/switches all
+// serving the same bridge or hub — lands in one layer and blows it out to a
+// single ~28000px row, dragging every other node across that span to align with
+// it: a useless smear adrift in empty canvas. ELK's built-in wrapping.strategy
+// only cuts the *sequence* of layers (for long-thin graphs); it can't subdivide
+// one over-full layer.
 //
-// We fix it after the fact. ELK's edge geometry is already discarded (ReactFlow
-// redraws every edge between handles), so a node's position is the only ELK
-// output that matters — repositioning nodes post-layout is free of side effects.
-// We group the laid-out nodes into rows by shared Y (one ELK layer = one Y under
-// the UP flow), and any row whose nodes would exceed MAX_ROW_WIDTH is reflowed
-// into a centred grid. Rows below the wrapped one (larger Y) shift down by the
-// height the extra grid rows consume. A row that fits is untouched, so multi-row
-// bands whose layers are each narrow (e.g. the topology-ordered technology band)
-// are unaffected — only genuine over-wide fans wrap.
+// So we hide each wide row from a second ELK pass. The first pass reveals which
+// nodes share an over-wide row (grouping by Y — one ELK layer is one Y under the
+// UP flow); each such row is replaced by a single super-node sized to the grid
+// its members will occupy. ELK then lays a compact backbone around the boxes,
+// and we expand each box back into the grid — which fits exactly, since the
+// super-node reserved its footprint. Discovering rows from a real layout (rather
+// than a neighbour-set heuristic) catches heterogeneous rows too, e.g. the mix
+// of HA-integrated devices that don't share an identical hub set. (ELK's edge
+// geometry is discarded anyway: ReactFlow redraws every edge between handles.)
 const PITCH_X = NODE_WIDTH + 64; // node box + elk.spacing.nodeNode
-const PITCH_Y = NODE_HEIGHT + 56; // node box + a tight inter-sub-row gap
-// ~16 columns. Wide enough that no scoped view's normal band wraps, narrow
-// enough that the device fan folds into ~5 readable rows instead of one smear.
+const PITCH_Y = NODE_HEIGHT + 56; // node box + a tight inter-row gap within the grid
+// ~16 columns. Wide enough that an ordinary band never trips the wide-row rule,
+// narrow enough that a big leaf fan folds into a few readable rows.
 const MAX_ROW_WIDTH = 6000;
+const FAN_COLUMNS = Math.max(1, Math.floor(MAX_ROW_WIDTH / PITCH_X));
 
-function wrapWideRows(positions: Map<string, { x: number; y: number }>): void {
-  // Group node ids by their row (shared Y). Round to absorb float noise; ELK
-  // gives every node in a layer the same Y, so members of a row collapse onto
-  // one key.
+interface FanPlan {
+  id: string;
+  memberIds: string[];
+  width: number;
+  height: number;
+  partition: number;
+}
+
+interface CollapsedGraph {
+  children: {
+    id: string;
+    width: number;
+    height: number;
+    layoutOptions: Record<string, string>;
+  }[];
+  edges: {
+    id: string;
+    sources: string[];
+    targets: string[];
+    layoutOptions: Record<string, string>;
+  }[];
+  memberFan: Map<string, FanPlan>;
+}
+
+/** From a completed layout, find every row (nodes sharing a Y, i.e. one ELK
+ *  layer under the UP flow) with more than FAN_COLUMNS members, and turn each
+ *  into a fan: a super-node sized to the grid those members will be laid out in.
+ *  Rows that already fit are left alone, so a view with no wide row yields no
+ *  fans and skips the second pass entirely. */
+function discoverWideRowFans(
+  nodes: Node[],
+  positions: Map<string, { x: number; y: number }>,
+): FanPlan[] {
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
   const rows = new Map<number, string[]>();
-  for (const [id, pos] of positions) {
-    const key = Math.round(pos.y);
-    const members = rows.get(key);
-    if (members) {
-      members.push(id);
-    } else {
-      rows.set(key, [id]);
-    }
-  }
-
-  const cols = Math.max(1, Math.floor(MAX_ROW_WIDTH / PITCH_X));
-  // Walk rows top-to-bottom, accumulating the vertical shift each wrap injects so
-  // every lower row drops by the room the rows above it grew into.
-  let shift = 0;
-  for (const key of [...rows.keys()].sort((a, b) => a - b)) {
-    const ids = rows.get(key)!;
-    const baseY = key + shift;
-    if (ids.length <= cols) {
-      // Fits in one row: just carry the running shift.
-      for (const id of ids) {
-        positions.get(id)!.y = baseY;
-      }
+  for (const node of nodes) {
+    const position = positions.get(node.id);
+    if (!position) {
       continue;
     }
-    // Reflow into a grid, ordered left-to-right by the X ELK already assigned
-    // (which clusters each hub's children), centred on the row's original span.
-    ids.sort((a, b) => positions.get(a)!.x - positions.get(b)!.x);
-    const minX = Math.min(...ids.map((id) => positions.get(id)!.x));
-    const maxX = Math.max(...ids.map((id) => positions.get(id)!.x));
-    const centerX = (minX + maxX + NODE_WIDTH) / 2;
-    const gridWidth = cols * NODE_WIDTH + (cols - 1) * (PITCH_X - NODE_WIDTH);
-    const startX = centerX - gridWidth / 2;
-    ids.forEach((id, i) => {
-      const pos = positions.get(id)!;
-      pos.x = startX + (i % cols) * PITCH_X;
-      pos.y = baseY + Math.floor(i / cols) * PITCH_Y;
-    });
-    const usedRows = Math.ceil(ids.length / cols);
-    shift += (usedRows - 1) * PITCH_Y;
+    const key = Math.round(position.y);
+    const members = rows.get(key);
+    if (members) {
+      members.push(node.id);
+    } else {
+      rows.set(key, [node.id]);
+    }
   }
+
+  const fans: FanPlan[] = [];
+  let index = 0;
+  for (const memberIds of rows.values()) {
+    if (memberIds.length <= FAN_COLUMNS) {
+      continue; // already fits one row — no need to collapse
+    }
+    const columns = Math.min(FAN_COLUMNS, memberIds.length);
+    const gridRows = Math.ceil(memberIds.length / FAN_COLUMNS);
+    fans.push({
+      id: `__fan${index++}`,
+      // Keep the left-to-right order ELK gave the row, so the grid keeps
+      // neighbours adjacent rather than reshuffling.
+      memberIds: [...memberIds].sort(
+        (a, b) => (positions.get(a)?.x ?? 0) - (positions.get(b)?.x ?? 0),
+      ),
+      width: columns * NODE_WIDTH + (columns - 1) * (PITCH_X - NODE_WIDTH),
+      height: gridRows * NODE_HEIGHT + (gridRows - 1) * (PITCH_Y - NODE_HEIGHT),
+      partition: bandPartition(nodeById.get(memberIds[0])!),
+    });
+  }
+  return fans;
+}
+
+/** Build the graph ELK's second pass lays out: every fan member removed, one
+ *  super-node per fan in its place, and each fan member's edges redirected onto
+ *  its super-node (deduped to one per hub, original direction kept). */
+function buildCollapsedGraph(
+  nodes: Node[],
+  edges: Edge[],
+  fans: FanPlan[],
+): CollapsedGraph {
+  const memberFan = new Map<string, FanPlan>();
+  for (const fan of fans) {
+    for (const id of fan.memberIds) {
+      memberFan.set(id, fan);
+    }
+  }
+
+  const children: CollapsedGraph["children"] = [
+    ...nodes
+      .filter((node) => !memberFan.has(node.id))
+      .map((node) => ({
+        id: node.id,
+        width: NODE_WIDTH,
+        height: NODE_HEIGHT,
+        layoutOptions: { "elk.partitioning.partition": String(bandPartition(node)) },
+      })),
+    ...fans.map((fan) => ({
+      id: fan.id,
+      width: fan.width,
+      height: fan.height,
+      layoutOptions: { "elk.partitioning.partition": String(fan.partition) },
+    })),
+  ];
+
+  const elkEdges: CollapsedGraph["edges"] = [];
+  const seen = new Set<string>();
+  for (const edge of edges) {
+    const sourceFan = memberFan.get(edge.source);
+    const targetFan = memberFan.get(edge.target);
+    if (sourceFan && targetFan) {
+      continue; // both ends collapse away — no edge to draw in the layout graph
+    }
+    if (!sourceFan && !targetFan) {
+      elkEdges.push({
+        id: edge.id,
+        sources: [edge.source],
+        targets: [edge.target],
+        layoutOptions: { "elk.priority": String(relationPriority(edge)) },
+      });
+      continue;
+    }
+    // Exactly one end is a fan member — redirect it onto the super-node, keeping
+    // the original direction, and keep just one edge per (fan, hub).
+    const fan = (sourceFan ?? targetFan)!;
+    const fromFan = Boolean(sourceFan);
+    const hub = fromFan ? edge.target : edge.source;
+    const key = `${fan.id}:${hub}:${fromFan ? "f" : "t"}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    elkEdges.push({
+      id: `fan:${key}`,
+      sources: [fromFan ? fan.id : hub],
+      targets: [fromFan ? hub : fan.id],
+      layoutOptions: { "elk.priority": String(relationPriority(edge)) },
+    });
+  }
+
+  return { children, edges: elkEdges, memberFan };
+}
+
+/** Place a fan's members as a grid filling the box ELK reserved for its
+ *  super-node, top-left origin, in the row order discovered earlier. */
+function expandFan(
+  fan: FanPlan,
+  origin: { x: number; y: number },
+  positions: Map<string, { x: number; y: number }>,
+): void {
+  fan.memberIds.forEach((id, i) => {
+    positions.set(id, {
+      x: origin.x + (i % FAN_COLUMNS) * PITCH_X,
+      y: origin.y + Math.floor(i / FAN_COLUMNS) * PITCH_Y,
+    });
+  });
 }
