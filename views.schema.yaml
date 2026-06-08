@@ -116,6 +116,14 @@ properties:
       traversed, so neighbourDepth cannot pull it back. Use to keep a class of
       element out of an otherwise-broad view, e.g. the physical Device fleet out
       of the application Landscape.
+  excludeProducers:
+    $ref: "#/$defs/valueList"
+    description: |
+      Registered producer ids (must appear in pipeline-producers.yaml) whose
+      every element is dropped from the view — the same universe gate as
+      `excludeInstances`/`excludeKinds`, keyed on producer. Use to keep a whole
+      source out of an otherwise-broad view, e.g. the home-automation/IoT device
+      fleets and the helm-charts release instances out of Infrastructure.
   neighbourDepth:
     type: integer
     minimum: 0

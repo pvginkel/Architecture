@@ -1,7 +1,13 @@
 id: infrastructure
 label: Infrastructure & network
-description: The physical and host substrate — devices, compute nodes, and the system software that runs on them.
+description: The physical and host substrate — servers, network hardware, and the system software that runs on them.
 icon: Network
 predicate:
   kinds: [Node, Device, SystemSoftware]
+# Keep the substrate (compute Nodes, network Devices, host system software), drop
+# the noise: the home-automation/IoT device fleets and the helm-charts release
+# instances (apps deployed into environments) belong in their own views. Note
+# this can't be excludeInstances — the prd server Nodes are themselves env-tagged
+# instances, and dropping instances would delete the servers.
+excludeProducers: [home-automation-fleet, iotsupport-app, helm-charts]
 neighbourDepth: 0

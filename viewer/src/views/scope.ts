@@ -162,20 +162,25 @@ export function resolveViewScope(
 ): Set<string> {
   const capMembers = capabilityMembers(manifest);
   // Universe gates: excludeInstances (env-/release-tagged runtime instances, see
-  // model.ts) and excludeKinds (whole kinds, e.g. the physical Device fleet) drop
-  // matching elements from the entire resolution — not the base, not as expansion
-  // neighbours, not via explicit include — and they aren't traversed, so
-  // neighbourDepth can't pull them back. With neither gate set, admits is a
-  // cheap pass-through.
+  // model.ts), excludeKinds (whole kinds, e.g. the physical Device fleet) and
+  // excludeProducers (everything from a producer, e.g. the home-automation /
+  // helm-charts fleets) drop matching elements from the entire resolution — not
+  // the base, not as expansion neighbours, not via explicit include — and they
+  // aren't traversed, so neighbourDepth can't pull them back. With no gate set,
+  // admits is a cheap pass-through.
   const excludedKinds = new Set(view.excludeKinds ?? []);
+  const excludedProducers = new Set(view.excludeProducers ?? []);
   const admits =
-    view.excludeInstances || excludedKinds.size > 0
+    view.excludeInstances || excludedKinds.size > 0 || excludedProducers.size > 0
       ? (id: string) => {
           const el = model.elementById.get(id);
           if (!el) {
             return true;
           }
           if (view.excludeInstances && el.isInstance) {
+            return false;
+          }
+          if (excludedProducers.has(el.producer)) {
             return false;
           }
           return !excludedKinds.has(el.kind);
