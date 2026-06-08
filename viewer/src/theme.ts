@@ -110,6 +110,7 @@ export const CAPABILITY_ICON: Record<CapabilityId, LucideIcon> = {
   "cap:media-streaming": Clapperboard,
   "cap:home-automation": House,
   "cap:iot-device": Cpu,
+  "cap:mcp": Plug,
 };
 
 // View-tab glyphs, keyed by the `icon` name a view declares in its YAML. The
