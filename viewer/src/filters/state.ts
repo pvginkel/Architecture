@@ -45,7 +45,7 @@ export const HIDDEN_RELATIONSHIP_TYPES: ReadonlySet<string> = new Set([
 
 /** The relationship-group selection a fresh view seeds to: every type except the
  *  hidden ones. Deliberately the complement, not an empty set — an empty
- *  selection means "show all relations" (see computeVisibleGraph), which would
+ *  selection means "show all relations" (see computeExpandedVisibleGraph), which would
  *  reveal exactly the edges we mean to hide. A non-empty complement keeps the
  *  edge filter always active. */
 export function defaultRelationshipSelection(): Set<string> {
@@ -106,6 +106,19 @@ export function matchesSearch(el: ArchElement, term: string): boolean {
   return haystack.includes(term);
 }
 
+/** True when an element passes every node group's selection (AND across groups)
+ *  and the global search term. */
+export function passesNodeFilters(
+  el: ArchElement,
+  filterState: FilterState,
+  term: string,
+): boolean {
+  return (
+    matchesSearch(el, term) &&
+    NODE_GROUP_IDS.every((g) => passesNodeGroup(el, g, filterState.get(g)))
+  );
+}
+
 /** Elements passing every node group's selection (AND across groups) and the
  *  global search term. */
 export function computeVisibleElements(
@@ -114,11 +127,18 @@ export function computeVisibleElements(
   searchTerm: string,
 ): ArchElement[] {
   const term = searchTerm.trim().toLowerCase();
-  return model.elements.filter(
-    (el) =>
-      matchesSearch(el, term) &&
-      NODE_GROUP_IDS.every((g) => passesNodeGroup(el, g, filterState.get(g))),
-  );
+  return model.elements.filter((el) => passesNodeFilters(el, filterState, term));
+}
+
+/** Does the relation-type selection permit this type? Empty/absent selection =
+ *  no constraint (every type passes). Shared by edge rendering and by the
+ *  expansion traversal, which follows only currently-selected relationship
+ *  types. */
+export function relationSelected(
+  relSelection: Set<string> | undefined,
+  type: string,
+): boolean {
+  return !relSelection || relSelection.size === 0 || relSelection.has(type);
 }
 
 export interface VisibleGraph {
@@ -126,19 +146,103 @@ export interface VisibleGraph {
   visibleRelations: ManifestRelation[];
 }
 
-/** Visible nodes (AND-of-OR predicates + search), then edges among them
- *  filtered by the relation-type selection. */
-export function computeVisibleGraph(
+/** The node ids reachable from each expansion anchor within its hop radius.
+ *
+ *  Walked over the FULL federated model (not the active view's scope) and
+ *  following only currently-selected relationship types — that traversal gate
+ *  is the only filter honoured here. Node filters are deliberately ignored: the
+ *  walk must reach past a filtered-out node to stay connected, and the caller
+ *  re-applies node filters when rendering. Each anchor runs its own BFS (a
+ *  shared visited set would let one anchor's reach truncate another's), and the
+ *  per-anchor reachable sets are unioned. */
+export function computeExpansionUniverse(
   model: ArchModel,
+  anchors: Map<string, number>,
+  relSelection: Set<string> | undefined,
+): Set<string> {
+  const universe = new Set<string>();
+  if (anchors.size === 0) {
+    return universe;
+  }
+  const adjacency = new Map<string, string[]>();
+  const link = (from: string, to: string) => {
+    const list = adjacency.get(from);
+    if (list) {
+      list.push(to);
+    } else {
+      adjacency.set(from, [to]);
+    }
+  };
+  for (const rel of model.relations) {
+    if (!relationSelected(relSelection, rel.type)) {
+      continue;
+    }
+    link(rel.source, rel.target);
+    link(rel.target, rel.source);
+  }
+  for (const [anchorId, radius] of anchors) {
+    const visited = new Set<string>([anchorId]);
+    let frontier = [anchorId];
+    for (let hop = 0; hop < radius; hop++) {
+      const next: string[] = [];
+      for (const id of frontier) {
+        for (const neighbour of adjacency.get(id) ?? []) {
+          if (!visited.has(neighbour)) {
+            visited.add(neighbour);
+            next.push(neighbour);
+          }
+        }
+      }
+      frontier = next;
+    }
+    for (const id of visited) {
+      universe.add(id);
+    }
+  }
+  return universe;
+}
+
+/** The visible graph: the view-scoped elements (or, when a node is isolated,
+ *  only that node) plus the expansion universe, narrowed by the node filters +
+ *  search, then the edges among the survivors filtered by relationship type.
+ *
+ *  Expansion draws from the full `model`, so the universe can reach elements
+ *  outside `scopedModel`; node filters still apply to everything (an expanded
+ *  node that fails a filter is added-but-hidden), which is what lets a filter
+ *  narrow an expanded scope. With no anchors and no isolation this is exactly
+ *  the plain filtered view of `scopedModel`. */
+export function computeExpandedVisibleGraph(
+  model: ArchModel,
+  scopedModel: ArchModel,
   filterState: FilterState,
   searchTerm: string,
+  anchors: Map<string, number>,
+  isolatedId: string | null,
 ): VisibleGraph {
-  const visibleElements = computeVisibleElements(model, filterState, searchTerm);
-  const visibleIds = new Set(visibleElements.map((el) => el.id));
   const relSelection = filterState.get(RELATIONSHIP_GROUP);
+  const universe = computeExpansionUniverse(model, anchors, relSelection);
+
+  const candidateIds = isolatedId
+    ? new Set<string>([isolatedId])
+    : new Set(scopedModel.elements.map((el) => el.id));
+  for (const id of universe) {
+    candidateIds.add(id);
+  }
+
+  const term = searchTerm.trim().toLowerCase();
+  const visibleElements: ArchElement[] = [];
+  for (const id of candidateIds) {
+    // Every candidate id is a scoped element or a relation endpoint, so it
+    // resolves in the model (buildModel drops dangling relations).
+    const el = model.elementById.get(id)!;
+    if (passesNodeFilters(el, filterState, term)) {
+      visibleElements.push(el);
+    }
+  }
+  const visibleIds = new Set(visibleElements.map((el) => el.id));
   const visibleRelations = model.relations.filter(
     (rel) =>
-      (!relSelection || relSelection.size === 0 || relSelection.has(rel.type)) &&
+      relationSelected(relSelection, rel.type) &&
       visibleIds.has(rel.source) &&
       visibleIds.has(rel.target),
   );

@@ -1175,6 +1175,85 @@ body,
   border-bottom-color: var(--control-border);
 }
 
+/* Node-selection control: a floating card sitting just right of the zoom
+   controls (bottom-left). The controls column is ~28px wide at the default 15px
+   panel margin, so clear it with the left margin below. */
+.react-flow__panel.selection-panel {
+  margin-left: 56px;
+}
+
+.selection-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 196px;
+  padding: 10px;
+  border: 1px solid var(--control-border);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 12px 30px rgba(var(--shadow-rgb), 0.12);
+}
+
+.selection-panel__head {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.selection-panel__label {
+  font-size: 13px;
+  font-weight: 740;
+  color: var(--ink-850);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selection-panel__kind {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.selection-panel__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.selection-panel__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  background: var(--panel-strong);
+  color: var(--brand-strong);
+  font-size: 13px;
+  font-weight: 740;
+}
+
+.selection-panel__button:hover:not(:disabled) {
+  border-color: var(--brand-hover);
+  background: var(--brand-tint);
+}
+
+.selection-panel__button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.selection-panel__level {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.selection-panel__level strong {
+  color: var(--ink-850);
+  font-weight: 740;
+}
+
 @media (max-width: 1100px) {
   .workspace {
     grid-template-columns: 1fr;

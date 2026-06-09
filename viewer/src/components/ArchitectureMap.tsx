@@ -62,13 +62,14 @@ import {
 } from "../filters/persistence";
 import {
   addFilterOptions,
-  computeVisibleGraph,
+  computeExpandedVisibleGraph,
   initialFilterState,
   removeFilterOptions,
   serializeFilters,
   toggleFilterOption,
   type FilterState,
 } from "../filters/state";
+import { SelectionPanel } from "./SelectionPanel";
 import {
   pickInitialView,
   resolveViewScope,
@@ -332,19 +333,25 @@ const edgeTypes = {
 
 function useVisibleGraph(
   model: ArchModel | null,
+  scopedModel: ArchModel | null,
   filterState: FilterState,
   searchTerm: string,
+  anchors: Map<string, number>,
+  isolatedId: string | null,
   directedPositions: Map<string, { x: number; y: number }> | null,
 ) {
   return useMemo(() => {
-    if (!model) {
+    if (!model || !scopedModel) {
       return { nodes: [], edges: [], visibleElements: [] as ArchElement[] };
     }
 
-    const { visibleElements, visibleRelations } = computeVisibleGraph(
+    const { visibleElements, visibleRelations } = computeExpandedVisibleGraph(
       model,
+      scopedModel,
       filterState,
       searchTerm,
+      anchors,
+      isolatedId,
     );
 
     // A node is shown only once the current layout has placed it. Newly-visible
@@ -372,7 +379,7 @@ function useVisibleGraph(
     });
 
     return { nodes, edges, visibleElements };
-  }, [model, filterState, searchTerm, directedPositions]);
+  }, [model, scopedModel, filterState, searchTerm, anchors, isolatedId, directedPositions]);
 }
 
 function Tooltip({ tooltip }: { tooltip: TooltipState }) {
@@ -422,6 +429,12 @@ function ArchitectureMapInner() {
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => loadCollapsed(src));
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Node-expansion overlay (see computeExpandedVisibleGraph). `anchors` maps a
+  // node id to the hop radius Expand has grown it to; `isolatedId`, when set,
+  // suppresses the view scope so only that node (plus any expansion) shows.
+  // Both are ephemeral — cleared on Reset filters and on view switch.
+  const [anchors, setAnchors] = useState<Map<string, number>>(() => new Map());
+  const [isolatedId, setIsolatedId] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [edgeTooltip, setEdgeTooltip] = useState<EdgeTooltipState | null>(null);
   const [directedPositions, setDirectedPositions] = useState<Map<
@@ -489,9 +502,12 @@ function ArchitectureMapInner() {
   }, [model, manifest, activeView]);
 
   const { nodes, edges, visibleElements } = useVisibleGraph(
+    model,
     scopedModel,
     filterState,
     searchTerm,
+    anchors,
+    isolatedId,
     directedPositions,
   );
 
@@ -511,6 +527,8 @@ function ArchitectureMapInner() {
       setSearchTerm("");
       setFilterState(viewBaselineFilterState(view));
       setSelectedId(null);
+      setAnchors(new Map());
+      setIsolatedId(null);
     },
     [manifest, src],
   );
@@ -779,7 +797,53 @@ function ArchitectureMapInner() {
     setFilterState(
       activeView ? viewBaselineFilterState(activeView) : initialFilterState(),
     );
+    setAnchors(new Map());
+    setIsolatedId(null);
   }, [activeView]);
+
+  // Isolate: drop everything but the selected node, then let Expand rebuild from
+  // it. Expand: grow the selected node's hop radius by one. Collapse: shrink it,
+  // dropping the outermost ring; a node at radius 0 isn't an anchor.
+  const isolateNode = useCallback(() => {
+    if (!selectedId) {
+      return;
+    }
+    setIsolatedId(selectedId);
+    setAnchors(new Map());
+  }, [selectedId]);
+
+  const expandNode = useCallback(() => {
+    if (!selectedId) {
+      return;
+    }
+    setAnchors((current) => {
+      const next = new Map(current);
+      next.set(selectedId, (current.get(selectedId) ?? 0) + 1);
+      return next;
+    });
+  }, [selectedId]);
+
+  const collapseNode = useCallback(() => {
+    if (!selectedId) {
+      return;
+    }
+    setAnchors((current) => {
+      const level = current.get(selectedId) ?? 0;
+      if (level === 0) {
+        return current;
+      }
+      const next = new Map(current);
+      if (level <= 1) {
+        next.delete(selectedId);
+      } else {
+        next.set(selectedId, level - 1);
+      }
+      return next;
+    });
+  }, [selectedId]);
+
+  const selectedElement = selectedId ? model?.elementById.get(selectedId) ?? null : null;
+  const selectedLevel = selectedId ? anchors.get(selectedId) ?? 0 : 0;
 
   return (
     <div className="architecture-page">
@@ -841,6 +905,15 @@ function ArchitectureMapInner() {
             >
               <Background gap={24} size={1} />
               <Controls showInteractive={false} />
+              {selectedElement ? (
+                <SelectionPanel
+                  element={selectedElement}
+                  level={selectedLevel}
+                  onIsolate={isolateNode}
+                  onExpand={expandNode}
+                  onCollapse={collapseNode}
+                />
+              ) : null}
             </ReactFlow>
           )}
           {layoutOverlay !== "none" ? <div className="canvas-veil" /> : null}
