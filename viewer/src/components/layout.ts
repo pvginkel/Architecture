@@ -118,15 +118,21 @@ const LAYOUT_OPTIONS = {
   "elk.layered.spacing.edgeNodeBetweenLayers": "0",
   "elk.layered.spacing.edgeEdgeBetweenLayers": "0",
   "elk.spacing.nodeNode": "64",
-  // BRANDES_KOEPF, not NETWORK_SIMPLEX. Network simplex gives the most
-  // balanced/compact placement, but it dominates layout cost: on the real
-  // everything view (~540 nodes / ~990 edges) it ran ~20s vs ~2.2s for
-  // Brandes-Koepf — a 9x difference, and 20s on the main thread is the
-  // everything-view lockup. Brandes-Koepf keeps the same banded structure
-  // with slightly less column balancing, which is an acceptable trade for
-  // the firehose view.
-  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  // nodePlacement.strategy is chosen per-pass by node count — see
+  // nodePlacementStrategy().
 } as const;
+
+// Network simplex gives the most balanced/compact placement, but it dominates
+// layout cost: on the real everything view (~540 nodes / ~990 edges) it ran
+// ~20s vs ~2.2s for Brandes-Koepf — a 9x difference, and 20s on the main thread
+// is the everything-view lockup. Brandes-Koepf keeps the same banded structure
+// with slightly less column balancing. So use the nicer placement on small
+// graphs and fall back to the cheap one once the view gets big.
+const NETWORK_SIMPLEX_MAX_NODES = 80;
+
+function nodePlacementStrategy(nodeCount: number): string {
+  return nodeCount <= NETWORK_SIMPLEX_MAX_NODES ? "NETWORK_SIMPLEX" : "BRANDES_KOEPF";
+}
 
 export async function getDirectedLayout(nodes: Node[], edges: Edge[]) {
   const architectureNodes = nodes.filter((node) => node.type === "architecture");
@@ -194,7 +200,10 @@ async function layoutNodes(
 ): Promise<Map<string, { x: number; y: number }>> {
   const layout = await elk.layout({
     id: "root",
-    layoutOptions: { ...LAYOUT_OPTIONS },
+    layoutOptions: {
+      ...LAYOUT_OPTIONS,
+      "elk.layered.nodePlacement.strategy": nodePlacementStrategy(children.length),
+    },
     children,
     edges: elkEdges,
   });
