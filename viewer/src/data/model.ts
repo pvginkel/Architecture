@@ -105,8 +105,16 @@ export function buildModel(manifest: Manifest): ArchModel {
   }
 
   const elementById = new Map(elements.map((el) => [el.id, el]));
+  // Every manifest relation is asserted: the viewer derives relationships at
+  // render time (views/derive.ts), so `derived` is no longer a wire field. A
+  // manifest still carrying the legacy collect-time projection (one not yet
+  // rebuilt by the current collector) would otherwise surface those edges grey
+  // but without a `via` path to expand — so drop them and let the engine
+  // re-derive the same connections, with their path, from the instance-level
+  // edges they were projected from.
   const relations = manifest.relations.filter(
-    (rel) => elementById.has(rel.source) && elementById.has(rel.target),
+    (rel) =>
+      rel.derived !== true && elementById.has(rel.source) && elementById.has(rel.target),
   );
   return { elements, relations, elementById };
 }

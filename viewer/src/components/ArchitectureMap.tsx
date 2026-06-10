@@ -1010,15 +1010,6 @@ function ArchitectureMapInner() {
   }, []);
 
   const onEdgeClick = useCallback((_: ReactMouseEvent, edge: Edge<RelationshipEdgeData>) => {
-    const rel = edge.data?.relation;
-    console.debug("[edge-select]", edge.id, {
-      type: rel?.type,
-      source: rel?.source,
-      target: rel?.target,
-      derived: rel?.derived,
-      via: rel?.via,
-      hops: rel?.via?.length ?? 0,
-    });
     setSelectedEdgeId(edge.id);
     setSelectedId(null);
   }, []);
