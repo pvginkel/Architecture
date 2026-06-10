@@ -81,6 +81,7 @@ import {
   type FilterState,
 } from "../filters/state";
 import { SelectionPanel } from "./SelectionPanel";
+import { EdgeSelectionPanel } from "./EdgeSelectionPanel";
 import { deriveBridges } from "../views/derive";
 import {
   pickInitialView,
@@ -471,6 +472,7 @@ function useVisibleGraph(
   searchTerm: string,
   anchors: Map<string, number>,
   isolatedId: string | null,
+  revealedIds: Set<string>,
   directedPositions: Map<string, { x: number; y: number }> | null,
 ) {
   // Graph layer: the visible elements + relations (asserted + render-time
@@ -490,6 +492,7 @@ function useVisibleGraph(
       searchTerm,
       anchors,
       isolatedId,
+      revealedIds,
     );
     // Bridge visible nodes connected only through hidden ones (the render-time
     // ArchiMate derivation, replacing the old collect-time projection). The
@@ -503,7 +506,7 @@ function useVisibleGraph(
         `${model.elements.length} total node(s) in ${(performance.now() - deriveStart).toFixed(1)}ms`,
     );
     return { visibleElements, allRelations: [...visibleRelations, ...derived] };
-  }, [model, scopedModel, filterState, searchTerm, anchors, isolatedId]);
+  }, [model, scopedModel, filterState, searchTerm, anchors, isolatedId, revealedIds]);
 
   // Placement layer: map the current layout positions onto flow nodes/edges.
   // Reruns on every relayout, but it's cheap — no derivation, no graph rebuild.
@@ -586,12 +589,18 @@ function ArchitectureMapInner() {
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => loadCollapsed(src));
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // The selected relationship (edge), mutually exclusive with selectedId. Its
+  // panel offers "Expand derived path".
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   // Node-expansion overlay (see computeExpandedVisibleGraph). `anchors` maps a
   // node id to the hop radius Expand has grown it to; `isolatedId`, when set,
   // suppresses the view scope so only that node (plus any expansion) shows.
-  // Both are ephemeral — cleared on Reset filters and on view switch.
+  // `revealedIds` are the hidden nodes pulled onto the canvas by expanding a
+  // derived edge's path. All three are ephemeral — cleared on Reset filters and
+  // on view switch.
   const [anchors, setAnchors] = useState<Map<string, number>>(() => new Map());
   const [isolatedId, setIsolatedId] = useState<string | null>(null);
+  const [revealedIds, setRevealedIds] = useState<Set<string>>(() => new Set());
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [edgeTooltip, setEdgeTooltip] = useState<EdgeTooltipState | null>(null);
   const [directedPositions, setDirectedPositions] = useState<Map<
@@ -665,8 +674,19 @@ function ArchitectureMapInner() {
     searchTerm,
     anchors,
     isolatedId,
+    revealedIds,
     directedPositions,
   );
+
+  // The selected relationship, resolved against the current edges. If a reveal
+  // (or a filter change) dissolved it — e.g. expanding a derived path replaces
+  // the grey bridge with the real chain — this goes null and its panel closes.
+  const selectedRelation = useMemo(() => {
+    if (!selectedEdgeId) {
+      return null;
+    }
+    return edges.find((edge) => edge.id === selectedEdgeId)?.data?.relation ?? null;
+  }, [edges, selectedEdgeId]);
 
   const groups = useMemo(
     () =>
@@ -687,8 +707,10 @@ function ArchitectureMapInner() {
       setSearchTerm("");
       setFilterState(viewBaselineFilterState(view));
       setSelectedId(null);
+      setSelectedEdgeId(null);
       setAnchors(new Map());
       setIsolatedId(null);
+      setRevealedIds(new Set());
     },
     [manifest, src],
   );
@@ -750,24 +772,35 @@ function ArchitectureMapInner() {
   }, [edges, selectedId]);
 
   const decoratedEdges = useMemo(() => {
-    if (!selectedId) {
-      return edges;
-    }
-    return edges.map((edge) => {
-      const touchesSelected = edge.source === selectedId || edge.target === selectedId;
-      if (touchesSelected) {
+    if (selectedId) {
+      return edges.map((edge) => {
+        const touchesSelected = edge.source === selectedId || edge.target === selectedId;
+        if (touchesSelected) {
+          return {
+            ...edge,
+            zIndex: 20,
+            data: edge.data ? { ...edge.data, highlighted: true } : edge.data,
+          };
+        }
         return {
           ...edge,
-          zIndex: 20,
-          data: edge.data ? { ...edge.data, highlighted: true } : edge.data,
+          data: edge.data ? { ...edge.data, dimmed: true } : edge.data,
         };
-      }
-      return {
-        ...edge,
-        data: edge.data ? { ...edge.data, dimmed: true } : edge.data,
-      };
-    });
-  }, [edges, selectedId]);
+      });
+    }
+    if (selectedEdgeId) {
+      return edges.map((edge) =>
+        edge.id === selectedEdgeId
+          ? {
+              ...edge,
+              zIndex: 20,
+              data: edge.data ? { ...edge.data, highlighted: true } : edge.data,
+            }
+          : edge,
+      );
+    }
+    return edges;
+  }, [edges, selectedId, selectedEdgeId]);
 
   const decoratedNodes = useMemo(() => {
     if (!connectedNodeIds) {
@@ -942,15 +975,36 @@ function ArchitectureMapInner() {
       return;
     }
     setSelectedId(node.id);
+    setSelectedEdgeId(null);
   }, []);
 
   const onPaneClick = useCallback(() => {
     setSelectedId(null);
+    setSelectedEdgeId(null);
   }, []);
 
-  const onEdgeClick = useCallback(() => {
+  const onEdgeClick = useCallback((_: ReactMouseEvent, edge: Edge<RelationshipEdgeData>) => {
+    setSelectedEdgeId(edge.id);
     setSelectedId(null);
   }, []);
+
+  // Reveal the hidden nodes a derived edge bridges (its `via` run), pulling them
+  // onto the canvas. Once they show, the path is no longer all-hidden, so the
+  // engine stops bridging it: the grey derived edge is replaced by the real
+  // chain of asserted edges through the revealed nodes.
+  const expandDerivedPath = useCallback(() => {
+    const via = selectedRelation?.via;
+    if (!via || via.length === 0) {
+      return;
+    }
+    setRevealedIds((current) => {
+      const next = new Set(current);
+      for (const id of via) {
+        next.add(id);
+      }
+      return next;
+    });
+  }, [selectedRelation]);
 
   const clearFilters = useCallback(() => {
     setSearchTerm("");
@@ -959,6 +1013,8 @@ function ArchitectureMapInner() {
     );
     setAnchors(new Map());
     setIsolatedId(null);
+    setRevealedIds(new Set());
+    setSelectedEdgeId(null);
   }, [activeView]);
 
   // Isolate: drop everything but the selected node, then let Expand rebuild from
@@ -1076,6 +1132,12 @@ function ArchitectureMapInner() {
                   onIsolate={isolateNode}
                   onExpand={expandNode}
                   onCollapse={collapseNode}
+                />
+              ) : selectedRelation ? (
+                <EdgeSelectionPanel
+                  derived={selectedRelation.derived === true}
+                  hopCount={selectedRelation.via?.length ?? 0}
+                  onExpandDerivedPath={expandDerivedPath}
                 />
               ) : null}
             </ReactFlow>

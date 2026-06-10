@@ -52,9 +52,12 @@ export interface ManifestRelation {
   accessType?: AccessType;
   // Set by the viewer's render-time derivation engine (views/derive.ts) on the
   // synthetic relationships it bridges between visible nodes across hidden ones.
-  // Drawn thinner than asserted edges. Not a wire field — absent on every
+  // Drawn in grey to read as inferred. Not a wire field — absent on every
   // relation in the manifest, which are all asserted.
   derived?: boolean;
+  // On a derived relation: the hidden interior nodes the bridge spans, in chain
+  // order. "Expand derived path" reveals them. Absent on asserted relations.
+  via?: string[];
 }
 
 export interface ManifestDerived {

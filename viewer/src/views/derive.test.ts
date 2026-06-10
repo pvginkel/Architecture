@@ -52,6 +52,8 @@ describe("deriveBridges", () => {
       derived: true,
       confidence: "valid",
     });
+    // `via` records the hidden instances the bridge spans, for "Expand path".
+    expect([...out[0].via].sort()).toEqual(["instA", "instB"]);
   });
 
   it("keeps a definition→definition Specialization chain merely potential (dropped at the valid floor)", () => {

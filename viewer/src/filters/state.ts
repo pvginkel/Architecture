@@ -218,6 +218,7 @@ export function computeExpandedVisibleGraph(
   searchTerm: string,
   anchors: Map<string, number>,
   isolatedId: string | null,
+  revealedIds: ReadonlySet<string> = new Set(),
 ): VisibleGraph {
   const relSelection = filterState.get(RELATIONSHIP_GROUP);
   const universe = computeExpansionUniverse(model, anchors, relSelection);
@@ -228,14 +229,21 @@ export function computeExpandedVisibleGraph(
   for (const id of universe) {
     candidateIds.add(id);
   }
+  // Nodes the user revealed by expanding a derived path: shown unconditionally,
+  // bypassing scope and node filters (they are hidden precisely because some
+  // filter/scope excludes them — that is what made the path derived). See
+  // "Expand derived path" in ArchitectureMap.
+  for (const id of revealedIds) {
+    candidateIds.add(id);
+  }
 
   const term = searchTerm.trim().toLowerCase();
   const visibleElements: ArchElement[] = [];
   for (const id of candidateIds) {
-    // Every candidate id is a scoped element or a relation endpoint, so it
-    // resolves in the model (buildModel drops dangling relations).
+    // Every candidate id is a scoped element, a relation endpoint, or a revealed
+    // node, so it resolves in the model (buildModel drops dangling relations).
     const el = model.elementById.get(id)!;
-    if (passesNodeFilters(el, filterState, term)) {
+    if (revealedIds.has(id) || passesNodeFilters(el, filterState, term)) {
       visibleElements.push(el);
     }
   }
