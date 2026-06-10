@@ -813,6 +813,10 @@ function ArchitectureMapInner() {
     }
     setIsolatedId(selectedId);
     setAnchors(new Map());
+    // Search is a locator: it found this node. Clear it on isolate so it can't
+    // then hide the neighbours Expand pulls in (they rarely match the term the
+    // search-matched anchor was found by — see passesNodeFilters/matchesSearch).
+    setSearchTerm("");
   }, [selectedId]);
 
   const expandNode = useCallback(() => {
