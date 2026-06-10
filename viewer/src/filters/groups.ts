@@ -32,6 +32,7 @@ import {
   ENVIRONMENT_GROUP,
   RELATIONSHIP_GROUP,
   NODE_GROUP_IDS,
+  NO_VALUE,
   computeVisibleElements,
   matchesSearch,
   passesNodeGroup,
@@ -73,7 +74,7 @@ function nodeOptions(
 ): FilterOption[] {
   const fullCounts = tally(model.elements, (el) => nodeValue(el, groupId));
   const liveCounts = tally(base, (el) => nodeValue(el, groupId));
-  return [...fullCounts.entries()]
+  const options = [...fullCounts.entries()]
     .map(([value, full]) => ({
       value,
       label: labelOf(value),
@@ -82,6 +83,18 @@ function nodeOptions(
     }))
     .sort((a, b) => b.full - a.full || a.label.localeCompare(b.label))
     .map(({ value, label, count }) => ({ value, label, count }));
+
+  // Pin a "(none)" row to the bottom for groups whose data carries value-less
+  // elements, so selecting concrete values doesn't silently drop them. Skip
+  // environment: env-agnostic elements always pass, so the row would be a no-op.
+  if (groupId !== ENVIRONMENT_GROUP) {
+    const fullNone = model.elements.filter((el) => nodeValue(el, groupId) === undefined).length;
+    if (fullNone > 0) {
+      const count = base.filter((el) => nodeValue(el, groupId) === undefined).length;
+      options.push({ value: NO_VALUE, label: "(none)", count });
+    }
+  }
+  return options;
 }
 
 function nodeGroup(
