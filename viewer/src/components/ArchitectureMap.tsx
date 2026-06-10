@@ -512,8 +512,11 @@ function ArchitectureMapInner() {
   );
 
   const groups = useMemo(
-    () => (scopedModel ? buildGroups(scopedModel, filterState, searchTerm) : []),
-    [scopedModel, filterState, searchTerm],
+    () =>
+      scopedModel && model
+        ? buildGroups(scopedModel, model, filterState, searchTerm)
+        : [],
+    [scopedModel, model, filterState, searchTerm],
   );
 
   const selectView = useCallback(

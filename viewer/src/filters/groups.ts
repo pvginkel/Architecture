@@ -6,6 +6,11 @@
 // counts. Option membership and sort order, by contrast, are fixed against the
 // full dataset (count desc, then label) so the list doesn't reshuffle or pop
 // rows in and out as you select — only the displayed numbers move.
+//
+// Node groups are membered against the active view's SCOPED model, so each view
+// lists only the element attributes it actually contains. The relationship
+// group is the deliberate exception: it is membered against the FULL model so
+// every relationship type stays present in every view (see relationshipGroup).
 
 import {
   KIND_LABELS,
@@ -99,19 +104,26 @@ function nodeGroup(
 }
 
 function relationshipGroup(
-  model: ArchModel,
+  scopedModel: ArchModel,
+  fullModel: ArchModel,
   filterState: FilterState,
   searchTerm: string,
 ): FilterGroupModel {
-  // Edges are scoped to the currently-visible node set (all node groups +
-  // search applied). The relationship group's own selection does not narrow its
-  // counts (within-group OR).
+  // Unlike the node groups, the relationship list is NOT pruned to the active
+  // view's scope: membership/order come from the FULL model, so every type the
+  // data carries stays visible and selectable in every view (the relationship
+  // selection also feeds the Isolate/Expand traversal, so a type silently
+  // dropping out of the panel would silently gate what Expand can reach). Counts
+  // still reflect only the scoped, currently-visible node set, so a type with no
+  // edges in this view reads as 0 rather than vanishing.
   const visibleIds = new Set(
-    computeVisibleElements(model, filterState, searchTerm).map((el) => el.id),
+    computeVisibleElements(scopedModel, filterState, searchTerm).map((el) => el.id),
   );
-  const fullCounts = tally(model.relations, (rel) => rel.type);
+  const fullCounts = tally(fullModel.relations, (rel) => rel.type);
   const liveCounts = tally(
-    model.relations.filter((rel) => visibleIds.has(rel.source) && visibleIds.has(rel.target)),
+    scopedModel.relations.filter(
+      (rel) => visibleIds.has(rel.source) && visibleIds.has(rel.target),
+    ),
     (rel) => rel.type,
   );
   const options = [...fullCounts.entries()]
@@ -126,11 +138,16 @@ function relationshipGroup(
   return { id: RELATIONSHIP_GROUP, title: "Relationship type", options };
 }
 
-export function buildGroups(model: ArchModel, filterState: FilterState, searchTerm: string): FilterGroupModel[] {
+export function buildGroups(
+  model: ArchModel,
+  fullModel: ArchModel,
+  filterState: FilterState,
+  searchTerm: string,
+): FilterGroupModel[] {
   const term = searchTerm.trim().toLowerCase();
   const groups: FilterGroupModel[] = [
     nodeGroup(KIND_GROUP, "Element type", model, filterState, term, (v) => KIND_LABELS[v as ElementKind]),
-    relationshipGroup(model, filterState, searchTerm),
+    relationshipGroup(model, fullModel, filterState, searchTerm),
     nodeGroup(LAYER_GROUP, "Layer", model, filterState, term, (v) => LAYER_LABELS[v as LayerId]),
     nodeGroup(PRODUCER_GROUP, "Producer", model, filterState, term, (v) => v),
     nodeGroup(RELEASE_GROUP, "Release", model, filterState, term, (v) => v),
