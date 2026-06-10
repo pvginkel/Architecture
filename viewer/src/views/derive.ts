@@ -111,16 +111,23 @@ const TYPE_BY_LOWER = new Map<string, RelationshipType>(
 
 /** A relationship reduced to what derivation cares about: endpoints + a
  *  lowercase type, the accumulated confidence of the chain that produced it (an
- *  asserted edge starts "valid"), and `via` — the hidden interior nodes the
- *  chain has consumed so far, including the partial's current (hidden) endpoint.
- *  When the chain closes onto a visible node, `via` is exactly the run of hidden
- *  nodes the derived edge bridges, which "Expand derived path" reveals. */
+ *  asserted edge starts "valid"), and the path it bridges:
+ *   - `via`      — the hidden interior nodes consumed so far (incl. the partial's
+ *                  current hidden endpoint); on a closed chain, exactly the nodes
+ *                  the derived edge spans, which "Expand derived path" reveals.
+ *   - `viaEdges` — the asserted edge ids consumed along that chain, so the viewer
+ *                  can highlight the precise path (one more than `via`: a chain
+ *                  of n interior nodes has n+1 edges).
+ *   - `id`       — set only on the asserted-edge entries in `byPair`; the source
+ *                  edge id a seed/step contributes to `viaEdges`. */
 interface Rel {
+  id?: string;
   source: string;
   target: string;
   type: string; // lowercase
   confidence: Confidence;
   via?: string[];
+  viaEdges?: string[];
 }
 
 function typeMatches(typeLower: string, pat: Pattern): boolean {
@@ -302,6 +309,7 @@ export function deriveBridges(
     const key = pairKey(rel.source, rel.target);
     const list = byPair.get(key);
     const entry: Rel = {
+      id: rel.id,
       source: rel.source,
       target: rel.target,
       type: rel.type.toLowerCase(),
@@ -390,7 +398,7 @@ export function deriveBridges(
         continue; // direct visible→visible edges are asserted, not bridged
       }
       for (const r of relationsBetween(start, h)) {
-        const seed: Rel = { ...r, via: [h] };
+        const seed: Rel = { ...r, via: [h], viaEdges: r.id ? [r.id] : [] };
         if (addPartial(h, seed)) {
           frontier.push({ node: h, rel: seed });
         }
@@ -410,8 +418,12 @@ export function deriveBridges(
           for (const edge of relationsBetween(h, h2)) {
             for (const c of compose(p, edge, h, isInstance)) {
               // h was just eliminated; h2 is the new (hidden) endpoint — both
-              // belong to the bridged run.
-              const ext: Rel = { ...c, via: [...(p.via ?? []), h2] };
+              // belong to the bridged run, and `edge` is the link between them.
+              const ext: Rel = {
+                ...c,
+                via: [...(p.via ?? []), h2],
+                viaEdges: edge.id ? [...(p.viaEdges ?? []), edge.id] : p.viaEdges,
+              };
               if (addPartial(h2, ext)) {
                 next.push({ node: h2, rel: ext });
               }
@@ -435,9 +447,14 @@ export function deriveBridges(
         for (const p of partials.values()) {
           for (const edge of edges) {
             // b is visible (not interior); the bridged run is p.via, which
-            // already includes h, the node being closed here.
+            // already includes h, the node being closed here. `edge` is the
+            // final link, from h onto the visible endpoint b.
             for (const c of compose(p, edge, h, isInstance)) {
-              derived.push({ ...c, via: p.via ?? [] });
+              derived.push({
+                ...c,
+                via: p.via ?? [],
+                viaEdges: edge.id ? [...(p.viaEdges ?? []), edge.id] : p.viaEdges,
+              });
             }
           }
         }
@@ -486,6 +503,7 @@ export function deriveBridges(
       derived: true,
       confidence: r.confidence,
       via: r.via ?? [],
+      viaEdges: r.viaEdges ?? [],
     });
   }
   out.sort((a, b) => a.id.localeCompare(b.id));
@@ -493,11 +511,13 @@ export function deriveBridges(
 }
 
 /** A bridged relationship: a ManifestRelation always tagged derived, carrying
- *  the confidence it was derived at (a future suggestion style reads this) and
- *  `via`, the hidden interior nodes it bridges ("Expand derived path" reveals
- *  them). */
+ *  the confidence it was derived at (a future suggestion style reads this), the
+ *  hidden interior nodes it bridges (`via`, revealed by "Expand derived path"),
+ *  and the asserted edge ids forming that path (`viaEdges`, highlighted on
+ *  expand). */
 export interface DerivedRelation extends ManifestRelation {
   derived: true;
   confidence: Confidence;
   via: string[];
+  viaEdges: string[];
 }

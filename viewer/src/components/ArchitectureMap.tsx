@@ -604,6 +604,13 @@ function ArchitectureMapInner() {
   const [anchors, setAnchors] = useState<Map<string, number>>(() => new Map());
   const [isolatedId, setIsolatedId] = useState<string | null>(null);
   const [revealedIds, setRevealedIds] = useState<Set<string>>(() => new Set());
+  // The path just revealed by "Expand derived path": its node ids and asserted
+  // edge ids, highlighted (rest dimmed) so the change is obvious. Cleared on the
+  // next selection/deselect, like any other highlight.
+  const [expandedPath, setExpandedPath] = useState<{
+    nodes: Set<string>;
+    edges: Set<string>;
+  } | null>(null);
   const [tooltip, setTooltip] = useState<TooltipState | null>(null);
   const [edgeTooltip, setEdgeTooltip] = useState<EdgeTooltipState | null>(null);
   const [directedPositions, setDirectedPositions] = useState<Map<
@@ -711,6 +718,7 @@ function ArchitectureMapInner() {
       setFilterState(viewBaselineFilterState(view));
       setSelectedId(null);
       setSelectedEdgeId(null);
+      setExpandedPath(null);
       setAnchors(new Map());
       setIsolatedId(null);
       setRevealedIds(new Set());
@@ -805,8 +813,22 @@ function ArchitectureMapInner() {
             },
       );
     }
+    if (expandedPath) {
+      return edges.map((edge) =>
+        expandedPath.edges.has(edge.id)
+          ? {
+              ...edge,
+              zIndex: 20,
+              data: edge.data ? { ...edge.data, highlighted: true } : edge.data,
+            }
+          : {
+              ...edge,
+              data: edge.data ? { ...edge.data, dimmed: true } : edge.data,
+            },
+      );
+    }
     return edges;
-  }, [edges, selectedId, selectedEdgeId]);
+  }, [edges, selectedId, selectedEdgeId, expandedPath]);
 
   // The two endpoints of the selected edge, highlighted like the connected nodes
   // are for a node selection.
@@ -839,8 +861,16 @@ function ArchitectureMapInner() {
           : { ...node, data: { ...node.data, dimmed: true } },
       );
     }
+    if (expandedPath) {
+      // Highlight the expanded path's nodes, dim the rest.
+      return nodes.map((node) =>
+        expandedPath.nodes.has(node.id)
+          ? { ...node, zIndex: 20, data: { ...node.data, highlighted: true } }
+          : { ...node, data: { ...node.data, dimmed: true } },
+      );
+    }
     return nodes;
-  }, [nodes, connectedNodeIds, selectedId, selectedEdgeNodeIds]);
+  }, [nodes, connectedNodeIds, selectedId, selectedEdgeNodeIds, expandedPath]);
 
   // One translucent background band per ArchiMate layer, spanning the full
   // diagram width and the vertical extent of that layer's laid-out nodes. The
@@ -1002,16 +1032,19 @@ function ArchitectureMapInner() {
     }
     setSelectedId(node.id);
     setSelectedEdgeId(null);
+    setExpandedPath(null);
   }, []);
 
   const onPaneClick = useCallback(() => {
     setSelectedId(null);
     setSelectedEdgeId(null);
+    setExpandedPath(null);
   }, []);
 
   const onEdgeClick = useCallback((_: ReactMouseEvent, edge: Edge<RelationshipEdgeData>) => {
     setSelectedEdgeId(edge.id);
     setSelectedId(null);
+    setExpandedPath(null);
   }, []);
 
   // Reveal the hidden nodes a derived edge bridges (its `via` run), pulling them
@@ -1019,17 +1052,25 @@ function ArchitectureMapInner() {
   // engine stops bridging it: the grey derived edge is replaced by the real
   // chain of asserted edges through the revealed nodes.
   const expandDerivedPath = useCallback(() => {
-    const via = selectedRelation?.via;
-    if (!via || via.length === 0) {
+    const rel = selectedRelation;
+    if (!rel?.via || rel.via.length === 0) {
       return;
     }
     setRevealedIds((current) => {
       const next = new Set(current);
-      for (const id of via) {
+      for (const id of rel.via!) {
         next.add(id);
       }
       return next;
     });
+    // Highlight exactly the path: its two endpoints + revealed interior nodes,
+    // and only the asserted edges that form it (not the other edges the revealed
+    // nodes happen to carry).
+    setExpandedPath({
+      nodes: new Set<string>([rel.source, rel.target, ...rel.via]),
+      edges: new Set<string>(rel.viaEdges ?? []),
+    });
+    setSelectedEdgeId(null);
   }, [selectedRelation]);
 
   const clearFilters = useCallback(() => {
@@ -1041,6 +1082,7 @@ function ArchitectureMapInner() {
     setIsolatedId(null);
     setRevealedIds(new Set());
     setSelectedEdgeId(null);
+    setExpandedPath(null);
   }, [activeView]);
 
   // Isolate: drop everything but the selected node, then let Expand rebuild from

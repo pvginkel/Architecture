@@ -58,6 +58,9 @@ export interface ManifestRelation {
   // On a derived relation: the hidden interior nodes the bridge spans, in chain
   // order. "Expand derived path" reveals them. Absent on asserted relations.
   via?: string[];
+  // On a derived relation: the asserted edge ids forming that path (one more than
+  // `via`). Used to highlight exactly the path on expand. Absent on asserted.
+  viaEdges?: string[];
 }
 
 export interface ManifestDerived {

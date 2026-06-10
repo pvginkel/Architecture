@@ -54,6 +54,15 @@ describe("deriveBridges", () => {
     });
     // `via` records the hidden instances the bridge spans, for "Expand path".
     expect([...out[0].via].sort()).toEqual(["instA", "instB"]);
+    // `viaEdges` records the asserted edges forming the path (one more than via)
+    // so the viewer can highlight exactly the path.
+    expect([...out[0].viaEdges].sort()).toEqual(
+      [
+        "instA~Serving~instB",
+        "instA~Specialization~defA",
+        "instB~Specialization~defB",
+      ].sort(),
+    );
   });
 
   it("keeps a definition→definition Specialization chain merely potential (dropped at the valid floor)", () => {
