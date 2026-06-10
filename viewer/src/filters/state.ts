@@ -250,9 +250,17 @@ export function computeExpandedVisibleGraph(
   const visibleIds = new Set(visibleElements.map((el) => el.id));
   const visibleRelations = model.relations.filter(
     (rel) =>
-      relationSelected(relSelection, rel.type) &&
       visibleIds.has(rel.source) &&
-      visibleIds.has(rel.target),
+      visibleIds.has(rel.target) &&
+      // Edges touching a revealed node bypass the relationship-type filter. A
+      // derived edge is composed over the *full* graph, including types the view
+      // hides (notably Association) — so "Expand derived path" reveals the
+      // interior nodes, and we must also surface the edges that link them, or the
+      // path would appear as disconnected nodes. Everything else honours the
+      // type filter as before.
+      (relationSelected(relSelection, rel.type) ||
+        revealedIds.has(rel.source) ||
+        revealedIds.has(rel.target)),
   );
   return { visibleElements, visibleRelations };
 }
