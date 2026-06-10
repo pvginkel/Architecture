@@ -74,7 +74,7 @@ $defs:
     properties:
       type:
         type: string
-        enum: [string, date, uri, enum, idRef, stringMap]
+        enum: [string, boolean, date, uri, enum, idRef, stringMap]
       required: { type: boolean }
       description: { type: string }
       pattern:

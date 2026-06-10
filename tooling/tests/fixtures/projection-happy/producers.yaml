@@ -1,3 +1,0 @@
-producers:
-- id: helm
-  jenkinsJob: HelmCharts/master

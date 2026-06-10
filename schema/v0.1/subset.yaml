@@ -128,6 +128,22 @@ relationAttributes:
       renders the deployment. Without it, an unresolved `boundBy` still fails
       loudly: that remains the signal for a stale recipe or a chart that must
       surface the var.
+  directed:
+    type: boolean
+    required: false
+    description: >
+      ArchiMate notation refinement for an Association: when true the edge is
+      directed and renders with an open arrow at the target; absent/false is an
+      undirected association (no decoration). Ignored on other relation types.
+  accessType:
+    type: enum
+    required: false
+    enumValues: [Read, Write, ReadWrite, Unspecified]
+    description: >
+      ArchiMate Access direction: which end of an Access edge carries the open
+      arrow. Write (the default when absent) points at the accessed data
+      object; Read points back at the active element; ReadWrite decorates both
+      ends; Unspecified neither. Ignored on other relation types.
 
 # Stereotype definitions.
 # A kind that lists a stereotype in `applicableStereotypes` allows artifact

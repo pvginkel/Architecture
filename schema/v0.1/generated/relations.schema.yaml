@@ -39,10 +39,6 @@ properties:
     - Specialization
     - Triggering
     description: ArchiMate relationship type.
-  derived:
-    type: boolean
-    description: True when the collector synthesised this relation by projecting an instance-level edge onto its definition.
-      Absent on authored relations.
   boundBy:
     description: 'Binding recipe for a runtime dependency edge: where the concrete provider''s identity is found at deploy
       time. `env:<VAR>` names a container environment variable in the rendered deployment; the producer that renders the deployment
@@ -65,6 +61,24 @@ properties:
       '
     type: string
     minLength: 1
+  directed:
+    description: 'ArchiMate notation refinement for an Association: when true the edge is directed and renders with an open
+      arrow at the target; absent/false is an undirected association (no decoration). Ignored on other relation types.
+
+      '
+    type: boolean
+  accessType:
+    description: 'ArchiMate Access direction: which end of an Access edge carries the open arrow. Write (the default when
+      absent) points at the accessed data object; Read points back at the active element; ReadWrite decorates both ends; Unspecified
+      neither. Ignored on other relation types.
+
+      '
+    type: string
+    enum:
+    - Read
+    - Write
+    - ReadWrite
+    - Unspecified
 x-allowedTriples:
 - source: ApplicationComponent
   type: Access
