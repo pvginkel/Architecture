@@ -1139,6 +1139,15 @@ body,
   text-transform: uppercase;
 }
 
+.edge-tooltip__derived {
+  margin-left: auto;
+  color: var(--text-muted2);
+  font-size: 11px;
+  font-weight: 500;
+  font-style: italic;
+  text-transform: none;
+}
+
 .edge-tooltip p {
   margin: 7px 0 9px;
   color: var(--ink-700);

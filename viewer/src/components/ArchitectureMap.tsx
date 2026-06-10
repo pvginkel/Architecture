@@ -101,6 +101,7 @@ interface EdgeTooltipState {
   sourceLabel: string;
   targetLabel: string;
   typeLabel: string;
+  derived: boolean;
 }
 
 // Each node exposes a source and a target handle on both its top and bottom
@@ -433,6 +434,7 @@ function EdgeTooltip({ tooltip }: { tooltip: EdgeTooltipState }) {
       <div className="edge-tooltip__title">
         <Spline size={15} />
         <span>{tooltip.typeLabel}</span>
+        {tooltip.derived ? <em className="edge-tooltip__derived">derived</em> : null}
       </div>
       <div className="edge-tooltip__route">
         <strong>{tooltip.sourceLabel}</strong>
@@ -972,6 +974,7 @@ function ArchitectureMapInner() {
         sourceLabel: edge.data.sourceLabel,
         targetLabel: edge.data.targetLabel,
         typeLabel: edge.data.typeLabel,
+        derived: edge.data.relation.derived === true,
       });
     },
     [],
