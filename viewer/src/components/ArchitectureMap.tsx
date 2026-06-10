@@ -48,7 +48,16 @@ import {
   type Manifest,
   type ViewDefinition,
 } from "../data/manifest";
-import { CAPABILITY_ICON, KIND_ICON, LAYER_ACCENT } from "../theme";
+import {
+  CAPABILITY_ICON,
+  EDGE_DECORATIONS,
+  EDGE_MARKER_COLORS,
+  KIND_ICON,
+  LAYER_ACCENT,
+  RELATIONSHIP_STYLE,
+  edgeMarkerId,
+  type EdgeDecoration,
+} from "../theme";
 import { getDirectedLayout } from "./layout";
 import { ViewTabs } from "./ViewTabs";
 import { emitToParent, onSetView } from "../parent-bridge";
@@ -227,6 +236,122 @@ function ArchitectureNodeCard({ data }: NodeProps<Node<ArchNodeData>>) {
   );
 }
 
+// SVG marker geometry per ArchiMate endpoint decoration, in a stroke-width-
+// relative coordinate system (markerUnits="strokeWidth"), so a thinner derived
+// edge gets a proportionally smaller decoration for free. Transcribed (scaled)
+// from the Archi connection figures; see tmp/archimate-line-rules.json.
+interface MarkerGeometry {
+  kind: "polygon" | "polyline" | "circle";
+  points?: string;
+  circle?: { cx: number; cy: number; r: number };
+  // fill = solid line colour; hollow = white centre + colour stroke; open =
+  // no fill, colour stroke (the two-stroke V of an open arrow).
+  mode: "fill" | "hollow" | "open";
+  width: number;
+  height: number;
+  refX: number;
+  refY: number;
+}
+
+const MARKER_GEOMETRY: Record<EdgeDecoration, MarkerGeometry> = {
+  filledArrow: { kind: "polygon", points: "0,0 6,3 0,6", mode: "fill", width: 6, height: 6, refX: 6, refY: 3 },
+  openArrow: { kind: "polyline", points: "0,0 6,3 0,6", mode: "open", width: 7, height: 6, refX: 5.4, refY: 3 },
+  hollowTriangle: { kind: "polygon", points: "0,0 7,3.5 0,7", mode: "hollow", width: 8, height: 7, refX: 7, refY: 3.5 },
+  filledDiamond: { kind: "polygon", points: "0,3 3.5,0 7,3 3.5,6", mode: "fill", width: 7, height: 6, refX: 7, refY: 3 },
+  hollowDiamond: { kind: "polygon", points: "0,3 3.5,0 7,3 3.5,6", mode: "hollow", width: 7, height: 6, refX: 7, refY: 3 },
+  ball: { kind: "circle", circle: { cx: 3, cy: 3, r: 2.6 }, mode: "fill", width: 6, height: 6, refX: 6, refY: 3 },
+};
+
+// One shared <marker> per (decoration, edge colour). Markers can't inherit the
+// referencing path's stroke, so each colour needs its own; orient
+// "auto-start-reverse" lets the same marker serve as either a source (start) or
+// target (end) decoration. Rendered once, off-canvas, referenced by url(#id).
+function EdgeMarkerDefs() {
+  return (
+    <svg
+      aria-hidden="true"
+      style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}
+    >
+      <defs>
+        {EDGE_MARKER_COLORS.flatMap((color) =>
+          EDGE_DECORATIONS.map((decoration) => {
+            const g = MARKER_GEOMETRY[decoration];
+            const fill = g.mode === "fill" ? color : g.mode === "hollow" ? "#ffffff" : "none";
+            const stroke = g.mode === "fill" ? "none" : color;
+            const strokeWidth = g.mode === "fill" ? 0 : 1;
+            return (
+              <marker
+                key={edgeMarkerId(decoration, color)}
+                id={edgeMarkerId(decoration, color)}
+                markerUnits="strokeWidth"
+                markerWidth={g.width}
+                markerHeight={g.height}
+                refX={g.refX}
+                refY={g.refY}
+                orient="auto-start-reverse"
+              >
+                {g.kind === "circle" ? (
+                  <circle
+                    cx={g.circle!.cx}
+                    cy={g.circle!.cy}
+                    r={g.circle!.r}
+                    fill={fill}
+                    stroke={stroke}
+                    strokeWidth={strokeWidth}
+                  />
+                ) : g.kind === "polyline" ? (
+                  <polyline
+                    points={g.points}
+                    fill="none"
+                    stroke={stroke}
+                    strokeWidth={1}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                  />
+                ) : (
+                  <polygon
+                    points={g.points}
+                    fill={fill}
+                    stroke={stroke}
+                    strokeWidth={strokeWidth}
+                    strokeLinejoin="round"
+                  />
+                )}
+              </marker>
+            );
+          }),
+        )}
+      </defs>
+    </svg>
+  );
+}
+
+/** The source/target decorations to actually draw for a relation, resolving the
+ *  two dynamic types: Access by its accessType (default Write = target arrow),
+ *  Association by its `directed` flag. Everything else takes the static style. */
+function edgeDecorations(
+  data: RelationshipEdgeData,
+): { source?: EdgeDecoration; target?: EdgeDecoration } {
+  const { relation } = data;
+  const style = RELATIONSHIP_STYLE[relation.type];
+  if (relation.type === "Access") {
+    switch (relation.accessType ?? "Write") {
+      case "Read":
+        return { source: "openArrow" };
+      case "ReadWrite":
+        return { source: "openArrow", target: "openArrow" };
+      case "Unspecified":
+        return {};
+      default: // Write
+        return { target: "openArrow" };
+    }
+  }
+  if (relation.type === "Association") {
+    return relation.directed ? { target: "openArrow" } : {};
+  }
+  return { source: style.source, target: style.target };
+}
+
 function RelationshipEdge({
   id,
   sourceX,
@@ -235,7 +360,6 @@ function RelationshipEdge({
   targetY,
   sourcePosition,
   targetPosition,
-  markerEnd,
   data,
 }: EdgeProps<Edge<RelationshipEdgeData>>) {
   if (!data?.relation) {
@@ -251,16 +375,22 @@ function RelationshipEdge({
     targetPosition,
     borderRadius: 10,
   });
-  const baseWidth = 2.2;
+  // Derived edges (bridged at render time across hidden nodes) read as inferred,
+  // not modelled: drawn thinner and slightly muted, but in the SAME ArchiMate
+  // notation (line style + decorations) as the asserted edge they stand in for.
+  const derived = data.relation.derived === true;
+  const baseWidth = derived ? 1.4 : 2.2;
   const baseOpacity = 0.62;
   const strokeWidth = data.highlighted ? baseWidth + 1.6 : baseWidth;
-  // Opacity rides on the group, not the path's strokeOpacity, so the arrowhead
-  // marker (a separate, shared SVG element that doesn't inherit strokeOpacity)
-  // dims and brightens together with the line.
+  // Opacity rides on the group, not the path's strokeOpacity, so the markers
+  // (separate shared SVG elements that don't inherit strokeOpacity) dim and
+  // brighten together with the line.
   const opacity = data.dimmed ? 0.12 : data.highlighted ? 0.98 : baseOpacity;
-  // Derived edges (collector-projected from instance-level facts) read as
-  // inferred, not modelled: dashed line, slightly muted unless highlighted.
-  const derived = data.relation.derived === true;
+
+  const style = RELATIONSHIP_STYLE[data.relation.type];
+  const { source, target } = edgeDecorations(data);
+  const markerStart = source ? `url(#${edgeMarkerId(source, data.color)})` : undefined;
+  const markerEnd = target ? `url(#${edgeMarkerId(target, data.color)})` : undefined;
 
   return (
     <g
@@ -272,10 +402,11 @@ function RelationshipEdge({
         className="relationship-edge__path"
         d={edgePath}
         fill="none"
+        markerStart={markerStart}
         markerEnd={markerEnd}
         stroke={data.color}
         strokeWidth={strokeWidth}
-        strokeDasharray={derived ? "6 4" : undefined}
+        strokeDasharray={style.dash}
       />
       <path
         className="relationship-edge__interaction"
@@ -881,6 +1012,7 @@ function ArchitectureMapInner() {
           ) : null}
 
           <div className="canvas-region">
+          <EdgeMarkerDefs />
           {error ? (
             <div className="load-state load-state--error">
               <TriangleAlert size={22} />

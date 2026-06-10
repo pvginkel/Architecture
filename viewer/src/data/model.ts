@@ -52,6 +52,22 @@ export interface ArchModel {
 export const NODE_WIDTH = 300;
 export const NODE_HEIGHT = 158;
 
+/** A runtime instance — a concrete deployed unit rather than an architectural
+ *  definition: it carries an `environment` (it lives in dev/tst/uat/prd) and/or
+ *  a `stats.release` (a Helm release's deployed workload/container). Definitions
+ *  are environment-agnostic.
+ *
+ *  Single source of truth for "what is an instance" on the viewer side: the
+ *  `isInstance` field below, the derivation engine's instance→definition gate
+ *  (views/derive.ts), and scope.ts all read this notion. MUST stay in lockstep
+ *  with collect.py `_is_instance`, which encodes the identical rule in Python —
+ *  the two define instance-hood across the language boundary. (Distinct from the
+ *  node card's container-layout test, which additionally requires container +
+ *  workload stats to be present; that is a display concern, not this one.) */
+export function isInstanceElement(el: ManifestElement): boolean {
+  return el.environment !== undefined || el.stats?.release !== undefined;
+}
+
 /** Invert derived.capabilityRealizations into element-id → capability. First
  *  realized capability wins, deterministically (object insertion order). */
 function buildElementCapability(manifest: Manifest): Map<string, CapabilityId> {
@@ -83,7 +99,7 @@ export function buildModel(manifest: Manifest): ArchModel {
         kind,
         layer,
         capabilityId: elementCapability.get(el.id),
-        isInstance: el.environment !== undefined || el.stats?.release !== undefined,
+        isInstance: isInstanceElement(el),
       });
     }
   }
@@ -135,12 +151,10 @@ export function toFlowEdge(
       color,
     },
     interactionWidth: 18,
-    markerEnd: {
-      type: "arrowclosed",
-      color,
-      width: 16,
-      height: 16,
-    },
+    // No markerEnd here: RelationshipEdge draws ArchiMate notation (per-type
+    // line style + endpoint decorations) using its own shared SVG markers,
+    // keyed off data.relation.type and the edge colour. See theme.ts
+    // RELATIONSHIP_STYLE and ArchitectureMap EdgeMarkerDefs.
   };
 }
 

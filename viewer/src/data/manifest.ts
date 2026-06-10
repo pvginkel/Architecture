@@ -32,6 +32,11 @@ export interface ManifestElement {
   stats?: Record<string, string>;
 }
 
+// ArchiMate Access direction: which end of the edge the open arrow sits on,
+// i.e. whether the active element reads from, writes to, or both, the data
+// object. Absent => Write (the Archi default), drawn as a target arrow.
+export type AccessType = "Read" | "Write" | "ReadWrite" | "Unspecified";
+
 export interface ManifestRelation {
   id: string;
   source: string;
@@ -39,9 +44,16 @@ export interface ManifestRelation {
   type: RelationshipType;
   boundBy?: string;
   boundByDefaultValue?: string;
-  // Set by the collector on relations it synthesised by projecting an
-  // instance-level edge onto its definition. Rendered as an inferred (dashed)
-  // edge. Absent on authored relations.
+  // ArchiMate notation refinements, optional on the relevant relation types
+  // (ignored on others). `directed` turns a plain Association into a directed
+  // one (open arrow at the target); `accessType` places the Access arrow per
+  // read/write semantics. See theme.ts RELATIONSHIP_STYLE.
+  directed?: boolean;
+  accessType?: AccessType;
+  // Set by the viewer's render-time derivation engine (views/derive.ts) on the
+  // synthetic relationships it bridges between visible nodes across hidden ones.
+  // Drawn thinner than asserted edges. Not a wire field — absent on every
+  // relation in the manifest, which are all asserted.
   derived?: boolean;
 }
 
