@@ -797,26 +797,48 @@ function ArchitectureMapInner() {
               zIndex: 20,
               data: edge.data ? { ...edge.data, highlighted: true } : edge.data,
             }
-          : edge,
+          : {
+              ...edge,
+              data: edge.data ? { ...edge.data, dimmed: true } : edge.data,
+            },
       );
     }
     return edges;
   }, [edges, selectedId, selectedEdgeId]);
 
-  const decoratedNodes = useMemo(() => {
-    if (!connectedNodeIds) {
-      return nodes;
+  // The two endpoints of the selected edge, highlighted like the connected nodes
+  // are for a node selection.
+  const selectedEdgeNodeIds = useMemo(() => {
+    if (!selectedEdgeId) {
+      return null;
     }
-    return nodes.map((node) => {
-      if (node.id === selectedId) {
-        return { ...node, zIndex: 20, data: { ...node.data, highlighted: true } };
-      }
-      if (connectedNodeIds.has(node.id)) {
-        return node;
-      }
-      return { ...node, data: { ...node.data, dimmed: true } };
-    });
-  }, [nodes, connectedNodeIds, selectedId]);
+    const edge = edges.find((e) => e.id === selectedEdgeId);
+    return edge ? new Set<string>([edge.source, edge.target]) : null;
+  }, [edges, selectedEdgeId]);
+
+  const decoratedNodes = useMemo(() => {
+    if (connectedNodeIds) {
+      return nodes.map((node) => {
+        if (node.id === selectedId) {
+          return { ...node, zIndex: 20, data: { ...node.data, highlighted: true } };
+        }
+        if (connectedNodeIds.has(node.id)) {
+          return node;
+        }
+        return { ...node, data: { ...node.data, dimmed: true } };
+      });
+    }
+    if (selectedEdgeNodeIds) {
+      // Edge selection: highlight the two endpoints, dim everything else —
+      // mirroring node selection.
+      return nodes.map((node) =>
+        selectedEdgeNodeIds.has(node.id)
+          ? { ...node, zIndex: 20, data: { ...node.data, highlighted: true } }
+          : { ...node, data: { ...node.data, dimmed: true } },
+      );
+    }
+    return nodes;
+  }, [nodes, connectedNodeIds, selectedId, selectedEdgeNodeIds]);
 
   // One translucent background band per ArchiMate layer, spanning the full
   // diagram width and the vertical extent of that layer's laid-out nodes. The
