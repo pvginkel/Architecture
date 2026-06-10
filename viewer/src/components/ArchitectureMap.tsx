@@ -79,6 +79,7 @@ import {
   type FilterState,
 } from "../filters/state";
 import { SelectionPanel } from "./SelectionPanel";
+import { deriveBridges } from "../views/derive";
 import {
   pickInitialView,
   resolveViewScope,
@@ -485,6 +486,15 @@ function useVisibleGraph(
       isolatedId,
     );
 
+    // Bridge visible nodes connected only through hidden ones (the render-time
+    // ArchiMate derivation, replacing the old collect-time projection). Runs
+    // over the full graph + the visible set; the asserted edges among visible
+    // nodes already came back above, so the engine adds only the synthetic
+    // bridges. Memoised by this useMemo's deps (visible set + full graph).
+    const visibleIds = new Set(visibleElements.map((el) => el.id));
+    const derived = deriveBridges(model, visibleIds);
+    const allRelations = [...visibleRelations, ...derived];
+
     // A node is shown only once the current layout has placed it. Newly-visible
     // nodes (a filter/view change introduced them) have no position yet, so
     // they would otherwise paint at (0,0) until the worker returns — a visible
@@ -494,7 +504,7 @@ function useVisibleGraph(
       const position = directedPositions?.get(node.id);
       return position ? { ...node, position } : { ...node, hidden: true };
     });
-    const edges = toFlowEdges(visibleRelations, model.elementById).map((edge) => {
+    const edges = toFlowEdges(allRelations, model.elementById).map((edge) => {
       const source = directedPositions?.get(edge.source);
       const target = directedPositions?.get(edge.target);
       if (!source || !target) {

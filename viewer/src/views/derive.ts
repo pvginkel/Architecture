@@ -1,0 +1,427 @@
+// Render-time relationship derivation.
+//
+// Two visible nodes are often connected only *through* nodes that the current
+// view/filters hide (a definitions-only view hides the runtime instances that
+// carry the real edges; isolate/expand hides filtered-out neighbours). Without
+// derivation such a view is a field of disconnected boxes. This engine bridges
+// the gap: for every pair of visible nodes joined by a run of consecutive hidden
+// nodes, it composes the chain of relationships into a single derived edge,
+// following the ArchiMate 3.2 relationship-derivation rules (Appendix B,
+// transcribed below from tmp/derived-relationships-roles.json).
+//
+// It replaces the collector's old instance→definition projection (a single
+// hard-coded slice of these rules, baked unconditionally into the manifest).
+// Here it runs over the *visible* set, so a bridge only appears when the path
+// it stands for is actually hidden.
+//
+// Confidence: stock ArchiMate marks the inheritance rules (PDR1–PDR4) as
+// "potential" (modeller judgement). We promote them to "valid" for our alias
+// semantics — an instance→definition Specialization — and drop everything else
+// that stays "potential". The engine still *computes* potential derivations so
+// surfacing them later (an even-lighter "suggestion" style) is a one-line change
+// (see deriveBridges' confidenceFloor).
+
+import { ALLOWED_TRIPLES, RELATIONSHIP_TYPES, type RelationshipType } from "../generated/vocab";
+import type { ArchModel } from "../data/model";
+import type { ManifestRelation } from "../data/manifest";
+
+// Largest run of consecutive hidden nodes the engine will bridge across. A path
+// with more hidden interior nodes than this is dropped (and counted — see the
+// console.warn in deriveBridges), never silently truncated. Tunable: raising it
+// finds longer bridges at more pathfinding cost; lowering it is stricter.
+export const MAX_HIDDEN_HOPS = 4;
+
+type Confidence = "valid" | "potential";
+type Category = "structural" | "dependency" | "dynamic" | "other";
+type RuleVar = "a" | "b" | "c";
+
+// Category membership and strength orderings, from the rule file. Type names are
+// lowercase here (the rule file's vocabulary); our RelationshipType is
+// PascalCase, bridged by lowering on the way in and TYPE_BY_LOWER on the way out.
+const CATEGORY_MEMBERS: Record<Category, string[]> = {
+  structural: ["composition", "aggregation", "assignment", "realization"],
+  dependency: ["serving", "access", "influence", "association"],
+  dynamic: ["triggering", "flow"],
+  other: ["specialization"],
+};
+
+// weakestTypeOf: lower index = weaker = wins. Only ever compares within one
+// category, given how the rules are written.
+const STRENGTH: Record<"structural" | "dependency", string[]> = {
+  structural: ["realization", "assignment", "aggregation", "composition"],
+  dependency: ["association", "influence", "access", "serving"],
+};
+
+interface Pattern {
+  source: RuleVar;
+  target: RuleVar;
+  types?: string[]; // explicit lowercase type names
+  category?: Category | "any"; // or a category (any = every type)
+}
+
+type DeriveType =
+  | { kind: "fixedType"; type: string }
+  | { kind: "copyTypeOf"; rel: "P" | "Q" }
+  | { kind: "weakestTypeOf"; rels: ("P" | "Q")[] };
+
+interface DerivationRule {
+  id: string;
+  confidence: Confidence;
+  p: Pattern;
+  q: Pattern;
+  derive: { source: RuleVar; target: RuleVar; type: DeriveType };
+  // PDR12 only: the shared element must be a Grouping. Groupings are pruned from
+  // the viewer model, so a rule carrying this never fires — kept for fidelity.
+  groupingVar?: RuleVar;
+}
+
+// The full rule set. DR1–DR8 are "valid"; PDR1–PDR12 are "potential" (PDR1–PDR4
+// promote — see promote()). Transcribed verbatim from the rule file.
+const RULES: DerivationRule[] = [
+  { id: "DR1", confidence: "valid", p: { source: "a", target: "b", types: ["specialization"] }, q: { source: "b", target: "c", types: ["specialization"] }, derive: { source: "a", target: "c", type: { kind: "fixedType", type: "specialization" } } },
+  { id: "DR2", confidence: "valid", p: { source: "a", target: "b", category: "structural" }, q: { source: "b", target: "c", category: "structural" }, derive: { source: "a", target: "c", type: { kind: "weakestTypeOf", rels: ["P", "Q"] } } },
+  { id: "DR3", confidence: "valid", p: { source: "a", target: "b", category: "structural" }, q: { source: "b", target: "c", category: "dependency" }, derive: { source: "a", target: "c", type: { kind: "copyTypeOf", rel: "Q" } } },
+  { id: "DR4", confidence: "valid", p: { source: "a", target: "b", category: "structural" }, q: { source: "c", target: "b", category: "dependency" }, derive: { source: "c", target: "a", type: { kind: "copyTypeOf", rel: "Q" } } },
+  { id: "DR5", confidence: "valid", p: { source: "a", target: "b", category: "structural" }, q: { source: "b", target: "c", category: "dynamic" }, derive: { source: "a", target: "c", type: { kind: "copyTypeOf", rel: "Q" } } },
+  { id: "DR6", confidence: "valid", p: { source: "a", target: "b", category: "structural" }, q: { source: "c", target: "b", types: ["flow"] }, derive: { source: "c", target: "a", type: { kind: "fixedType", type: "flow" } } },
+  { id: "DR7", confidence: "valid", p: { source: "a", target: "b", types: ["triggering"] }, q: { source: "b", target: "c", category: "structural" }, derive: { source: "a", target: "c", type: { kind: "fixedType", type: "triggering" } } },
+  { id: "DR8", confidence: "valid", p: { source: "a", target: "b", types: ["triggering"] }, q: { source: "b", target: "c", types: ["triggering"] }, derive: { source: "a", target: "c", type: { kind: "fixedType", type: "triggering" } } },
+  { id: "PDR1", confidence: "potential", p: { source: "a", target: "b", types: ["specialization"] }, q: { source: "b", target: "c", category: "any" }, derive: { source: "a", target: "c", type: { kind: "copyTypeOf", rel: "Q" } } },
+  { id: "PDR2", confidence: "potential", p: { source: "a", target: "b", types: ["specialization"] }, q: { source: "c", target: "b", category: "any" }, derive: { source: "c", target: "a", type: { kind: "copyTypeOf", rel: "Q" } } },
+  { id: "PDR3", confidence: "potential", p: { source: "a", target: "b", types: ["specialization"] }, q: { source: "a", target: "c", category: "any" }, derive: { source: "b", target: "c", type: { kind: "copyTypeOf", rel: "Q" } } },
+  { id: "PDR4", confidence: "potential", p: { source: "a", target: "b", types: ["specialization"] }, q: { source: "c", target: "a", category: "any" }, derive: { source: "c", target: "b", type: { kind: "copyTypeOf", rel: "Q" } } },
+  { id: "PDR5", confidence: "potential", p: { source: "a", target: "b", category: "structural" }, q: { source: "c", target: "a", category: "dependency" }, derive: { source: "c", target: "b", type: { kind: "copyTypeOf", rel: "Q" } } },
+  { id: "PDR6", confidence: "potential", p: { source: "a", target: "b", category: "structural" }, q: { source: "a", target: "c", category: "dependency" }, derive: { source: "b", target: "c", type: { kind: "copyTypeOf", rel: "Q" } } },
+  { id: "PDR7", confidence: "potential", p: { source: "a", target: "b", category: "dependency" }, q: { source: "b", target: "c", category: "dependency" }, derive: { source: "a", target: "c", type: { kind: "weakestTypeOf", rels: ["P", "Q"] } } },
+  { id: "PDR8", confidence: "potential", p: { source: "a", target: "b", types: ["flow"] }, q: { source: "b", target: "c", category: "structural" }, derive: { source: "a", target: "c", type: { kind: "fixedType", type: "flow" } } },
+  { id: "PDR9", confidence: "potential", p: { source: "a", target: "b", category: "structural" }, q: { source: "a", target: "c", category: "dynamic" }, derive: { source: "b", target: "c", type: { kind: "copyTypeOf", rel: "Q" } } },
+  { id: "PDR10", confidence: "potential", p: { source: "a", target: "b", types: ["flow"] }, q: { source: "b", target: "c", types: ["flow"] }, derive: { source: "a", target: "c", type: { kind: "fixedType", type: "flow" } } },
+  { id: "PDR11", confidence: "potential", p: { source: "a", target: "b", types: ["triggering"] }, q: { source: "c", target: "b", category: "structural" }, derive: { source: "a", target: "c", type: { kind: "fixedType", type: "triggering" } } },
+  { id: "PDR12", confidence: "potential", p: { source: "b", target: "a", types: ["aggregation", "composition"] }, q: { source: "b", target: "c", types: ["realization", "assignment"] }, derive: { source: "a", target: "c", type: { kind: "copyTypeOf", rel: "Q" } }, groupingVar: "b" },
+];
+
+// PDR1–PDR4: specialization inheritance. Promotes to "valid" when the
+// Specialization edge is instance→definition (our alias semantics).
+const PROMOTABLE = new Set(["PDR1", "PDR2", "PDR3", "PDR4"]);
+
+// Lowercase rule-vocabulary name → our PascalCase RelationshipType.
+const TYPE_BY_LOWER = new Map<string, RelationshipType>(
+  RELATIONSHIP_TYPES.map((t) => [t.toLowerCase(), t]),
+);
+
+/** A relationship reduced to what derivation cares about: endpoints + a
+ *  lowercase type, plus the accumulated confidence of the chain that produced
+ *  it (an asserted edge starts "valid"). */
+interface Rel {
+  source: string;
+  target: string;
+  type: string; // lowercase
+  confidence: Confidence;
+}
+
+function typeMatches(typeLower: string, pat: Pattern): boolean {
+  if (pat.types) {
+    return pat.types.includes(typeLower);
+  }
+  if (pat.category === "any") {
+    return true;
+  }
+  if (pat.category) {
+    return CATEGORY_MEMBERS[pat.category].includes(typeLower);
+  }
+  return false;
+}
+
+/** The weaker of two types per the strength ordering (both share a category, by
+ *  construction of the rules that use weakestTypeOf). */
+function weakestType(types: string[]): string | null {
+  for (const cat of ["structural", "dependency"] as const) {
+    const order = STRENGTH[cat];
+    if (types.every((t) => order.includes(t))) {
+      return types.reduce((best, t) =>
+        order.indexOf(t) < order.indexOf(best) ? t : best,
+      );
+    }
+  }
+  return null;
+}
+
+function deriveTypeOf(spec: DeriveType, p: Rel, q: Rel): string | null {
+  switch (spec.kind) {
+    case "fixedType":
+      return spec.type;
+    case "copyTypeOf":
+      return (spec.rel === "P" ? p : q).type;
+    case "weakestTypeOf":
+      return weakestType(spec.rels.map((r) => (r === "P" ? p : q).type));
+  }
+}
+
+/** Apply one rule to an ordered pair (p plays P, q plays Q) whose shared element
+ *  is `mid`. Returns the single derived relationship, or null if the rule
+ *  doesn't match. `mid` is the node being eliminated — it must be the element
+ *  the rule's shared variable binds to, and must not survive as an endpoint. */
+function applyRule(
+  rule: DerivationRule,
+  p: Rel,
+  q: Rel,
+  mid: string,
+  isInstance: (id: string) => boolean,
+): Rel | null {
+  if (!typeMatches(p.type, rule.p) || !typeMatches(q.type, rule.q)) {
+    return null;
+  }
+  if (rule.groupingVar) {
+    // The shared element would have to be a Grouping; groupings are pruned, so
+    // this rule can never apply in our model.
+    return null;
+  }
+  // Bind each variable to a concrete element; reject on conflict.
+  const bind = new Map<RuleVar, string>();
+  const set = (v: RuleVar, el: string): boolean => {
+    const prev = bind.get(v);
+    if (prev !== undefined && prev !== el) {
+      return false;
+    }
+    bind.set(v, el);
+    return true;
+  };
+  if (!set(rule.p.source, p.source) || !set(rule.p.target, p.target)) {
+    return null;
+  }
+  if (!set(rule.q.source, q.source) || !set(rule.q.target, q.target)) {
+    return null;
+  }
+  // The variable shared between P and Q must bind to the eliminated node.
+  const pVars = new Set<RuleVar>([rule.p.source, rule.p.target]);
+  const shared = [rule.q.source, rule.q.target].filter((v) => pVars.has(v));
+  if (shared.length === 0 || shared.some((v) => bind.get(v) !== mid)) {
+    return null;
+  }
+  const source = bind.get(rule.derive.source);
+  const target = bind.get(rule.derive.target);
+  if (source === undefined || target === undefined) {
+    return null;
+  }
+  if (source === target || source === mid || target === mid) {
+    return null;
+  }
+  const type = deriveTypeOf(rule.derive.type, p, q);
+  if (type === null) {
+    return null;
+  }
+  let confidence = rule.confidence;
+  if (confidence === "potential" && PROMOTABLE.has(rule.id)) {
+    // P is the Specialization edge (a→b). Promote for instance→definition.
+    if (isInstance(p.source) && !isInstance(p.target)) {
+      confidence = "valid";
+    }
+  }
+  return { source, target, type, confidence };
+}
+
+/** Compose two relationships sharing element `mid` into every derived
+ *  relationship the rule set yields (trying each rule in both P/Q orderings).
+ *  The step's confidence is combined with the two inputs' accumulated
+ *  confidence (any "potential" link makes the whole chain potential). */
+function compose(r1: Rel, r2: Rel, mid: string, isInstance: (id: string) => boolean): Rel[] {
+  const out: Rel[] = [];
+  for (const rule of RULES) {
+    for (const [p, q] of [
+      [r1, r2],
+      [r2, r1],
+    ] as const) {
+      const derived = applyRule(rule, p, q, mid, isInstance);
+      if (derived) {
+        const chained: Confidence =
+          r1.confidence === "valid" && r2.confidence === "valid" && derived.confidence === "valid"
+            ? "valid"
+            : "potential";
+        out.push({ ...derived, confidence: chained });
+      }
+    }
+  }
+  return out;
+}
+
+/** Keep the strongest confidence per distinct (source, type, target). */
+function dedupeStrongest(rels: Rel[]): Rel[] {
+  const best = new Map<string, Rel>();
+  for (const r of rels) {
+    const key = `${r.source}|${r.type}|${r.target}`;
+    const prev = best.get(key);
+    if (!prev || (prev.confidence === "potential" && r.confidence === "valid")) {
+      best.set(key, r);
+    }
+  }
+  return [...best.values()];
+}
+
+/** Collapse one visible→hidden…→visible path into the relationships it derives
+ *  between its two visible endpoints, by folding the rules left along the chain,
+ *  eliminating one hidden node per step. */
+function reducePath(
+  path: string[],
+  relationsBetween: (u: string, v: string) => Rel[],
+  isInstance: (id: string) => boolean,
+): Rel[] {
+  // Seed with the asserted relations on the first hop (endpoint → first hidden).
+  let partials = relationsBetween(path[0], path[1]);
+  for (let i = 1; i < path.length - 1; i++) {
+    const mid = path[i];
+    const hop = relationsBetween(mid, path[i + 1]);
+    const next: Rel[] = [];
+    for (const partial of partials) {
+      for (const edge of hop) {
+        next.push(...compose(partial, edge, mid, isInstance));
+      }
+    }
+    partials = dedupeStrongest(next);
+    if (partials.length === 0) {
+      break;
+    }
+  }
+  return partials;
+}
+
+/** Synthetic, viewer-only relationships bridging visible nodes across hidden
+ *  runs. Returns one ManifestRelation per surviving derived triple, tagged
+ *  `derived: true` with a `confidence`, deterministic id, sorted.
+ *
+ *  `confidenceFloor` is the weakest confidence kept — "valid" (default) drops
+ *  the unpromoted potential derivations; "potential" surfaces everything, the
+ *  hook for a future suggestion style. */
+export function deriveBridges(
+  model: ArchModel,
+  visibleIds: ReadonlySet<string>,
+  confidenceFloor: Confidence = "valid",
+): DerivedRelation[] {
+  // Relations among the FULL graph, indexed by unordered endpoint pair, and the
+  // undirected adjacency the path search walks.
+  const byPair = new Map<string, Rel[]>();
+  const adjacency = new Map<string, Set<string>>();
+  let hasHidden = false;
+  const pairKey = (u: string, v: string) => (u < v ? `${u} ${v}` : `${v} ${u}`);
+  for (const rel of model.relations) {
+    const key = pairKey(rel.source, rel.target);
+    const list = byPair.get(key);
+    const entry: Rel = {
+      source: rel.source,
+      target: rel.target,
+      type: rel.type.toLowerCase(),
+      confidence: "valid",
+    };
+    if (list) {
+      list.push(entry);
+    } else {
+      byPair.set(key, [entry]);
+    }
+    (adjacency.get(rel.source) ?? adjacency.set(rel.source, new Set()).get(rel.source)!).add(rel.target);
+    (adjacency.get(rel.target) ?? adjacency.set(rel.target, new Set()).get(rel.target)!).add(rel.source);
+    if (!visibleIds.has(rel.source) || !visibleIds.has(rel.target)) {
+      hasHidden = true;
+    }
+  }
+  // Nothing hidden (e.g. the Everything view) → no bridges, no work.
+  if (!hasHidden) {
+    return [];
+  }
+  const relationsBetween = (u: string, v: string): Rel[] => byPair.get(pairKey(u, v)) ?? [];
+  const isInstance = (id: string): boolean => model.elementById.get(id)?.isInstance ?? false;
+
+  // Asserted relations already visible — a derived edge that duplicates one is
+  // suppressed (global constraint: don't re-derive an asserted relationship).
+  const assertedVisible = new Set<string>();
+  for (const rel of model.relations) {
+    if (visibleIds.has(rel.source) && visibleIds.has(rel.target)) {
+      assertedVisible.add(`${rel.source}|${rel.type}|${rel.target}`);
+    }
+  }
+
+  // Discover every visible→(hidden…)→visible path (interior all hidden, ≤
+  // MAX_HIDDEN_HOPS) by DFS from each visible node, then reduce it.
+  const derived: Rel[] = [];
+  let droppedPaths = 0;
+  for (const start of visibleIds) {
+    if (!adjacency.has(start)) {
+      continue;
+    }
+    const stack: string[] = [start];
+    const dfs = (node: string) => {
+      for (const nb of adjacency.get(node) ?? []) {
+        if (stack.includes(nb)) {
+          continue; // keep the path simple
+        }
+        if (visibleIds.has(nb)) {
+          // A bridge needs at least one hidden interior node; a direct
+          // visible→visible edge is asserted and already drawn.
+          if (stack.length >= 2 && nb !== start) {
+            derived.push(...reducePath([...stack, nb], relationsBetween, isInstance));
+          }
+          continue; // never traverse past a visible node
+        }
+        // nb is hidden — recurse if there's still hidden-hop budget.
+        if (stack.length > MAX_HIDDEN_HOPS) {
+          droppedPaths++;
+          continue;
+        }
+        stack.push(nb);
+        dfs(nb);
+        stack.pop();
+      }
+    };
+    dfs(start);
+  }
+  if (droppedPaths > 0) {
+    console.warn(
+      `[derive] ${droppedPaths} path(s) exceeded MAX_HIDDEN_HOPS=${MAX_HIDDEN_HOPS} and were not bridged`,
+    );
+  }
+
+  // Global constraints + confidence floor, then emit.
+  const keep = confidenceFloor === "valid";
+  const out: DerivedRelation[] = [];
+  const emitted = new Set<string>();
+  for (const r of dedupeStrongest(derived)) {
+    if (keep && r.confidence !== "valid") {
+      continue;
+    }
+    const type = TYPE_BY_LOWER.get(r.type);
+    if (!type) {
+      continue;
+    }
+    const key = `${r.source}|${type}|${r.target}`;
+    if (emitted.has(key) || assertedVisible.has(key)) {
+      continue;
+    }
+    const sourceKind = model.elementById.get(r.source)?.kind;
+    const targetKind = model.elementById.get(r.target)?.kind;
+    if (!sourceKind || !targetKind) {
+      continue;
+    }
+    // The metamodel must permit this triple (Appendix B.5). Cross-domain
+    // motivation restrictions (B.4) are vacuous here — our subset has no
+    // motivation-layer kinds — so the triple matrix is the whole gate.
+    if (!ALLOWED_TRIPLES.has(`${sourceKind}|${type}|${targetKind}`)) {
+      continue;
+    }
+    emitted.add(key);
+    out.push({
+      id: `rel:derived:${r.source}|${type}|${r.target}`,
+      source: r.source,
+      target: r.target,
+      type,
+      derived: true,
+      confidence: r.confidence,
+    });
+  }
+  out.sort((a, b) => a.id.localeCompare(b.id));
+  return out;
+}
+
+/** A bridged relationship: a ManifestRelation always tagged derived, carrying
+ *  the confidence it was derived at (a future suggestion style reads this). */
+export interface DerivedRelation extends ManifestRelation {
+  derived: true;
+  confidence: Confidence;
+}

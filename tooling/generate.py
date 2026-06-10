@@ -446,24 +446,22 @@ def emit_per_kind_schema(
     return schema
 
 
-def emit_relations_schema(
-    relationship_types: set[str],
+def compute_allowed_triples(
     matrix: Mapping[tuple[str, str], set[str]],
     subset_kinds: Mapping[str, Any],
-    relation_attributes: Mapping[str, Any],
-) -> dict[str, Any]:
-    """Build relations.schema.yaml: allowed (source-kind, type, target-kind) triples."""
+) -> list[tuple[str, str, str]]:
+    """The permitted (source-kind, type, target-kind) triples for the subset:
+    the full ArchiMate triple matrix narrowed to entries where both concepts map
+    to a subset-included kind. Sorted, deterministic. Shared by the relations
+    schema (x-allowedTriples) and the viewer vocab (ALLOWED_TRIPLES), so the
+    validator and the viewer's derivation engine read the same matrix."""
     # Map our kind name → its ArchiMate concept name (same in v0.1 — kinds
     # are named after their ArchiMate type — but keep the indirection clean).
-    kind_to_concept = {
-        kname: k["archimateType"] for kname, k in subset_kinds.items()
-    }
+    kind_to_concept = {kname: k["archimateType"] for kname, k in subset_kinds.items()}
     concept_to_kinds: dict[str, list[str]] = {}
     for kname, concept in kind_to_concept.items():
         concept_to_kinds.setdefault(concept, []).append(kname)
 
-    # Narrow the full triple matrix to only entries where both source and
-    # target concepts map to a subset-included kind.
     allowed_triples: list[tuple[str, str, str]] = []
     for (src_concept, tgt_concept), rels in matrix.items():
         for src_kind in concept_to_kinds.get(src_concept, []):
@@ -472,6 +470,17 @@ def emit_relations_schema(
                     allowed_triples.append((src_kind, rel, tgt_kind))
 
     allowed_triples.sort()
+    return allowed_triples
+
+
+def emit_relations_schema(
+    relationship_types: set[str],
+    matrix: Mapping[tuple[str, str], set[str]],
+    subset_kinds: Mapping[str, Any],
+    relation_attributes: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Build relations.schema.yaml: allowed (source-kind, type, target-kind) triples."""
+    allowed_triples = compute_allowed_triples(matrix, subset_kinds)
 
     description = (
         "A relation entry. Each (source, target, type) triple must appear "
@@ -563,6 +572,16 @@ def _ts_record(name: str, key_type: str, value_type: str, mapping: dict[str, str
     )
 
 
+def _ts_allowed_triples(triples: list[tuple[str, str, str]]) -> str:
+    """Emit ALLOWED_TRIPLES as a Set of "Source|Type|Target" keys — the same
+    matrix the relations schema embeds as x-allowedTriples, in a shape the
+    viewer's derivation engine can test a derived triple against in O(1)."""
+    body = "".join(f"  {json.dumps(f'{s}|{t}|{tg}')},\n" for (s, t, tg) in triples)
+    return (
+        f"export const ALLOWED_TRIPLES: ReadonlySet<string> = new Set([\n{body}]);\n\n"
+    )
+
+
 def _ts_logo_files(mapping: dict[str, str]) -> str:
     body = "".join(f"  {json.dumps(k)}: {json.dumps(v)},\n" for k, v in mapping.items())
     return (
@@ -571,7 +590,11 @@ def _ts_logo_files(mapping: dict[str, str]) -> str:
     )
 
 
-def emit_vocab_ts(subset: Mapping[str, Any], relationship_types: set[str]) -> str:
+def emit_vocab_ts(
+    subset: Mapping[str, Any],
+    relationship_types: set[str],
+    matrix: Mapping[tuple[str, str], set[str]],
+) -> str:
     """Build the generated TypeScript vocab module the viewer types against.
 
     Element kinds keep subset.yaml insertion order (semantic); relationship
@@ -620,6 +643,11 @@ def emit_vocab_ts(subset: Mapping[str, Any], relationship_types: set[str]) -> st
     # and the viewer can never disagree about which logos exist. The viewer
     # resolves a bare `logo` name through this map to a real asset path.
     out.append(_ts_logo_files(scan_logo_library()))
+    # The permitted (source-kind, type, target-kind) triples, same matrix the
+    # relations schema embeds. The viewer's render-time derivation engine tests
+    # every derived relationship against this so it never invents a triple the
+    # metamodel forbids.
+    out.append(_ts_allowed_triples(compute_allowed_triples(matrix, subset["kinds"])))
     return "".join(out)
 
 
@@ -683,7 +711,7 @@ def main(check: bool) -> None:
 
     # Viewer vocab module. Lives outside GENERATED_DIR, so it is handled
     # separately from the orphan-swept per-kind/relations schemas above.
-    vocab_content = emit_vocab_ts(subset, xsd_relationship_types)
+    vocab_content = emit_vocab_ts(subset, xsd_relationship_types, triple_matrix)
 
     # Write or check.
     if check:
