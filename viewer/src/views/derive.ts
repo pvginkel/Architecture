@@ -132,6 +132,22 @@ function typeMatches(typeLower: string, pat: Pattern): boolean {
   return false;
 }
 
+// Rules indexed by the concrete (P-type, Q-type) lowercase pair, so compose
+// tries only the handful of rules whose patterns can match a given pair of
+// relationship types — not all 20 in both orderings. Built once at load; a pair
+// with no matching rule is simply absent.
+const RULES_BY_TYPE_PAIR = new Map<string, DerivationRule[]>();
+for (const tp of RELATIONSHIP_TYPES) {
+  for (const tq of RELATIONSHIP_TYPES) {
+    const lp = tp.toLowerCase();
+    const lq = tq.toLowerCase();
+    const matched = RULES.filter((rule) => typeMatches(lp, rule.p) && typeMatches(lq, rule.q));
+    if (matched.length > 0) {
+      RULES_BY_TYPE_PAIR.set(`${lp}|${lq}`, matched);
+    }
+  }
+}
+
 /** The weaker of two types per the strength ordering (both share a category, by
  *  construction of the rules that use weakestTypeOf). */
 function weakestType(types: string[]): string | null {
@@ -168,9 +184,8 @@ function applyRule(
   mid: string,
   isInstance: (id: string) => boolean,
 ): Rel | null {
-  if (!typeMatches(p.type, rule.p) || !typeMatches(q.type, rule.q)) {
-    return null;
-  }
+  // Type compatibility is already established by RULES_BY_TYPE_PAIR (compose's
+  // lookup key), so applyRule starts straight at variable binding.
   if (rule.groupingVar) {
     // The shared element would have to be a Grouping; groupings are pruned, so
     // this rule can never apply in our model.
@@ -226,11 +241,15 @@ function applyRule(
  *  confidence (any "potential" link makes the whole chain potential). */
 function compose(r1: Rel, r2: Rel, mid: string, isInstance: (id: string) => boolean): Rel[] {
   const out: Rel[] = [];
-  for (const rule of RULES) {
-    for (const [p, q] of [
-      [r1, r2],
-      [r2, r1],
-    ] as const) {
+  for (const [p, q] of [
+    [r1, r2],
+    [r2, r1],
+  ] as const) {
+    const rules = RULES_BY_TYPE_PAIR.get(`${p.type}|${q.type}`);
+    if (!rules) {
+      continue;
+    }
+    for (const rule of rules) {
       const derived = applyRule(rule, p, q, mid, isInstance);
       if (derived) {
         const chained: Confidence =
@@ -255,33 +274,6 @@ function dedupeStrongest(rels: Rel[]): Rel[] {
     }
   }
   return [...best.values()];
-}
-
-/** Collapse one visible→hidden…→visible path into the relationships it derives
- *  between its two visible endpoints, by folding the rules left along the chain,
- *  eliminating one hidden node per step. */
-function reducePath(
-  path: string[],
-  relationsBetween: (u: string, v: string) => Rel[],
-  isInstance: (id: string) => boolean,
-): Rel[] {
-  // Seed with the asserted relations on the first hop (endpoint → first hidden).
-  let partials = relationsBetween(path[0], path[1]);
-  for (let i = 1; i < path.length - 1; i++) {
-    const mid = path[i];
-    const hop = relationsBetween(mid, path[i + 1]);
-    const next: Rel[] = [];
-    for (const partial of partials) {
-      for (const edge of hop) {
-        next.push(...compose(partial, edge, mid, isInstance));
-      }
-    }
-    partials = dedupeStrongest(next);
-    if (partials.length === 0) {
-      break;
-    }
-  }
-  return partials;
 }
 
 /** Synthetic, viewer-only relationships bridging visible nodes across hidden
@@ -338,43 +330,111 @@ export function deriveBridges(
     }
   }
 
-  // Discover every visible→(hidden…)→visible path (interior all hidden, ≤
-  // MAX_HIDDEN_HOPS) by DFS from each visible node, then reduce it.
+  // Bridge by BFS relaxation, not path enumeration. Enumerating every simple
+  // visible→hidden…→visible path is exponential — a dense hidden subgraph (the
+  // instances behind a definitions-only view) explodes into millions of paths.
+  // Instead, from each visible source we propagate *partial* derivations across
+  // the hidden subgraph, keeping at each hidden node only the deduplicated set of
+  // relationships reachable from the source (bounded by type × direction, a
+  // small constant). That collapses the path blow-up to roughly
+  // (hidden nodes × that constant) work per source, and the result is identical
+  // for the chains we care about (the rules only ever compose pairwise anyway).
+  //
+  // A partial at hidden node h is a relationship connecting the source to h. We
+  // seed with the source's asserted edges to its hidden neighbours, relax inward
+  // up to MAX_HIDDEN_HOPS hidden nodes, then close every partial against the
+  // visible neighbours of its node to emit a source→visible bridge.
+  // Confidence is monotonic along a chain: combine() only ever downgrades
+  // valid→potential, never the reverse, and promotion happens at the composing
+  // step. So a potential partial can only ever yield potential bridges. When the
+  // floor is "valid" we therefore never propagate (or emit) potential partials —
+  // that prunes whole swaths of the hidden subgraph the moment a chain goes
+  // potential (e.g. a dependency∘dependency step), which is what kept the dense
+  // instance subgraph cheap.
+  const keepPotential = confidenceFloor === "potential";
   const derived: Rel[] = [];
-  let droppedPaths = 0;
+  let overflow = 0; // partial chains still open at the hop cap (longer, not derived)
   for (const start of visibleIds) {
-    if (!adjacency.has(start)) {
+    const seeds = adjacency.get(start);
+    if (!seeds) {
       continue;
     }
-    const stack: string[] = [start];
-    const dfs = (node: string) => {
-      for (const nb of adjacency.get(node) ?? []) {
-        if (stack.includes(nb)) {
-          continue; // keep the path simple
+    // reach: hidden id → (triple key → strongest partial reaching it).
+    const reach = new Map<string, Map<string, Rel>>();
+    const addPartial = (h: string, r: Rel): boolean => {
+      if (!keepPotential && r.confidence === "potential") {
+        return false;
+      }
+      let bucket = reach.get(h);
+      if (!bucket) {
+        bucket = new Map();
+        reach.set(h, bucket);
+      }
+      const key = `${r.source}|${r.type}|${r.target}`;
+      const prev = bucket.get(key);
+      // New, or an upgrade of a previously-potential partial to valid.
+      if (prev && !(prev.confidence === "potential" && r.confidence === "valid")) {
+        return false;
+      }
+      bucket.set(key, r);
+      return true;
+    };
+    // Seed: asserted edges from the source to each hidden neighbour (1 hop).
+    let frontier: { node: string; rel: Rel }[] = [];
+    for (const h of seeds) {
+      if (visibleIds.has(h)) {
+        continue; // direct visible→visible edges are asserted, not bridged
+      }
+      for (const r of relationsBetween(start, h)) {
+        if (addPartial(h, r)) {
+          frontier.push({ node: h, rel: r });
         }
-        if (visibleIds.has(nb)) {
-          // A bridge needs at least one hidden interior node; a direct
-          // visible→visible edge is asserted and already drawn.
-          if (stack.length >= 2 && nb !== start) {
-            derived.push(...reducePath([...stack, nb], relationsBetween, isInstance));
+      }
+    }
+    // Relax inward. Seeds are 1 hidden node deep; MAX_HIDDEN_HOPS − 1 further
+    // rounds reach chains of up to MAX_HIDDEN_HOPS hidden nodes. Only freshly
+    // added partials are propagated (a standard BFS frontier), so each partial
+    // is expanded once.
+    for (let hop = 1; hop < MAX_HIDDEN_HOPS && frontier.length > 0; hop++) {
+      const next: { node: string; rel: Rel }[] = [];
+      for (const { node: h, rel: p } of frontier) {
+        for (const h2 of adjacency.get(h) ?? []) {
+          if (h2 === start || visibleIds.has(h2)) {
+            continue; // visible nodes are closed at emit, not traversed through
           }
-          continue; // never traverse past a visible node
+          for (const edge of relationsBetween(h, h2)) {
+            for (const c of compose(p, edge, h, isInstance)) {
+              if (addPartial(h2, c)) {
+                next.push({ node: h2, rel: c });
+              }
+            }
+          }
         }
-        // nb is hidden — recurse if there's still hidden-hop budget.
-        if (stack.length > MAX_HIDDEN_HOPS) {
-          droppedPaths++;
+      }
+      frontier = next;
+    }
+    overflow += frontier.length; // chains still open past the cap
+    // Close: compose each partial against edges from its node to visible nodes.
+    for (const [h, partials] of reach) {
+      for (const b of adjacency.get(h) ?? []) {
+        if (!visibleIds.has(b) || b === start) {
           continue;
         }
-        stack.push(nb);
-        dfs(nb);
-        stack.pop();
+        const edges = relationsBetween(h, b);
+        if (edges.length === 0) {
+          continue;
+        }
+        for (const p of partials.values()) {
+          for (const edge of edges) {
+            derived.push(...compose(p, edge, h, isInstance));
+          }
+        }
       }
-    };
-    dfs(start);
+    }
   }
-  if (droppedPaths > 0) {
+  if (overflow > 0) {
     console.warn(
-      `[derive] ${droppedPaths} path(s) exceeded MAX_HIDDEN_HOPS=${MAX_HIDDEN_HOPS} and were not bridged`,
+      `[derive] ${overflow} partial chain(s) still open at MAX_HIDDEN_HOPS=${MAX_HIDDEN_HOPS}; longer bridges not derived`,
     );
   }
 
