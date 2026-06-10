@@ -492,7 +492,12 @@ function useVisibleGraph(
     // nodes already came back above, so the engine adds only the synthetic
     // bridges. Memoised by this useMemo's deps (visible set + full graph).
     const visibleIds = new Set(visibleElements.map((el) => el.id));
+    const deriveStart = performance.now();
     const derived = deriveBridges(model, visibleIds);
+    console.debug(
+      `[derive] ${derived.length} bridge(s) over ${visibleIds.size} visible / ` +
+        `${model.elements.length} total node(s) in ${(performance.now() - deriveStart).toFixed(1)}ms`,
+    );
     const allRelations = [...visibleRelations, ...derived];
 
     // A node is shown only once the current layout has placed it. Newly-visible
