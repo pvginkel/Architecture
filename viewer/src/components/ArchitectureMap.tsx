@@ -46,6 +46,7 @@ import {
   loadManifest,
   resolveSrc,
   type Manifest,
+  type ManifestRelation,
   type ViewDefinition,
 } from "../data/manifest";
 import {
@@ -472,11 +473,16 @@ function useVisibleGraph(
   isolatedId: string | null,
   directedPositions: Map<string, { x: number; y: number }> | null,
 ) {
-  return useMemo(() => {
+  // Graph layer: the visible elements + relations (asserted + render-time
+  // derived). Deliberately independent of layout positions, so a relayout — which
+  // flips directedPositions on every graph change — does NOT re-run the
+  // derivation; only the placement memo below reacts to positions. (Without this
+  // split a single filter toggle ran the engine twice: once for the filter
+  // change, once more when its own layout result came back.)
+  const graph = useMemo(() => {
     if (!model || !scopedModel) {
-      return { nodes: [], edges: [], visibleElements: [] as ArchElement[] };
+      return { visibleElements: [] as ArchElement[], allRelations: [] as ManifestRelation[] };
     }
-
     const { visibleElements, visibleRelations } = computeExpandedVisibleGraph(
       model,
       scopedModel,
@@ -485,12 +491,10 @@ function useVisibleGraph(
       anchors,
       isolatedId,
     );
-
     // Bridge visible nodes connected only through hidden ones (the render-time
-    // ArchiMate derivation, replacing the old collect-time projection). Runs
-    // over the full graph + the visible set; the asserted edges among visible
-    // nodes already came back above, so the engine adds only the synthetic
-    // bridges. Memoised by this useMemo's deps (visible set + full graph).
+    // ArchiMate derivation, replacing the old collect-time projection). The
+    // asserted edges among visible nodes already came back above, so the engine
+    // adds only the synthetic bridges.
     const visibleIds = new Set(visibleElements.map((el) => el.id));
     const deriveStart = performance.now();
     const derived = deriveBridges(model, visibleIds);
@@ -498,8 +502,16 @@ function useVisibleGraph(
       `[derive] ${derived.length} bridge(s) over ${visibleIds.size} visible / ` +
         `${model.elements.length} total node(s) in ${(performance.now() - deriveStart).toFixed(1)}ms`,
     );
-    const allRelations = [...visibleRelations, ...derived];
+    return { visibleElements, allRelations: [...visibleRelations, ...derived] };
+  }, [model, scopedModel, filterState, searchTerm, anchors, isolatedId]);
 
+  // Placement layer: map the current layout positions onto flow nodes/edges.
+  // Reruns on every relayout, but it's cheap — no derivation, no graph rebuild.
+  return useMemo(() => {
+    const { visibleElements, allRelations } = graph;
+    if (!model) {
+      return { nodes: [], edges: [], visibleElements };
+    }
     // A node is shown only once the current layout has placed it. Newly-visible
     // nodes (a filter/view change introduced them) have no position yet, so
     // they would otherwise paint at (0,0) until the worker returns — a visible
@@ -523,9 +535,8 @@ function useVisibleGraph(
         ? { ...edge, sourceHandle: HANDLE.sourceTop, targetHandle: HANDLE.targetBottom }
         : { ...edge, sourceHandle: HANDLE.sourceBottom, targetHandle: HANDLE.targetTop };
     });
-
     return { nodes, edges, visibleElements };
-  }, [model, scopedModel, filterState, searchTerm, anchors, isolatedId, directedPositions]);
+  }, [graph, model, directedPositions]);
 }
 
 function Tooltip({ tooltip }: { tooltip: TooltipState }) {
