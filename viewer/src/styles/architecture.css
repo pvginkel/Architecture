@@ -1199,8 +1199,9 @@ body,
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 32px;
-  padding: 0 12px;
+  /* Match the zoom controls' button box (26px tall, 12px glyphs). */
+  min-height: 26px;
+  padding: 0 10px;
   border: none;
   border-bottom: 1px solid var(--control-border);
   background: var(
@@ -1208,7 +1209,7 @@ body,
     var(--xy-controls-button-background-color-default)
   );
   color: var(--xy-controls-button-color, var(--xy-controls-button-color-default));
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
 }
 

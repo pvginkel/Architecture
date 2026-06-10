@@ -28,7 +28,7 @@ export function SelectionPanel({
         onClick={onIsolate}
         title="Clear the canvas and show only this node"
       >
-        <Focus size={15} />
+        <Focus size={16} />
         Isolate
       </button>
       <button
@@ -37,7 +37,7 @@ export function SelectionPanel({
         onClick={onExpand}
         title="Add this node's directly linked neighbours (following the selected relationship types)"
       >
-        <Plus size={15} />
+        <Plus size={16} />
         Expand
       </button>
       <button
@@ -47,7 +47,7 @@ export function SelectionPanel({
         disabled={level === 0}
         title="Remove the outermost ring this node expanded"
       >
-        <Minus size={15} />
+        <Minus size={16} />
         Collapse
       </button>
     </Panel>
