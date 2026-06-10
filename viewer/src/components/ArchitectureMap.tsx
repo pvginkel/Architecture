@@ -907,7 +907,6 @@ function ArchitectureMapInner() {
               <Controls showInteractive={false} />
               {selectedElement ? (
                 <SelectionPanel
-                  element={selectedElement}
                   level={selectedLevel}
                   onIsolate={isolateNode}
                   onExpand={expandNode}
