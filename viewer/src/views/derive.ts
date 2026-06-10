@@ -29,7 +29,7 @@ import type { ManifestRelation } from "../data/manifest";
 // with more hidden interior nodes than this is dropped (and counted — see the
 // console.warn in deriveBridges), never silently truncated. Tunable: raising it
 // finds longer bridges at more pathfinding cost; lowering it is stricter.
-export const MAX_HIDDEN_HOPS = 4;
+export const MAX_HIDDEN_HOPS = 5;
 
 type Confidence = "valid" | "potential";
 type Category = "structural" | "dependency" | "dynamic" | "other";
