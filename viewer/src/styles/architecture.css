@@ -1115,7 +1115,6 @@ body,
 
 .relationship-edge:hover .relationship-edge__path {
   stroke-width: 4;
-  stroke-opacity: 0.95;
 }
 
 .edge-tooltip {

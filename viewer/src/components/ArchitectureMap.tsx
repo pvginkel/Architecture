@@ -386,12 +386,13 @@ function RelationshipEdge({
   const derived = data.relation.derived === true;
   const color = derived ? EDGE_DERIVED_COLOR : data.color;
   const baseWidth = 2.2;
-  const baseOpacity = 0.62;
   const strokeWidth = data.highlighted ? baseWidth + 1.6 : baseWidth;
-  // Opacity rides on the group, not the path's strokeOpacity, so the markers
-  // (separate shared SVG elements that don't inherit strokeOpacity) dim and
-  // brighten together with the line.
-  const opacity = data.dimmed ? 0.12 : data.highlighted ? 0.98 : baseOpacity;
+  // Lines render fully opaque; the highlight reads from the heavier stroke
+  // alone. The only opacity left is the focus dim applied to edges that don't
+  // touch a current selection. (Opacity rides on the group, not the path's
+  // strokeOpacity, so the markers — separate shared SVG elements that don't
+  // inherit strokeOpacity — dim together with the line.)
+  const opacity = data.dimmed ? 0.12 : 1;
 
   const style = RELATIONSHIP_STYLE[data.relation.type];
   const { source, target } = edgeDecorations(data);
