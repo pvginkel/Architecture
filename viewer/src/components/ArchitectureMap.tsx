@@ -52,6 +52,7 @@ import {
 import {
   CAPABILITY_ICON,
   EDGE_DECORATIONS,
+  EDGE_DERIVED_COLOR,
   EDGE_MARKER_COLORS,
   KIND_ICON,
   LAYER_ACCENT,
@@ -378,10 +379,12 @@ function RelationshipEdge({
     borderRadius: 10,
   });
   // Derived edges (bridged at render time across hidden nodes) read as inferred,
-  // not modelled: drawn thinner and slightly muted, but in the SAME ArchiMate
-  // notation (line style + decorations) as the asserted edge they stand in for.
+  // not modelled: drawn in a neutral grey rather than their source-layer accent,
+  // but in the SAME ArchiMate notation (line style + decorations + width) as the
+  // asserted edge they stand in for.
   const derived = data.relation.derived === true;
-  const baseWidth = derived ? 1.4 : 2.2;
+  const color = derived ? EDGE_DERIVED_COLOR : data.color;
+  const baseWidth = 2.2;
   const baseOpacity = 0.62;
   const strokeWidth = data.highlighted ? baseWidth + 1.6 : baseWidth;
   // Opacity rides on the group, not the path's strokeOpacity, so the markers
@@ -391,14 +394,11 @@ function RelationshipEdge({
 
   const style = RELATIONSHIP_STYLE[data.relation.type];
   const { source, target } = edgeDecorations(data);
-  const markerStart = source ? `url(#${edgeMarkerId(source, data.color)})` : undefined;
-  const markerEnd = target ? `url(#${edgeMarkerId(target, data.color)})` : undefined;
+  const markerStart = source ? `url(#${edgeMarkerId(source, color)})` : undefined;
+  const markerEnd = target ? `url(#${edgeMarkerId(target, color)})` : undefined;
 
   return (
-    <g
-      className="relationship-edge"
-      style={{ opacity: derived && !data.highlighted ? opacity * 0.8 : opacity }}
-    >
+    <g className="relationship-edge" style={{ opacity }}>
       <path
         id={id}
         className="relationship-edge__path"
@@ -406,7 +406,7 @@ function RelationshipEdge({
         fill="none"
         markerStart={markerStart}
         markerEnd={markerEnd}
-        stroke={data.color}
+        stroke={color}
         strokeWidth={strokeWidth}
         strokeDasharray={style.dash}
       />

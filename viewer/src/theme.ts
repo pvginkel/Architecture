@@ -199,10 +199,14 @@ export const EDGE_DECORATIONS: EdgeDecoration[] = [
 // this, so any edge colour has a matching marker.
 export const EDGE_FALLBACK_COLOR = "#9aa09a";
 
-/** Every colour an edge (and therefore a marker) can take: the layer accents
- *  plus the fallback. Deduped, stable order. */
+// Derived (render-time bridged) edges render in this neutral grey rather than
+// their source-layer accent, to read as inferred rather than modelled.
+export const EDGE_DERIVED_COLOR = "#9aa0a6";
+
+/** Every colour an edge (and therefore a marker) can take: the layer accents,
+ *  the fallback, and the derived grey. Deduped, stable order. */
 export const EDGE_MARKER_COLORS: string[] = [
-  ...new Set([...Object.values(LAYER_ACCENT), EDGE_FALLBACK_COLOR]),
+  ...new Set([...Object.values(LAYER_ACCENT), EDGE_FALLBACK_COLOR, EDGE_DERIVED_COLOR]),
 ];
 
 /** Sanitise a colour to an id-safe token (`#5b8c5a` → `5b8c5a`). */
