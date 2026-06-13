@@ -2,9 +2,11 @@ id: design-assistant
 label: Design Assistant
 description: The Design Assistant application — an AI drive tool for marketing copy writing and authoring.
 icon: Sparkles
-# The release is the grouping handle. `releases: [design-assistant@prd]` selects
+# The release is the grouping handle. `releases: [design-assistant]` selects
 # the prd deployed runtime as one set — no instance ids to chase, and it scopes
-# cleanly to prd without leaning on the Environment filter. neighbourDepth 1 then
+# cleanly to prd without leaning on the Environment filter (the prd stage is
+# stamped as the bare chart name; other stages would be design-assistant@<stage>).
+# neighbourDepth 1 then
 # pulls each container's component definition back in via the Specialization edge
 # it carries.
 #
@@ -14,7 +16,7 @@ icon: Sparkles
 # would start a hop further out and the whole "what it consumes" half of the view
 # would fall to depth 2 and vanish.
 predicate:
-  releases: [design-assistant@prd]
+  releases: [design-assistant]
 include:
   - app:design-assistant,7ec690ae-15cd-4453-ace0-ede62f8a3e4d
 neighbourDepth: 1
