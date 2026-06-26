@@ -1,0 +1,12 @@
+{
+  "name": "cognitive-complexity",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "analyze": "tsx index.ts"
+  },
+  "dependencies": {
+    "typescript": "~5.7.0",
+    "tsx": "^4.0.0"
+  }
+}

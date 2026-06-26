@@ -6,6 +6,20 @@ dist
 /tmp
 __pycache__/
 *.pyc
+*.tsbuildinfo
+
+# AIWorkflow session-manager state + scratch artifacts
+.claude/sessions/
+/logs
+/.site-stage
+/test_results.md
+coverage_report.md
+*.conversation.json
+.pnpm-store
+
+# env files (keep an example if one is ever added)
+.env*
+!.env.example
 
 # home-automation-fleet generated artifact (build output)
 /tools/ha-fleet/out/
