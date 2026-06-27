@@ -21,4 +21,6 @@ services:
       - .:/work/Architecture:rw
       - ../HelmCharts-2:/work/HelmCharts:rw
       - ../Ansible-2:/work/Ansible:rw
+      - ../AIWorkflow:/work/AIWorkflow:rw
       - ../DockerImages:/work/DockerImages:rw
+      - ../ArchitectureSpecs:/work/ArchitectureSpecs:rw

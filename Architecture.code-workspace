@@ -1,15 +1,23 @@
 {
 	"folders": [
 		{
+			"name": "Architecture",
 			"path": "."
 		},
 		{
+			"name": "ArchitectureSpecs",
+			"path": "../ArchitectureSpecs"
+		},
+		{
+			"name": "Ansible-2",
 			"path": "../Ansible-2"
 		},
 		{
+			"name": "HelmCharts-2",
 			"path": "../HelmCharts-2"
 		},
 		{
+			"name": "DockerImages",
 			"path": "../DockerImages"
 		}
 	]
