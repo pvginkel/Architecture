@@ -24,7 +24,9 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = SCRIPT_DIR.parent
+# This script lives at <repo_root>/tools/ai_workflow/, so the repo root is two
+# levels up. Subproject directories (tooling/viewer/service) sit under it.
+PROJECT_ROOT = SCRIPT_DIR.parent.parent
 SESSIONS_DIR = PROJECT_ROOT / ".claude" / "sessions"
 
 # ---------------------------------------------------------------------------
@@ -213,9 +215,9 @@ def _now_iso() -> str:
 def _project_dir(name: str) -> str:
     """Resolve a project name to its absolute directory path.
 
-    'root' resolves to the monorepo root itself.
-    Internal projects (backend, frontend, portal) live under PROJECT_ROOT.
-    External projects (sse-gateway) live at configured paths outside the monorepo.
+    'root' resolves to the repo root itself.
+    Internal projects (tooling, viewer, service) live under PROJECT_ROOT.
+    External projects (none here) live at configured paths outside the repo.
     """
     if name == "root":
         return str(PROJECT_ROOT)
