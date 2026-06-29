@@ -621,13 +621,45 @@ def emit_vocab_ts(
     out.append(_ts_union_array("CAPABILITY_IDS", "CapabilityId", [c["id"] for c in caps]))
     out.append(_ts_union_array("LIFECYCLE_STATES", "LifecycleState", [s["id"] for s in lifecycles]))
     out.append(_ts_union_array("ENVIRONMENTS", "EnvironmentId", [e["id"] for e in environments]))
-    out.append(_ts_record("KIND_LABELS", "ElementKind", "string", {k: humanise(k) for k in kind_names}))
-    out.append(_ts_record("LAYER_LABELS", "LayerId", "string", {layer: humanise(layer) for layer in layer_ids}))
-    out.append(_ts_record("RELATIONSHIP_LABELS", "RelationshipType", "string", {r: humanise(r) for r in rel_types}))
-    out.append(_ts_record("CAPABILITY_LABELS", "CapabilityId", "string", {c["id"]: c["label"] for c in caps}))
-    out.append(_ts_record("CAPABILITY_SUMMARIES", "CapabilityId", "string", {c["id"]: c["summary"] for c in caps}))
-    out.append(_ts_record("LIFECYCLE_LABELS", "LifecycleState", "string", {s["id"]: s["label"] for s in lifecycles}))
-    out.append(_ts_record("ENVIRONMENT_LABELS", "EnvironmentId", "string", {e["id"]: e["label"] for e in environments}))
+    out.append(
+        _ts_record("KIND_LABELS", "ElementKind", "string", {k: humanise(k) for k in kind_names})
+    )
+    out.append(
+        _ts_record(
+            "LAYER_LABELS", "LayerId", "string", {layer: humanise(layer) for layer in layer_ids}
+        )
+    )
+    out.append(
+        _ts_record(
+            "RELATIONSHIP_LABELS", "RelationshipType", "string", {r: humanise(r) for r in rel_types}
+        )
+    )
+    out.append(
+        _ts_record(
+            "CAPABILITY_LABELS", "CapabilityId", "string", {c["id"]: c["label"] for c in caps}
+        )
+    )
+    out.append(
+        _ts_record(
+            "CAPABILITY_SUMMARIES", "CapabilityId", "string", {c["id"]: c["summary"] for c in caps}
+        )
+    )
+    out.append(
+        _ts_record(
+            "LIFECYCLE_LABELS",
+            "LifecycleState",
+            "string",
+            {s["id"]: s["label"] for s in lifecycles},
+        )
+    )
+    out.append(
+        _ts_record(
+            "ENVIRONMENT_LABELS",
+            "EnvironmentId",
+            "string",
+            {e["id"]: e["label"] for e in environments},
+        )
+    )
     # Logo name → actual filename. Built from the same directory scan as the
     # `logoLibrary` enum, so its key set is identical to the enum: the schema
     # and the viewer can never disagree about which logos exist. The viewer
