@@ -16,7 +16,7 @@ from urllib.parse import urljoin
 import jsonschema
 import yaml
 from jsonschema import Draft202012Validator
-from referencing import Registry, Resource
+from referencing import Registry
 from referencing.jsonschema import DRAFT202012
 
 # Version-agnostic UUID shape (8-4-4-4-12 hex). Not pinned to uuid4: ids may be
@@ -80,9 +80,10 @@ def meta_validate_schemas() -> list[tuple[Path, str | None]]:
     return results
 
 
-def load_master_schema() -> dict:
+def load_master_schema() -> dict[str, Any]:
     """The architecture.schema.yaml document — root of artifact validation."""
-    return load_yaml(SCHEMA_DIR / "architecture.schema.yaml")
+    doc: dict[str, Any] = load_yaml(SCHEMA_DIR / "architecture.schema.yaml")
+    return doc
 
 
 def build_registry() -> Registry:
@@ -97,7 +98,7 @@ def build_registry() -> Registry:
 
     for path in sorted(GENERATED_DIR.glob("*.yaml")):
         doc = load_yaml(path)
-        resource = Resource(contents=doc, specification=DRAFT202012)
+        resource = DRAFT202012.create_resource(doc)
         registry = registry.with_resource(uri=doc["$id"], resource=resource)
         registry = registry.with_resource(uri=path.as_uri(), resource=resource)
         relative_resolved = urljoin(arch_uri, f"./generated/{path.name}")
@@ -121,7 +122,7 @@ def load_capability_enum() -> set[str]:
     return {entry["id"] for entry in doc["entries"]}
 
 
-def load_capability_catalog() -> dict[str, dict]:
+def load_capability_catalog() -> dict[str, dict[str, Any]]:
     """Full capability enum entries keyed by id. Each entry carries the
     Capability element fields (id, label, summary, introduced, lifecycle).
     The collector materialises Capability nodes from these for capabilities
@@ -195,7 +196,7 @@ def parse_id(s: str) -> tuple[str, str | None, str | None]:
 def load_pipeline_producers(
     yaml_path: Path = PIPELINE_PRODUCERS_FILE,
     schema_path: Path = PIPELINE_PRODUCERS_SCHEMA,
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Load and validate the producer registry. Returns the list of entries
     (each a dict with `id` and optional `jenkinsJob`). Raises ValueError on
     schema violation or duplicate id — fail fast at collector startup, no
@@ -216,7 +217,7 @@ def load_pipeline_producers(
             lines.append(f"  at {pointer}: {e.message}")
         raise ValueError("\n".join(lines))
 
-    producers = doc["producers"]
+    producers: list[dict[str, Any]] = doc["producers"]
     seen: dict[str, int] = {}
     for i, p in enumerate(producers):
         if p["id"] in seen:

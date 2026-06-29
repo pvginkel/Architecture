@@ -111,7 +111,7 @@ class CollectorError(Exception):
 
 
 def discover_artifacts(
-    producers: list[dict], input_dir: Path
+    producers: list[dict[str, Any]], input_dir: Path
 ) -> dict[str, list[tuple[Path, str]]]:
     """Reconcile the registered producer list against the contents of
     `input_dir`. Returns a {producer-id: sorted-list-of-yaml-paths} map.
@@ -360,7 +360,7 @@ def backfill_capability_nodes(docs: dict[str, Any]) -> int:
     return len(nodes)
 
 
-def merge_artifacts(docs: dict[str, Any]) -> dict[str, list]:
+def merge_artifacts(docs: dict[str, Any]) -> dict[str, list[Any]]:
     """Union every element-kind array (and relations) across producers.
     Fails the run if any id appears in more than one place, reporting
     both the original producer + kind and the conflicting producer + kind.
@@ -370,7 +370,7 @@ def merge_artifacts(docs: dict[str, Any]) -> dict[str, list]:
     iteration is in sorted order so the merged array order is
     deterministic for the same input set.
     """
-    merged: dict[str, list] = {name: [] for name in (*ELEMENT_KIND_ARRAYS, "relations")}
+    merged: dict[str, list[Any]] = {name: [] for name in (*ELEMENT_KIND_ARRAYS, "relations")}
     seen: dict[str, tuple[str, str]] = {}  # id -> (kind, producer)
     messages: list[str] = []
 
@@ -410,12 +410,12 @@ class ResolutionIndex:
     """
 
     def __init__(self, docs: dict[str, Any]) -> None:
-        self.by_full_id: dict[str, tuple[str, dict, str]] = {}
-        self.by_uuid: dict[str, tuple[str, dict, str]] = {}
+        self.by_full_id: dict[str, tuple[str, dict[str, Any], str]] = {}
+        self.by_uuid: dict[str, tuple[str, dict[str, Any], str]] = {}
         # Internal-hint key is the id-prefix (e.g. "ss", "node") not the
         # YAML array name (e.g. "systemSoftware"), so it lines up with
         # what `parse_id` returns on a reference.
-        self.by_internal_hint: dict[tuple[str, str, str], tuple[str, dict, str]] = {}
+        self.by_internal_hint: dict[tuple[str, str, str], tuple[str, dict[str, Any], str]] = {}
         for pid in sorted(docs):
             doc = docs[pid]
             for kind_name in ELEMENT_KIND_ARRAYS:
@@ -431,7 +431,7 @@ class ResolutionIndex:
 
     def resolve(
         self, ref: str, relation_pid: str
-    ) -> tuple[tuple[str, dict, str] | None, str | None]:
+    ) -> tuple[tuple[str, dict[str, Any], str] | None, str | None]:
         """Return (entry-or-None, ref-supplied-hint-for-divergence-check).
 
         Lookup order:
@@ -697,6 +697,10 @@ def reconcile_alias_hints(
                 if owner_hint is None or ref_hint == owner_hint:
                     continue
                 uuid_key = parse_id(elem["id"])[2]
+                # Reachable only via by_uuid / by_internal_hint resolution, both
+                # of which key on a present UUID (by_full_id hits return a None
+                # ref-hint and are skipped above), so the element always has one.
+                assert uuid_key is not None
                 bucket = divergences.setdefault(
                     uuid_key,
                     {
@@ -715,8 +719,8 @@ def reconcile_alias_hints(
                     }
                 )
 
-    for entry in divergences.values():
-        report["divergences"].append(entry)
+    for divergence in divergences.values():
+        report["divergences"].append(divergence)
 
 
 def normalize_relation_endpoints(
@@ -764,7 +768,7 @@ def new_report() -> dict[str, Any]:
     return {"summary": {}, "warnings": [], "divergences": []}
 
 
-def load_views(views_dir: Path) -> list[dict]:
+def load_views(views_dir: Path) -> list[dict[str, Any]]:
     """Load + schema-validate the authored view files under `views_dir`,
     returned in the order declared by `views_dir/_order.yaml`.
 
@@ -789,7 +793,7 @@ def load_views(views_dir: Path) -> list[dict]:
     )
 
     messages: list[str] = []
-    by_id: dict[str, dict] = {}
+    by_id: dict[str, dict[str, Any]] = {}
     for path in view_files:
         doc = normalize(load_yaml(path))
         errors = sorted(
@@ -862,9 +866,9 @@ def _view_include_regex(entry: str) -> str | None:
 
 
 def check_views(
-    views: list[dict],
+    views: list[dict[str, Any]],
     index: ResolutionIndex,
-    producers: list[dict],
+    producers: list[dict[str, Any]],
 ) -> None:
     """Cross-check every authored view against the merged dataset + vocab:
 
@@ -975,10 +979,10 @@ def check_views(
 
 
 def assemble_merged_dataset(
-    producers: list[dict],
-    merged: dict[str, list],
+    producers: list[dict[str, Any]],
+    merged: dict[str, list[Any]],
     rollups: dict[str, Any],
-    views: list[dict],
+    views: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """The shape downstream consumers (validation service, viewer) read
     from `/data/v0.1/architecture.yaml` and `architecture.json`.
@@ -1014,7 +1018,7 @@ def assemble_merged_dataset(
 def finalize_report(
     report: dict[str, Any],
     docs: dict[str, Any],
-    merged: dict[str, list],
+    merged: dict[str, list[Any]],
 ) -> dict[str, Any]:
     """Fill in `summary`. Phases already appended to warnings + divergences.
     Errors never appear in the report — they failed the run before emit.
@@ -1255,8 +1259,8 @@ def main(
     merged_doc = assemble_merged_dataset(producers, merged, rollups, views)
     finalize_report(report, docs, merged)
     written = emit_outputs(output_dir, merged_doc, report)
-    for p in written:
-        click.echo(f"Wrote {p}")
+    for written_path in written:
+        click.echo(f"Wrote {written_path}")
 
 
 if __name__ == "__main__":

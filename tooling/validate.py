@@ -121,8 +121,8 @@ def main(target: str) -> None:
     if "*" in target or "?" in target:
         from glob import glob
 
-        for p in sorted(glob(target)):
-            paths.append(Path(p))
+        for match in sorted(glob(target)):
+            paths.append(Path(match))
     else:
         paths.append(Path(target))
 
