@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { deriveBridges, MAX_HIDDEN_HOPS } from "./derive";
+import { deriveBridges, filterDerivedByRelation, MAX_HIDDEN_HOPS } from "./derive";
 import { KIND_TO_LAYER, type ElementKind, type RelationshipType } from "../generated/vocab";
+import { defaultRelationshipSelection } from "../filters/state";
 import type { ArchElement, ArchModel } from "../data/model";
 import type { ManifestRelation } from "../data/manifest";
 
@@ -168,5 +169,71 @@ describe("deriveBridges", () => {
     expect(out).toHaveLength(0);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("MAX_HIDDEN_HOPS"));
     warn.mockRestore();
+  });
+});
+
+describe("filterDerivedByRelation", () => {
+  // A model whose visible set bridges across hidden hubs into two different-typed
+  // derived edges: a—Serving→b (DR3 over Composition∘Serving) and
+  // a—Association→c (DR3 over Composition∘Association). Both are "valid", so they
+  // survive the derivation floor and reach filterDerivedByRelation.
+  function twoTypeModel() {
+    return model(
+      [
+        el("a", "ApplicationComponent"),
+        el("b", "ApplicationComponent"),
+        el("c", "ApplicationComponent"),
+        el("h1", "ApplicationComponent"),
+        el("h2", "ApplicationComponent"),
+      ],
+      [
+        rel("a", "Composition", "h1"),
+        rel("h1", "Serving", "b"),
+        rel("a", "Composition", "h2"),
+        rel("h2", "Association", "c"),
+      ],
+    );
+  }
+
+  function deriveTwoTypes() {
+    const derived = deriveBridges(twoTypeModel(), new Set(["a", "b", "c"]));
+    // Guard the fixture: exactly one Serving and one Association bridge.
+    expect(derived.map((d) => d.type).sort()).toEqual(["Association", "Serving"]);
+    return derived;
+  }
+
+  it("drops derived edges whose type is excluded by the relationship selection", () => {
+    const derived = deriveTwoTypes();
+    // Selection contains Serving but not Association.
+    const kept = filterDerivedByRelation(derived, new Set(["Serving"]));
+    expect(kept).toHaveLength(1);
+    expect(kept[0]).toMatchObject({ source: "a", target: "b", type: "Serving" });
+    expect(kept.some((d) => d.type === "Association")).toBe(false);
+  });
+
+  it("hides derived Association under the default baseline and shows it once Association is selected", () => {
+    const derived = deriveTwoTypes();
+
+    // Default baseline hides Association (HIDDEN_RELATIONSHIP_TYPES) — the #74
+    // symptom: derived Associations must NOT render.
+    const baseline = defaultRelationshipSelection();
+    expect(baseline.has("Association")).toBe(false);
+    const underBaseline = filterDerivedByRelation(derived, baseline);
+    expect(underBaseline.some((d) => d.type === "Association")).toBe(false);
+    // Other types still render.
+    expect(underBaseline.some((d) => d.type === "Serving")).toBe(true);
+
+    // Adding Association to the selection makes the derived Association appear.
+    const withAssociation = filterDerivedByRelation(
+      derived,
+      new Set([...baseline, "Association"]),
+    );
+    expect(withAssociation.some((d) => d.type === "Association")).toBe(true);
+  });
+
+  it("keeps all derived edges when the relationship selection is empty or absent", () => {
+    const derived = deriveTwoTypes();
+    expect(filterDerivedByRelation(derived, undefined)).toHaveLength(derived.length);
+    expect(filterDerivedByRelation(derived, new Set())).toHaveLength(derived.length);
   });
 });

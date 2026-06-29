@@ -60,7 +60,7 @@ import {
   edgeMarkerId,
   type EdgeDecoration,
 } from "../theme";
-import { getDirectedLayout } from "./layout";
+import { getDirectedLayout, LAYOUT_ABORTED } from "./layout";
 import { ViewTabs } from "./ViewTabs";
 import { emitToParent, onSetView } from "../parent-bridge";
 import { FilterRail } from "../filters/FilterRail";
@@ -78,11 +78,12 @@ import {
   removeFilterOptions,
   serializeFilters,
   toggleFilterOption,
+  RELATIONSHIP_GROUP,
   type FilterState,
 } from "../filters/state";
 import { SelectionPanel } from "./SelectionPanel";
 import { EdgeSelectionPanel } from "./EdgeSelectionPanel";
-import { deriveBridges } from "../views/derive";
+import { deriveBridges, filterDerivedByRelation } from "../views/derive";
 import {
   pickInitialView,
   resolveViewScope,
@@ -508,7 +509,13 @@ function useVisibleGraph(
       `[derive] ${derived.length} bridge(s) over ${visibleIds.size} visible / ` +
         `${model.elements.length} total node(s) in ${(performance.now() - deriveStart).toFixed(1)}ms`,
     );
-    return { visibleElements, allRelations: [...visibleRelations, ...derived] };
+    // Derived edges honour the same relationship-type selection asserted edges
+    // do (the same filterState.get(RELATIONSHIP_GROUP) computeExpandedVisibleGraph
+    // applied). Unlike asserted edges they get NO revealed-node bypass — see
+    // filterDerivedByRelation for why.
+    const relSelection = filterState.get(RELATIONSHIP_GROUP);
+    const filteredDerived = filterDerivedByRelation(derived, relSelection);
+    return { visibleElements, allRelations: [...visibleRelations, ...filteredDerived] };
   }, [model, scopedModel, filterState, searchTerm, anchors, isolatedId, revealedIds]);
 
   // Placement layer: map the current layout positions onto flow nodes/edges.
@@ -934,39 +941,45 @@ function ArchitectureMapInner() {
     if (nodes.length === 0) {
       return;
     }
-    let cancelled = false;
+    // Aborting on cleanup terminates the in-flight worker (so a superseded
+    // layout does NOT run to completion) and makes its getDirectedLayout reject
+    // LAYOUT_ABORTED — it never resolves, so it can't apply stale positions or
+    // clear the latest run's overlay.
+    const controller = new AbortController();
     // Escalate the overlay the longer the layout runs; never downgrade, so a
     // run that follows a still-spinning one doesn't flicker spinner→muted.
     const muteTimer = window.setTimeout(() => {
-      if (!cancelled) {
-        setLayoutOverlay((current) => (current === "spinner" ? "spinner" : "muted"));
-      }
+      setLayoutOverlay((current) => (current === "spinner" ? "spinner" : "muted"));
     }, 600);
     const spinnerTimer = window.setTimeout(() => {
-      if (!cancelled) {
-        setLayoutOverlay("spinner");
-      }
+      setLayoutOverlay("spinner");
     }, 2000);
-    getDirectedLayout(nodes, edges).then((laidOut) => {
-      if (cancelled) {
-        return;
-      }
-      window.clearTimeout(muteTimer);
-      window.clearTimeout(spinnerTimer);
-      setLayoutOverlay("none");
-      setDirectedPositions(new Map(laidOut.map((item) => [item.id, item.position])));
-      window.requestAnimationFrame(() => {
+    getDirectedLayout(nodes, edges, { signal: controller.signal })
+      .then((laidOut) => {
+        window.clearTimeout(muteTimer);
+        window.clearTimeout(spinnerTimer);
+        setLayoutOverlay("none");
+        setDirectedPositions(new Map(laidOut.map((item) => [item.id, item.position])));
         window.requestAnimationFrame(() => {
-          fitView({
-            duration: 320,
-            padding: 0.12,
-            maxZoom: window.innerWidth < 760 ? 0.58 : 0.72,
+          window.requestAnimationFrame(() => {
+            fitView({
+              duration: 320,
+              padding: 0.12,
+              maxZoom: window.innerWidth < 760 ? 0.58 : 0.72,
+            });
           });
         });
+      })
+      .catch((err) => {
+        // A superseded run always rejects with LAYOUT_ABORTED; swallow only
+        // that. Any other rejection is a real ELK error and must surface.
+        if (err === LAYOUT_ABORTED) {
+          return;
+        }
+        throw err;
       });
-    });
     return () => {
-      cancelled = true;
+      controller.abort();
       window.clearTimeout(muteTimer);
       window.clearTimeout(spinnerTimer);
     };

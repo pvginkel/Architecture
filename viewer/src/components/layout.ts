@@ -1,5 +1,5 @@
 import type { Edge, Node } from "@xyflow/react";
-import ELK from "elkjs/lib/elk-api.js";
+import ELK, { type ElkLayoutArguments, type ElkNode } from "elkjs/lib/elk-api.js";
 import ElkWorker from "elkjs/lib/elk-worker.min.js?worker";
 import { NODE_WIDTH, NODE_HEIGHT, type ArchNodeData, type RelationshipEdgeData } from "../data/model";
 import type { ElementKind, LayerId } from "../generated/vocab";
@@ -9,7 +9,89 @@ import type { ElementKind, LayerId } from "../generated/vocab";
 // thread that locks the tab. The graph fed to layout() and the positions
 // returned are both plain JSON, so the postMessage hop is cheap relative to
 // the compute. Vite's `?worker` import gives a Worker constructor.
-const elk = new ELK({ workerFactory: () => new ElkWorker() });
+//
+// The instance is created LAZILY (getElk), never at module top level: the
+// `?worker` default is not a usable Worker constructor under vitest's node env,
+// so constructing `new ELK({ workerFactory: () => new ElkWorker() })` at import
+// time throws and makes this module unimportable in tests. Deferring it behind a
+// factory keeps the module importable and lets a test inject a fake ELK that
+// never touches the `?worker` path.
+
+/** The slice of the ELK instance this module uses. Typed against the concrete
+ *  ElkNode/ElkLayoutArguments shapes `layoutNodes` passes so the real generic
+ *  `ELK.layout<T extends ElkNode>` is structurally assignable, and so a test
+ *  fake can implement just these two methods. */
+export interface ElkLike {
+  layout(graph: ElkNode, args?: ElkLayoutArguments): Promise<ElkNode>;
+  terminateWorker(): void;
+}
+
+export type ElkFactory = () => ElkLike;
+
+export interface LayoutRunOptions {
+  /** Aborting terminates the worker and skips any pending/next pass; the run
+   *  then rejects with LAYOUT_ABORTED. */
+  signal?: AbortSignal;
+  /** Test seam: defaults to the real `?worker`-backed factory. */
+  elkFactory?: ElkFactory;
+}
+
+/** Rejection value of a superseded (aborted) layout run. The React effect
+ *  recognises it and treats it as "stop"; any *other* rejection is a real ELK
+ *  error and must surface (fail loud). */
+export const LAYOUT_ABORTED = Symbol("LAYOUT_ABORTED");
+
+// The default factory is the ONLY place that constructs the real worker-backed
+// ELK; it is invoked lazily by getElk.
+const defaultElkFactory: ElkFactory = () => new ELK({ workerFactory: () => new ElkWorker() });
+
+// The live ELK instance, created lazily and reused across non-superseded runs
+// (no worker churn). Torn down only on abort (resetElk), after which the next
+// run lazily recreates it.
+let elkInstance: ElkLike | null = null;
+
+function getElk(factory: ElkFactory): ElkLike {
+  if (!elkInstance) {
+    elkInstance = factory();
+  }
+  return elkInstance;
+}
+
+/** Terminate the live worker and forget the instance. Called only on abort, so
+ *  the next layout starts a fresh worker. Idempotent. */
+function resetElk(): void {
+  if (elkInstance) {
+    elkInstance.terminateWorker();
+    elkInstance = null;
+  }
+}
+
+/** Race a pass's layout promise against the abort signal. Terminating the worker
+ *  leaves the in-flight `layout()` promise permanently unsettled (the resolver is
+ *  dropped — verified in elk-api.js PromisedWorker.terminate), so the run MUST
+ *  stop awaiting it on abort rather than expect a resolution/rejection. The
+ *  signal's abort is what tells the awaiter to give up. */
+function raceAbort<T>(layoutPromise: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
+  if (!signal) {
+    return layoutPromise;
+  }
+  let onAbort: (() => void) | undefined;
+  const abortPromise = new Promise<T>((_, reject) => {
+    if (signal.aborted) {
+      reject(LAYOUT_ABORTED);
+    } else {
+      onAbort = () => reject(LAYOUT_ABORTED);
+      signal.addEventListener("abort", onAbort, { once: true });
+    }
+  });
+  // Remove the listener once the race settles either way, so a layout that wins
+  // (the common path) leaves nothing attached to the signal.
+  return Promise.race([layoutPromise, abortPromise]).finally(() => {
+    if (onAbort) {
+      signal.removeEventListener("abort", onAbort);
+    }
+  });
+}
 
 // --- Tier 1 layout semantics --------------------------------------------------
 // ELK gets fed the architecture meaning it was previously starved of:
@@ -134,79 +216,119 @@ function nodePlacementStrategy(nodeCount: number): string {
   return nodeCount <= NETWORK_SIMPLEX_MAX_NODES ? "NETWORK_SIMPLEX" : "BRANDES_KOEPF";
 }
 
-export async function getDirectedLayout(nodes: Node[], edges: Edge[]) {
-  const architectureNodes = nodes.filter((node) => node.type === "architecture");
-  const visibleIds = new Set(architectureNodes.map((node) => node.id));
-  const architectureEdges = edges.filter(
-    (edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target),
-  );
+export async function getDirectedLayout(
+  nodes: Node[],
+  edges: Edge[],
+  options?: LayoutRunOptions,
+) {
+  const signal = options?.signal;
+  // Pre-check: an already-aborted run does no work and rejects immediately.
+  if (signal?.aborted) {
+    throw LAYOUT_ABORTED;
+  }
 
-  // Pass 1: lay the whole graph out. This gives the final positions for views
-  // with no over-wide rows (the common case — one pass, no extra cost) and, when
-  // a row is too wide, reveals exactly which nodes share that row.
-  const first = await layoutNodes(
-    architectureNodes.map((node) => ({
-      id: node.id,
-      width: NODE_WIDTH,
-      height: NODE_HEIGHT,
-      layoutOptions: { "elk.partitioning.partition": String(bandPartition(node)) },
-    })),
-    architectureEdges.map((edge) => ({
-      id: edge.id,
-      sources: [edge.source],
-      targets: [edge.target],
-      layoutOptions: { "elk.priority": String(relationPriority(edge)) },
-    })),
-  );
+  const elk = getElk(options?.elkFactory ?? defaultElkFactory);
 
-  const fans = discoverWideRowFans(architectureNodes, first);
-  if (fans.length === 0) {
+  // A single abort tears the worker down (so each pass's race unblocks) and, via
+  // the per-pass raceAbort, makes this run reject with LAYOUT_ABORTED. Wired once
+  // per run, removed in the finally so a settled run leaves no listener behind.
+  const onAbort = () => {
+    console.debug("[layout] aborted; terminating worker");
+    resetElk();
+  };
+  signal?.addEventListener("abort", onAbort, { once: true });
+
+  try {
+    const architectureNodes = nodes.filter((node) => node.type === "architecture");
+    const visibleIds = new Set(architectureNodes.map((node) => node.id));
+    const architectureEdges = edges.filter(
+      (edge) => visibleIds.has(edge.source) && visibleIds.has(edge.target),
+    );
+
+    // Pass 1: lay the whole graph out. This gives the final positions for views
+    // with no over-wide rows (the common case — one pass, no extra cost) and, when
+    // a row is too wide, reveals exactly which nodes share that row.
+    const first = await layoutNodes(
+      elk,
+      signal,
+      architectureNodes.map((node) => ({
+        id: node.id,
+        width: NODE_WIDTH,
+        height: NODE_HEIGHT,
+        layoutOptions: { "elk.partitioning.partition": String(bandPartition(node)) },
+      })),
+      architectureEdges.map((edge) => ({
+        id: edge.id,
+        sources: [edge.source],
+        targets: [edge.target],
+        layoutOptions: { "elk.priority": String(relationPriority(edge)) },
+      })),
+    );
+
+    const fans = discoverWideRowFans(architectureNodes, first);
+    if (fans.length === 0) {
+      return architectureNodes.map((node) => ({
+        id: node.id,
+        position: first.get(node.id) ?? node.position,
+      }));
+    }
+
+    // Between passes: a filter change may have superseded this run while pass 1
+    // ran. Don't start the (expensive) second pass for a layout no one wants.
+    if (signal?.aborted) {
+      throw LAYOUT_ABORTED;
+    }
+
+    // Pass 2: replace each wide row with a single super-node sized to the grid its
+    // members will occupy, so ELK lays a compact backbone around the boxes instead
+    // of stretching everything across a smeared row. Then expand the boxes back
+    // into grids (which fit exactly — the super-node reserved their footprint).
+    const collapsed = buildCollapsedGraph(architectureNodes, architectureEdges, fans);
+    const second = await layoutNodes(elk, signal, collapsed.children, collapsed.edges);
+
+    const positions = new Map<string, { x: number; y: number }>();
+    for (const node of architectureNodes) {
+      if (!collapsed.memberFan.has(node.id)) {
+        positions.set(node.id, second.get(node.id) ?? node.position);
+      }
+    }
+    for (const fan of fans) {
+      const origin = second.get(fan.id);
+      if (origin) {
+        expandFan(fan, origin, positions);
+      }
+    }
+
     return architectureNodes.map((node) => ({
       id: node.id,
-      position: first.get(node.id) ?? node.position,
+      position: positions.get(node.id) ?? node.position,
     }));
+  } finally {
+    signal?.removeEventListener("abort", onAbort);
   }
-
-  // Pass 2: replace each wide row with a single super-node sized to the grid its
-  // members will occupy, so ELK lays a compact backbone around the boxes instead
-  // of stretching everything across a smeared row. Then expand the boxes back
-  // into grids (which fit exactly — the super-node reserved their footprint).
-  const collapsed = buildCollapsedGraph(architectureNodes, architectureEdges, fans);
-  const second = await layoutNodes(collapsed.children, collapsed.edges);
-
-  const positions = new Map<string, { x: number; y: number }>();
-  for (const node of architectureNodes) {
-    if (!collapsed.memberFan.has(node.id)) {
-      positions.set(node.id, second.get(node.id) ?? node.position);
-    }
-  }
-  for (const fan of fans) {
-    const origin = second.get(fan.id);
-    if (origin) {
-      expandFan(fan, origin, positions);
-    }
-  }
-
-  return architectureNodes.map((node) => ({
-    id: node.id,
-    position: positions.get(node.id) ?? node.position,
-  }));
 }
 
-/** Run the shared ELK config over a child/edge set and return id -> position. */
+/** Run the shared ELK config over a child/edge set and return id -> position.
+ *  The await races the abort signal: an aborted run rejects LAYOUT_ABORTED rather
+ *  than hanging on the now-dead worker's unsettled promise. */
 async function layoutNodes(
+  elk: ElkLike,
+  signal: AbortSignal | undefined,
   children: CollapsedGraph["children"],
   elkEdges: CollapsedGraph["edges"],
 ): Promise<Map<string, { x: number; y: number }>> {
-  const layout = await elk.layout({
-    id: "root",
-    layoutOptions: {
-      ...LAYOUT_OPTIONS,
-      "elk.layered.nodePlacement.strategy": nodePlacementStrategy(children.length),
-    },
-    children,
-    edges: elkEdges,
-  });
+  const layout = await raceAbort(
+    elk.layout({
+      id: "root",
+      layoutOptions: {
+        ...LAYOUT_OPTIONS,
+        "elk.layered.nodePlacement.strategy": nodePlacementStrategy(children.length),
+      },
+      children,
+      edges: elkEdges,
+    }),
+    signal,
+  );
   return new Map(
     layout.children?.map((node) => [node.id, { x: node.x ?? 0, y: node.y ?? 0 }]) ?? [],
   );

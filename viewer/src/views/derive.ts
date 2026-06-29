@@ -24,6 +24,7 @@
 import { ALLOWED_TRIPLES, RELATIONSHIP_TYPES, type RelationshipType } from "../generated/vocab";
 import type { ArchModel } from "../data/model";
 import type { ManifestRelation } from "../data/manifest";
+import { relationSelected } from "../filters/state";
 
 // Largest run of consecutive hidden nodes the engine will bridge across. A path
 // with more hidden interior nodes than this is dropped (and counted — see the
@@ -520,4 +521,18 @@ export interface DerivedRelation extends ManifestRelation {
   confidence: Confidence;
   via: string[];
   viaEdges: string[];
+}
+
+/** Drop derived edges whose type the relationship-type selection excludes, so
+ *  render-time derived edges honour `relationSelected` exactly as asserted edges
+ *  do (empty/absent selection = no constraint; see filters/state.ts). There is
+ *  deliberately NO revealed-node bypass here: that bypass is for the *asserted*
+ *  edges linking revealed interior nodes (so an expanded path is not a field of
+ *  disconnected boxes); extending it to derived edges would let a hidden-type
+ *  derived edge reappear after "Expand derived path". */
+export function filterDerivedByRelation(
+  derived: DerivedRelation[],
+  relSelection: Set<string> | undefined,
+): DerivedRelation[] {
+  return derived.filter((d) => relationSelected(relSelection, d.type));
 }
