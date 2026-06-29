@@ -20,6 +20,7 @@ ruff = "^0.6"
 mypy = "^1.10"
 types-pyyaml = "^6.0"
 types-jsonschema = "^4.0"
+pytest = "^8.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
@@ -34,3 +35,6 @@ select = ["E", "F", "W", "I", "B", "UP"]
 
 [tool.mypy]
 strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
