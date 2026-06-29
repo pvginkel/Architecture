@@ -30,7 +30,7 @@ systemSoftware:
     lifecycle: active
     stereotype: SoftwareProduct
     homepage: https://www.postgresql.org/
-    logo: postgresql.svg
+    logo: postgresql
 
   - id: ss:keycloak,2d45bc1f-81c0-4a98-8c00-5aad17e55214
     label: Keycloak
@@ -39,7 +39,7 @@ systemSoftware:
     lifecycle: active
     stereotype: SoftwareProduct
     homepage: https://www.keycloak.org/
-    logo: keycloak.svg
+    logo: keycloak
 
   - id: ss:keycloak-prd,44444444-4444-4444-8444-444444444441
     label: Keycloak (prd)
