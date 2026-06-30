@@ -28,6 +28,7 @@ applicationComponents:
     introduced: 2026-05-26
     lifecycle: active
     stereotype: SoftwareProduct
+    logo: federated-aac
     sourceRepository: git:pvginkel/Architecture
     stats:
       homepage: https://architecture.webathome.org/viewer/
