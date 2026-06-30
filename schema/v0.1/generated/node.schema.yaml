@@ -58,12 +58,15 @@ properties:
     - coredns
     - cpp
     - csharp
+    - design-assistant
     - dnsmasq
     - docker
     - elastic
     - elasticsearch
     - electronics-inventory
     - external-secrets
+    - federated-aac
+    - ginbov-nl
     - gitblit
     - github
     - gluetun
@@ -71,9 +74,11 @@ properties:
     - grafana
     - guacamole
     - haproxy
+    - headlamp
     - helm
     - home-assistant
     - html5
+    - intercom-server
     - iot-support
     - java
     - javascript
@@ -83,12 +88,15 @@ properties:
     - keepalived
     - keycloak
     - kibana
+    - kubecoder
     - kubernetes
     - markdown
     - maven
     - metallb
     - mosquitto
     - msbuild
+    - mydownloads
+    - newsfilter
     - nginx
     - nodejs
     - openai
@@ -111,12 +119,16 @@ properties:
     - rust
     - s3
     - samba
+    - scantopdf
     - smallstep
+    - sse-gateway
     - systemd
+    - telegram
     - terraform
     - typescript
     - ubiquiti
     - ubuntu
+    - webathome
     - xaml
     - xml
     - yaml

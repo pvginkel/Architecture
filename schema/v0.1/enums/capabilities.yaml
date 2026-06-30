@@ -206,3 +206,9 @@ entries:
     summary: Exposes tools and resources to LLM agents over the Model Context Protocol (MCP).
     lifecycle: active
     introduced: 2026-06-08
+
+  - id: cap:web-ui
+    label: Web UI
+    summary: Offers a browser-facing web UI a human points a browser at. Positive opt-in — machine endpoints (APIs, /metrics, MQTT, S3) do not realize it.
+    lifecycle: active
+    introduced: 2026-06-30
