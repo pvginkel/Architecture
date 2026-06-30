@@ -1,0 +1,95 @@
+schemaVersion: '0.1'
+producers:
+- widget
+- helm
+nodes: []
+devices: []
+systemSoftware:
+- id: ss:rabbitmq,22222222-2222-4222-8222-222222222221
+  label: RabbitMQ
+  summary: Broker product.
+  introduced: '2024-07-12'
+  lifecycle: active
+  stereotype: SoftwareProduct
+  logo: rabbitmq
+  producer: helm
+- id: ss:widget-prd-broker,22222222-2222-4222-8222-222222222222
+  label: widget/broker (prd)
+  summary: Running broker for Widget.
+  introduced: '2024-07-12'
+  lifecycle: active
+  environment: prd
+  cluster: prd
+  producer: helm
+  logo: rabbitmq
+applicationComponents:
+- id: app:widget-prd-app,33333333-3333-4333-8333-333333333331
+  label: widget/app (prd)
+  summary: Running Widget.
+  introduced: '2024-07-12'
+  lifecycle: active
+  environment: prd
+  cluster: prd
+  producer: helm
+  logo: ansible
+- id: app:widget,11111111-1111-4111-8111-111111111111
+  label: Widget
+  summary: The Widget product.
+  introduced: '2024-07-12'
+  lifecycle: active
+  stereotype: SoftwareProduct
+  producer: widget
+  logo: ansible
+applicationServices:
+- id: svc:widget-prd,44444444-4444-4444-8444-444444444441
+  label: widget (prd)
+  summary: Widget service.
+  introduced: '2024-07-12'
+  lifecycle: active
+  environment: prd
+  cluster: prd
+  producer: helm
+  logo: ansible
+applicationInterfaces:
+- id: if:widget,55555555-5555-4555-8555-555555555551
+  label: widget.home
+  summary: Widget ingress.
+  introduced: '2024-07-12'
+  lifecycle: active
+  environment: prd
+  cluster: prd
+  stats:
+    url: widget.home
+  producer: helm
+  logo: ansible
+technologyServices: []
+technologyInterfaces: []
+capabilities: []
+businessServices: []
+groupings: []
+relations:
+- id: rel:app-spec-product
+  source: app:widget-prd-app,33333333-3333-4333-8333-333333333331
+  target: app:widget,11111111-1111-4111-8111-111111111111
+  type: Specialization
+- id: rel:broker-spec-rabbitmq
+  source: ss:widget-prd-broker,22222222-2222-4222-8222-222222222222
+  target: ss:rabbitmq,22222222-2222-4222-8222-222222222221
+  type: Specialization
+- id: rel:app-realizes-svc
+  source: app:widget-prd-app,33333333-3333-4333-8333-333333333331
+  target: svc:widget-prd,44444444-4444-4444-8444-444444444441
+  type: Realization
+- id: rel:if-assign-svc
+  source: if:widget,55555555-5555-4555-8555-555555555551
+  target: svc:widget-prd,44444444-4444-4444-8444-444444444441
+  type: Assignment
+derived:
+  groupings: {}
+  capabilityRealizations: {}
+views:
+- id: everything
+  label: Everything
+  description: "The whole model \u2014 explore freely with the filters."
+  icon: Globe
+  predicate: {}

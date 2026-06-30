@@ -39,6 +39,7 @@ from _arch import (
     load_kind_names,
     load_layer_ids,
     load_lifecycle_ids,
+    load_logo_library,
     load_pipeline_producers,
     load_yaml,
     normalize,
@@ -760,6 +761,108 @@ def normalize_relation_endpoints(
     return rewritten
 
 
+def stamp_inherited_logos(
+    merged: dict[str, list[Any]],
+    producers: list[dict[str, Any]],
+    logo_library: set[str],
+) -> int:
+    """Stamp a `logo` onto every element that doesn't author one, resolved along
+    the ownership edges the producers already emit. A product carries one logo
+    and its instances/services/interfaces light up for free — no per-instance
+    authoring. Resolution order per logo-less element:
+
+      1. own `logo`                                     (authored — wins)
+      2. Specialization target            (instance  → product)
+      3. realizing component              (ApplicationService ← Realization)
+      4. assigned service / composing owner (Interface → Assignment / ← Composition)
+      5. producer default                 (pipeline-producers.yaml `defaultLogo`)
+
+    Stamped at merge time, so every consumer (viewer, homeapps) keeps reading a
+    plain `logo` field with no resolution logic of its own. Runs after endpoint
+    normalisation so the relation graph keys on canonical ids. Returns the count
+    stamped. A `defaultLogo` that isn't a real asset fails the build.
+    """
+    default_for: dict[str, str] = {}
+    bad: list[str] = []
+    for p in producers:
+        dl = p.get("defaultLogo")
+        if dl is None:
+            continue
+        if dl not in logo_library:
+            bad.append(f"producer {p['id']!r}: defaultLogo {dl!r} is not in the logo library")
+        default_for[p["id"]] = dl
+    if bad:
+        raise CollectorError("logo-inheritance", bad)
+
+    by_id: dict[str, tuple[str, dict[str, Any]]] = {}
+    for kind in ELEMENT_KIND_ARRAYS:
+        for elem in merged[kind]:
+            by_id[elem["id"]] = (kind, elem)
+
+    spec_target: dict[str, list[str]] = {}   # element  → its Specialization targets
+    realizes_src: dict[str, list[str]] = {}  # target   ← Realization sources
+    assign_target: dict[str, list[str]] = {}  # element → its Assignment targets
+    compose_src: dict[str, list[str]] = {}   # target   ← Composition sources
+    for rel in merged["relations"]:
+        s, t = rel["source"], rel["target"]
+        match rel["type"]:
+            case "Specialization":
+                spec_target.setdefault(s, []).append(t)
+            case "Realization":
+                realizes_src.setdefault(t, []).append(s)
+            case "Assignment":
+                assign_target.setdefault(s, []).append(t)
+            case "Composition":
+                compose_src.setdefault(t, []).append(s)
+
+    resolved: dict[str, str] = {}  # positive memo only
+
+    def resolve(eid: str, stack: frozenset[str]) -> str | None:
+        if eid in resolved:
+            return resolved[eid]
+        if eid in stack:
+            return None
+        entry = by_id.get(eid)
+        if entry is None:
+            return None
+        kind, elem = entry
+        own = elem.get("logo")
+        if own:
+            resolved[eid] = own
+            return own
+        nxt = stack | {eid}
+        candidates: list[str] = list(spec_target.get(eid, ()))
+        if kind == "applicationServices":
+            candidates += realizes_src.get(eid, ())
+        if kind in ("applicationInterfaces", "technologyInterfaces"):
+            candidates += assign_target.get(eid, ())
+            candidates += compose_src.get(eid, ())
+        for cand in candidates:
+            r = resolve(cand, nxt)
+            if r:
+                resolved[eid] = r
+                return r
+        dl = default_for.get(elem.get("producer"))
+        if dl:
+            resolved[eid] = dl
+            return dl
+        return None
+
+    stamped = 0
+    # Capabilities carry their own glyphs (CAPABILITY_ICON); never give them a logo.
+    for kind in ELEMENT_KIND_ARRAYS:
+        if kind == "capabilities":
+            continue
+        for elem in merged[kind]:
+            if elem.get("logo"):
+                continue
+            r = resolve(elem["id"], frozenset())
+            if r:
+                elem["logo"] = r
+                stamped += 1
+    return stamped
+
+
 def new_report() -> dict[str, Any]:
     """Empty validation-report scaffold. Phases append to `warnings` and
     `divergences`; the emit step (item 10) finalises `summary` and writes
@@ -1225,6 +1328,15 @@ def main(
     click.echo(
         f"Reference normalisation: {rewritten} relation endpoint(s) rewritten "
         f"to canonical element ids."
+    )
+
+    try:
+        stamped_logos = stamp_inherited_logos(merged, producers, load_logo_library())
+    except CollectorError as e:
+        _fail(e)
+    click.echo(
+        f"Logo inheritance: stamped `logo` onto {stamped_logos} element(s) "
+        f"via ownership edges + producer defaults."
     )
 
     try:

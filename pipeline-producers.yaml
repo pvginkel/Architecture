@@ -20,38 +20,55 @@ producers:
     jenkinsJob: AaC/DockerImages
   - id: ssegateway
     jenkinsJob: AaC/SSEGateway
+    defaultLogo: sse-gateway
   - id: electronics-inventory
     jenkinsJob: AaC/ElectronicsInventory
+    defaultLogo: electronics-inventory
   - id: electronics-inventory-ui
     jenkinsJob: AaC/ElectronicsInventoryUI
+    defaultLogo: electronics-inventory
   - id: iotsupport-app
     jenkinsJob: AaC/IoTSupport
+    defaultLogo: iot-support
   - id: iotsupport-ui
     jenkinsJob: AaC/IoTSupportUI
+    defaultLogo: iot-support
   - id: dhcpapp
     jenkinsJob: AaC/DHCPApp
+    defaultLogo: dnsmasq
   - id: dhcpapp-ui
     jenkinsJob: AaC//DHCPAppUI
+    defaultLogo: dnsmasq
   - id: zigbee-control
     jenkinsJob: AaC/ZigbeeControl
+    defaultLogo: zigbee2mqtt
   - id: zigbee-control-ui
     jenkinsJob: AaC/ZigbeeControlUI
+    defaultLogo: zigbee2mqtt
   - id: design-assistant
     jenkinsJob: AaC/DesignAssistant
+    defaultLogo: design-assistant
   - id: ginbov-nl
     jenkinsJob: AaC/Ginbov
+    defaultLogo: ginbov-nl
   - id: newsfilter
     jenkinsJob: AaC/NewsFilter
+    defaultLogo: newsfilter
   - id: scantopdf-server
     jenkinsJob: AaC/ScanToPdf
+    defaultLogo: scantopdf
   - id: webathome-org
     jenkinsJob: AaC/Webathome
+    defaultLogo: webathome
   - id: mydownloads-server
     jenkinsJob: AaC/MyDownloadsServer
+    defaultLogo: mydownloads
   - id: gitblit-mcp-server
     jenkinsJob: AaC/GitblitMCPServer
+    defaultLogo: gitblit
   - id: gitblit-initializer
     jenkinsJob: AaC/GitblitMCPSupportPlugin
+    defaultLogo: gitblit
   # ── batch 2: ESP32 firmware, Android clients, kiosk, intercom server ──
   - id: calendar-display
     jenkinsJob: AaC/CalendarDisplay
@@ -71,9 +88,12 @@ producers:
     jenkinsJob: AaC/InfraStatisticsDisplay
   - id: intercom-server
     jenkinsJob: AaC/IntercomServer
+    defaultLogo: intercom-server
   - id: scantopdf-client
     jenkinsJob: AaC/ScanToPdfClient
+    defaultLogo: scantopdf
   - id: mydownloads-client
     jenkinsJob: AaC/MyDownloadsClient
+    defaultLogo: mydownloads
   - id: kitchen-display
     jenkinsJob: AaC/KitchenDisplay

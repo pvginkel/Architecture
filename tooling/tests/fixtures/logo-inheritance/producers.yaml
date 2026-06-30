@@ -1,0 +1,6 @@
+producers:
+- id: widget
+  jenkinsJob: Widget/master
+  defaultLogo: ansible
+- id: helm
+  jenkinsJob: HelmCharts/master

@@ -122,6 +122,15 @@ def load_capability_enum() -> set[str]:
     return {entry["id"] for entry in doc["entries"]}
 
 
+def load_logo_library() -> set[str]:
+    """Set of valid bare logo names. Read from the `logo` enum the generator
+    embeds identically in every per-kind schema (here: applicationcomponent),
+    so it stays in lockstep with viewer/public/logos/ without re-scanning the
+    asset directory (which the collector's build stage need not have)."""
+    doc = load_yaml(GENERATED_DIR / "applicationcomponent.schema.yaml")
+    return set(doc["properties"]["logo"]["enum"])
+
+
 def load_capability_catalog() -> dict[str, dict[str, Any]]:
     """Full capability enum entries keyed by id. Each entry carries the
     Capability element fields (id, label, summary, introduced, lifecycle).
