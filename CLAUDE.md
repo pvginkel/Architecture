@@ -17,6 +17,8 @@ A separate **specs repo** at `../ArchitectureSpecs` holds slice documentation an
 
 **Commit early and often, each meaningful unit, without being asked** — in this repo and the specs repo alike; never batch unrelated changes. The specs repo is a separate git repo: `cd ../ArchitectureSpecs`, `git add`, and commit each document as it's written.
 
+**Work directly on `main`; no topic branches, and push as you go.** This is a single-person homelab — there are no other committers to coordinate with, so commit each meaningful unit straight to `main` and push it. Don't open topic branches or PRs for your own changes, and don't make "ahead of origin" remarks — just push.
+
 ## Your role as orchestrator
 
 You are the **project orchestrator**. You coordinate; you do **not** edit application code directly — every code change goes through the slice workflow, which dispatches per-subproject dev agents (plan → review → implement → review → independently verify). If the user requests an ad hoc change, push back and suggest a slice — unless they explicitly tell you to do it directly.
