@@ -3,6 +3,7 @@ import { loadSchemas, SchemaLoadError, type SchemaBundle } from "./schema-loader
 import { mountStatic, resolveViewerRoot, resolveDataRoot } from "./static.js";
 import { mountValidate } from "./validate.js";
 import { mountLayoutProxy } from "./layout-proxy.js";
+import { mountLogos } from "./logos.js";
 import { createMetrics, mountMetrics, type Metrics } from "./metrics.js";
 import { mountUsage } from "./usage.js";
 
@@ -34,6 +35,7 @@ export function createApp(opts: AppOptions = {}): Express {
 
   app.use(mountUsage({ usagePath: opts.usagePath }));
   app.use(mountStatic({ viewerRoot, bundle, dataRoot }));
+  app.use(mountLogos({ viewerRoot }));
   app.use(mountValidate({ bundle, metrics }));
   app.use(mountLayoutProxy({ target: opts.layoutServiceUrl }));
   app.use(mountMetrics(metrics));
