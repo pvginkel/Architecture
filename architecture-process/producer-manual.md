@@ -529,6 +529,15 @@ discovery), add a `Realization` from your firmware `ss:` element to
 `cap:iot-device`. That single edge is the selection axis for the IoT view —
 it is how your device shows up in it.
 
+**Browser UIs Realize `cap:web-ui`.** If a service or interface offers a
+browser-facing UI a human opens, add a `Realization` to `cap:web-ui` — the
+homeapps launcher surfaces every `cap:web-ui` interface (prd) as a tile. It is a
+positive opt-in: mark only human UIs. An HTTP server is not a web UI — machine
+endpoints never get it (REST/gRPC APIs, `/metrics`, MQTT/pub-sub, S3/object
+storage, MCP servers, image registries, ACME/CA). Prefer marking the
+**interface** when one service backs both a UI and a non-UI surface (e.g.
+OpenBao's 443 console vs its 8200 admin API) so only the UI becomes a tile.
+
 ```
 cap:iam                       Identity & Access Management
 cap:secrets-management        Secrets storage / rotation / lease management
@@ -562,6 +571,8 @@ cap:vpn                       Encrypted network tunnel
 cap:media-streaming           Audio/video catalogue, transcoding, client delivery
 cap:home-automation           Sensor/actuator orchestration over Zigbee/MQTT
 cap:iot-device                IoT device (in-house ESP32 firmware; MQTT-discovery, managed by IoTSupport)
+cap:mcp                       Model Context Protocol server (tools/resources for LLM agents)
+cap:web-ui                    Browser-facing web UI a human opens (homeapps launcher tiles; opt-in, never for APIs)
 ```
 
 If a needed capability isn't listed, raise it with Pieter — adding
