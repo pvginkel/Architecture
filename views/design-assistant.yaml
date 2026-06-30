@@ -16,7 +16,7 @@ icon: Sparkles
 # would start a hop further out and the whole "what it consumes" half of the view
 # would fall to depth 2 and vanish.
 predicate:
-  releases: [design-assistant]
+  releases: [design-assistant@dev]
 include:
   - app:design-assistant,7ec690ae-15cd-4453-ace0-ede62f8a3e4d
 neighbourDepth: 1
