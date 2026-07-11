@@ -318,9 +318,10 @@ relations:
     boundBy: "env:NGINX_CERTBOT_ENDPOINT"
 ```
 
-The consumption edge's **`source` is always the consumer** and `type` is
-`Association`. The recipe lives with the consumer (its own producer
-authors it), never in whatever packages or deploys it. The edge's
+For a provider-agnostic recipe the consumption edge's **`source` is always
+the consumer** and `type` is `Association` — the external-service case below
+flips this to `Serving`. The recipe lives with the consumer (its own
+producer authors it), never in whatever packages or deploys it. The edge's
 **target** says how specific the dependency is:
 
 - **`target: cap:<x>`** — a *substitutable* capability the consumer's
@@ -336,11 +337,25 @@ authors it), never in whatever packages or deploys it. The edge's
   var carries the wire (and to let the deployer project the edge onto the
   right instance/container); omit it when the logical edge suffices.
 
-A real runtime dependency whose provider is located by something *other*
-than an environment variable — a config file, an in-cluster service
-account — is still a legitimate consumption edge; it simply carries no
-`boundBy` (no `env:` recipe exists) and never resolves to a concrete
-`Serving` edge. Model it when it documents a real dependency.
+**External services — author the `Serving` edge, not an `Association`.** A
+third-party SaaS or any provider reached at a fixed, hardcoded host that no
+producer deploys (OpenAI, the Telegram Bot API, a public RSS feed, Firebase)
+carries no `boundBy` and is *never* resolved into a concrete edge by a
+deployer — there is none in the loop. Left as an `Association` it strands in
+the provider-agnostic recipe layer, reading as a generic, un-actioned
+dependency (and is hidden wherever Associations are filtered). Instead author
+the concrete form a resolved `boundBy` would have produced:
+`external-svc —Serving→ consumer` (source the service, target the consumer).
+It is the same `provider —Serving→ consumer` shape deployers hand-author
+where auto-resolution can't reach (e.g. `svc:openbao-api-prd —Serving→` the
+ESO controller), and it renders as the real dependency it is. Use `Serving`
+for every external-service consumption; reserve the unresolved `Association`
+for in-house recipes a deployer will resolve into that `Serving` for you.
+
+A dependency on an *in-house* provider located by a config file or service
+account (no `env:` recipe) may still be a plain `Association` with no
+`boundBy`; it just never resolves to a concrete `Serving`. Model it when it
+documents a real dependency.
 
 **`boundByDefaultValue` — the recipe's fallback value.** When the edge is
 real but no deployed container sets the env var, because the consumer's
