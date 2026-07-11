@@ -1,11 +1,15 @@
 # Architecture repo as self-producer — shared external services.
 #
-# Canonical entries for external SaaS that more than one in-house producer
-# consumes, lifted here so they're declared once and referenced by UUID rather
-# than re-minted per consumer. (OpenAI — design-assistant, electronics-inventory,
-# newsfilter. Telegram Bot API — jenkins-telegram-bot, telegram-mcp-server,
-# newsfilter.) Single-consumer external services stay in their consuming producer
-# until reuse appears.
+# Canonical entries for external / third-party SaaS that in-house producers reach
+# over a hardcoded host (never boundBy-resolved), declared once here and
+# referenced by UUID rather than re-minted per consumer. Multi-consumer services
+# are lifted here on sight (OpenAI — design-assistant, electronics-inventory,
+# newsfilter; Telegram Bot API — jenkins-telegram-bot, telegram-mcp-server,
+# newsfilter; GitHub — KubeCoder controller/worker + git-sync). Foundational
+# third-party SaaS are kept here even with a single current consumer so the
+# catalogue stays in one place (Anthropic, VS Code Dev Tunnels — KubeCoder).
+# The provider->consumer Serving edge itself is authored in each consuming
+# producer's own artifact, not here.
 
 schemaVersion: "0.1"
 producer: architecture
@@ -33,3 +37,37 @@ applicationServices:
     logo: telegram
     stats:
       homepage: https://telegram.org/
+
+  - id: svc:github-api,f2b55a4f-e295-499e-b514-c8162948d04c
+    label: GitHub
+    summary: >-
+      GitHub HTTPS surface — the REST API (api.github.com) for repository
+      discovery and git-over-HTTPS (github.com) for clone, fetch and push.
+      Hardcoded hosts; consumers carry no boundBy.
+    introduced: 2026-07-12
+    lifecycle: active
+    logo: github
+    stats:
+      homepage: https://github.com/
+
+  - id: svc:anthropic-api,6be141b1-1e99-4304-8647-8eb29bccbc14
+    label: Anthropic API
+    summary: >-
+      Anthropic HTTPS API (api.anthropic.com) backing the Claude coding agent,
+      dialed by the in-pod Claude CLI. Hardcoded host; consumers carry no
+      boundBy.
+    introduced: 2026-07-12
+    lifecycle: active
+    stats:
+      homepage: https://www.anthropic.com/
+
+  - id: svc:vscode-dev-tunnels,64867b93-91bf-406f-8427-2001475f43f0
+    label: VS Code Dev Tunnels
+    summary: >-
+      Microsoft Dev Tunnels relay (global.rel.tunnels.api.visualstudio.com) that
+      the `code tunnel` client dials so an operator's VS Code can reach an in-pod
+      session. Hardcoded host; consumers carry no boundBy.
+    introduced: 2026-07-12
+    lifecycle: active
+    stats:
+      homepage: https://code.visualstudio.com/docs/remote/tunnels
