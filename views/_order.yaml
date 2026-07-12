@@ -3,6 +3,7 @@
 # `everything` view last. Adding a view = a file under views/ + an entry here.
 order:
   - landscape
+  - kubecoder
   - design-assistant
   - intercom
   - scanner

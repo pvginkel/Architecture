@@ -1,0 +1,24 @@
+id: kubecoder
+label: KubeCoder
+description: KubeCoder — per-project Claude dev environments on Kubernetes, spanning the controller, bot, MCP adapter and in-pod worker plus what they consume.
+icon: Container
+# Mirrors the per-app view shape. `releases: [kubecoder]` selects the prd
+# deployed set (controller, bot, mcp instances — stamped with the bare chart
+# name at prd); neighbourDepth 1 pulls each container's product definition back
+# in via its Specialization edge.
+#
+# All four products are include-anchored: every edge — the wire surface each
+# realizes, the internal consumes-* edges (①/②/③), cap:mcp and
+# cap:container-orchestration, and the external GitHub / Anthropic / Telegram /
+# VS Code Dev Tunnels Serving edges — is authored on a product, so naming them
+# lands those one hop out. The worker also has no chart instance (it is injected
+# into env pods as an ImageVolume), so anchoring it is the only way it and its
+# GitHub/Anthropic/tunnel dependencies appear at all.
+predicate:
+  releases: [kubecoder]
+include:
+  - app:kubecoder-controller,ae8fd615-65fe-4d32-88d8-8803aa30630a # Controller
+  - app:kubecoder-bot,b6116876-1d4d-456e-9f58-b4e1e4d42408 # Bot
+  - app:kubecoder-mcp,2ecc48f5-6fae-4bec-bc10-51a84dfb006e # MCP adapter
+  - app:kubecoder-worker,abd40d9f-7123-49de-94fc-c4d52ef7b504 # Worker
+neighbourDepth: 1
