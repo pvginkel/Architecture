@@ -1,0 +1,15 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "architecture",
+  "description": "webathome.org federated Architecture-as-Code tooling.",
+  "owner": {
+    "name": "Pieter van Ginkel"
+  },
+  "plugins": [
+    {
+      "name": "arch",
+      "source": "./arch",
+      "description": "Producer-onboarding tooling for the webathome.org federated Architecture-as-Code system: the /arch:seed-architecture skill, the update-architecture and update-architecture-generated agents, and the bundled producer manual, starter skeleton, CLAUDE.md snippet, and validator."
+    }
+  ]
+}
