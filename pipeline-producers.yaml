@@ -97,3 +97,6 @@ producers:
     defaultLogo: mydownloads
   - id: kitchen-display
     jenkinsJob: AaC/KitchenDisplay
+  - id: kubecoder
+    jenkinsJob: AaC/KubeCoder
+    defaultLogo: kubecoder
