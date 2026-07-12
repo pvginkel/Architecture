@@ -238,5 +238,6 @@ export const VIEW_ICON: Record<string, LucideIcon> = {
   Sparkles,
   Radio,
   ScanLine,
+  Container,
   Globe,
 };
