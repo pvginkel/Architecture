@@ -37,10 +37,26 @@ plugin, so it works wherever it is installed.
 
 ## Installation
 
-The plugin is installed into the operator's `~/.claude/` from this repo's `arch/` directory
-(local plugin source — the repo is the origin, so an install is just a pull + reinstall, not
-a mirror). The exact install command is recorded here once the local-marketplace wiring is
-settled.
+This repo is itself a local Claude Code **marketplace**:
+[`.claude-plugin/marketplace.json`](../.claude-plugin/marketplace.json) (marketplace name
+`architecture`) lists the `arch` plugin with `source: ./arch`. Install it into `~/.claude/`
+by running, from a checkout of this repo:
+
+```
+/plugin marketplace add .
+/plugin install arch@architecture
+```
+
+The marketplace source is a **local path**, so the plugin is read live from this checkout —
+editing files under `arch/` takes effect without reinstalling (if a refresh is ever needed,
+`/plugin marketplace update architecture`). Installing from the local checkout does **not**
+require the repo to be pushed first. For a throwaway session without installing at all,
+`claude --plugin-dir arch` loads it for that session only.
+
+Component invocation once installed: the skill is `/arch:seed-architecture` (skills are
+plugin-namespaced); the agents are referenced by their bare names `update-architecture` /
+`update-architecture-generated` (plugin agents are not namespaced, and a same-named
+`.claude/agents/` file would override the plugin's).
 
 ## Editing
 
