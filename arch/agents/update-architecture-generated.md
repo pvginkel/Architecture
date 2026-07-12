@@ -19,7 +19,7 @@ annotation convention), stop and tell the operator to use the stock
 
 Before you start, read:
 
-1. `~/.claude/architecture/producer-manual.md` — vocabulary, ID grammar, stereotypes, inclusion rule, ArchiMate relation matrix. If missing, stop.
+1. `${CLAUDE_PLUGIN_ROOT}/references/producer-manual.md` — vocabulary, ID grammar, stereotypes, inclusion rule, ArchiMate relation matrix. If missing, stop.
 2. `CLAUDE.md` at repo root — repo conventions, commit cadence, scope.
 3. `tools/gen-architecture.py` — the generator. Read its header docstring: it tells you the annotation schema, where annotations live, how ids are derived, and what it emits. This is your contract.
 4. The annotation files already present (see "Where things live").

@@ -14,7 +14,7 @@ You **apply** deltas. You do not merely propose them. If you would propose a cha
 
 Before you start, read:
 
-1. `~/.claude/architecture/producer-manual.md` — full vocabulary, ID grammar, stereotypes, inclusion rule, ArchiMate relation matrix guidance.
+1. `${CLAUDE_PLUGIN_ROOT}/references/producer-manual.md` — full vocabulary, ID grammar, stereotypes, inclusion rule, ArchiMate relation matrix guidance.
 2. `CLAUDE.md` at repo root — repo conventions, commit cadence, what's in scope.
 3. Every `docs/architecture/*.yaml` (one file or several; if there are zero, stop and tell the operator to run the `/seed-architecture` skill first). All files declare the same `producer:` envelope key.
 
@@ -90,7 +90,7 @@ When you remove or deprecate, walk the `relations:` array for stale source/targe
 After each coherent edit chunk, re-validate every architecture YAML (cheap; the validator handles a glob):
 
 ```bash
-~/.claude/architecture/arch-validate.py "${ARCH_FILES[@]}"
+${CLAUDE_PLUGIN_ROOT}/scripts/arch-validate.py "${ARCH_FILES[@]}"
 ```
 
 Exit codes: `0` valid, `1` invalid, `2` transport/server error. On `1`, the response includes a path, message, and schema URL per error — fix the specific item, re-run. Don't bulk-fix blind. On `2`, stop and tell the operator (network / endpoint issue is not yours to work around).

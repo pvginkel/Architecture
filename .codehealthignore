@@ -8,7 +8,7 @@ tools/
 # Data, schema, and pipeline config — not code
 schema/
 views/
-architecture-process/
+arch/
 pipeline-producers.yaml
 pipeline-producers.schema.yaml
 views.schema.yaml

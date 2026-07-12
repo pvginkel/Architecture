@@ -11,7 +11,7 @@ Architecture is a federated **Architecture-as-Code** system for [webathome.org](
 - **`viewer/`** — the React + ReactFlow + ELK viewer (Vite, TypeScript, npm) that renders the merged dataset.
 - **`service/`** — the Express + TypeScript service (npm) that serves the viewer bundle and the published dataset/API.
 - **`schema/`** — the v0.1 metaschema + enums (source of the generated JSON Schemas + viewer vocab).
-- **`architecture-process/`** — operator-side producer-onboarding snapshot, kept in two-way sync with `~/.claude/` (see [`docs/architecture-process-sync.md`](docs/architecture-process-sync.md)).
+- **`arch/`** — the `arch` Claude Code plugin packaging the operator-side producer-onboarding tooling (the `/arch:seed-architecture` skill, the `update-architecture` agents, the producer manual, the starter skeleton, the validator), installed into `~/.claude/` from here (see [`docs/arch-plugin.md`](docs/arch-plugin.md)).
 
 A separate **specs repo** at `../ArchitectureSpecs` holds slice documentation and per-feature planning artifacts (change-request bundles, slices, the decision index). Slices live under `slices/` grouped by lifecycle state — pending at the top, `completed/` / `deferred/` / `cancelled/` for the rest; see its README.
 
@@ -87,7 +87,7 @@ Use `python3 tools/ai_workflow/send_message.py --title "<title>" "<message>"` to
 - [`docs/documentation-model.md`](docs/documentation-model.md) — how the project docs are organized and kept current (read first).
 - [`docs/index.md`](docs/index.md) and `tooling/`/`viewer/`/`service/` `docs/index.md` — per-scope topic-doc indexes; assemble a reading list from these.
 - [`docs/capability-enum.md`](docs/capability-enum.md) — the three places a `cap:` enum entry must touch (enum → generated vocab → hand-added viewer icon). Easy to forget; it has bitten us.
-- [`docs/architecture-process-sync.md`](docs/architecture-process-sync.md) — the two-way `architecture-process/` ↔ `~/.claude/` sync (those onboarding agents/skills are global, not in this repo).
+- [`docs/arch-plugin.md`](docs/arch-plugin.md) — the `arch/` plugin that packages the producer-onboarding tooling (seed skill, update agents, manual, validator) and installs into `~/.claude/`.
 - [`docs/deployment.md`](docs/deployment.md) — self-hosted K8s/Jenkins context; the container artifact is the deliverable.
 - `../ArchitectureSpecs/decisions.md` — the thin `DNNN` decision index. `../ArchitectureSpecs/slices/README.md` — the slice index.
 - `/major-change`, `/minor-change` — the dev-session change workflows.

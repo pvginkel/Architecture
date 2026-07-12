@@ -5,8 +5,8 @@ webathome.org federated Architecture-as-Code system, distilled from the May 2026
 backfill that onboarded 17 producers (21 app products) in one pass. Use it for the
 next batch.
 
-The federation model, vocabulary, and rules are in
-`~/.claude/architecture/producer-manual.md` (authoritative). This playbook is the
+The federation model, vocabulary, and rules are in the `arch` plugin's
+`references/producer-manual.md` (authoritative). This playbook is the
 *operational* layer: how to discover the work, drive headless seeding at scale,
 apply the house conventions, review, and land it.
 
@@ -97,7 +97,7 @@ docs/backfill/run_phase.py B --max 4 --timeout 3600
 
 ### Prompt anatomy (what each seed session is told)
 - Read the producer manual + repo `CLAUDE.md`/`README`/`docs` first; run the
-  `/seed-architecture` skill's method but **skip interactive triage** (headless) —
+  `/arch:seed-architecture` skill's method but **skip interactive triage** (headless) —
   decide and log to `SEED-NOTES.md` instead of blocking.
 - Fixed identity facts (producer id, product «SoftwareProduct» id(s),
   `sourceRepository`, image) so it doesn't re-derive them.
@@ -164,8 +164,8 @@ with the operator for a new batch, but they're the defaults:
 10. **Find outbound deps** with `grep -rIi '://'` (triage out docs/schema URLs) in
     addition to an env-var/config scan — hardcoded base-URL constants hide from env
     scans. (Now in the seed skill.)
-11. **Snippet home**: append the producer snippet from
-    `~/.claude/architecture/claude-md-snippet.md` to `CLAUDE.md` (often a symlink →
+11. **Snippet home**: append the producer snippet from the `arch` plugin's
+    `assets/claude-md-snippet.md` to `CLAUDE.md` (often a symlink →
     `AGENTS.md`; appending follows the link). `<ARCH-PATH>` = `docs/architecture/architecture.yaml`.
 
 ### Special repo shapes
@@ -186,7 +186,7 @@ Written into the working tree; never committed by the seed session:
 1. `docs/architecture/architecture.yaml` — `producer: <id>`, the artifact.
 2. `docs/architecture/SEED-NOTES.md` — every non-trivial decision + open questions
    (kept; it's the review surface and the audit trail).
-3. `scripts/arch-validate.py` — `cp ~/.claude/architecture/arch-validate.py`, `chmod +x`.
+3. `scripts/arch-validate.py` — copy from the `arch` plugin's `scripts/arch-validate.py`, `chmod +x`.
 4. `Jenkinsfile.architecture` at the repo root (or the subtree, for a per-subtree
    producer) — house style: `library('JenkinsPipelineUtils')`, `jenkins-agent` +
    `containerTemplates.python('python')`, clone via `git ... credentialsId

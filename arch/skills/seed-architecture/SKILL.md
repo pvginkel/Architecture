@@ -21,7 +21,7 @@ never from inside another agent.
 
 ## Read first (do not skip)
 
-1. `~/.claude/architecture/producer-manual.md` — the full manual.
+1. `${CLAUDE_PLUGIN_ROOT}/references/producer-manual.md` — the full manual.
    Vocabulary, **ID grammar**, **Element kinds**, **Inclusion rule**,
    **Ownership conventions**, **Generated producers**, the `boundBy` section
    and its deployer-side resolution mechanics. Your tagging and authoring
@@ -29,8 +29,8 @@ never from inside another agent.
 2. `CLAUDE.md` at repo root — what this repo owns end-to-end.
 3. `README.md` and any `docs/` that describe architecture, phases, runbooks.
 
-The starter skeleton is at `~/.claude/architecture/architecture.yaml`; the
-validator at `~/.claude/architecture/arch-validate.py` (the repo copies it to
+The starter skeleton is at `${CLAUDE_PLUGIN_ROOT}/assets/architecture.yaml`; the
+validator at `${CLAUDE_PLUGIN_ROOT}/scripts/arch-validate.py` (the repo copies it to
 `scripts/arch-validate.py`).
 
 ## Step 1 — Detect the mode

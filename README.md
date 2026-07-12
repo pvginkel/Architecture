@@ -224,4 +224,5 @@ deferred design decisions (logo single-sourcing, producer-supplied logos in the
 image, a canonical service↔interface idiom) tracked in [`docs/todo.md`](docs/todo.md).
 
 The operator-side onboarding workflow (producer manual, seeding skill, update
-agents) is mirrored under `architecture-process/` — see [`CLAUDE.md`](./CLAUDE.md).
+agents) is packaged as the `arch` Claude Code plugin under `arch/`, installed into
+the operator's `~/.claude/` from this repo — see [`CLAUDE.md`](./CLAUDE.md).

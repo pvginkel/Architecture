@@ -12,7 +12,7 @@ be assembled without opening them all.
 - [documentation-model.md](documentation-model.md) — how the whole doc set is organized and kept current (read first).
 - [deployment.md](deployment.md) — the self-hosted stack the container artifact ships into (K8s/Jenkins/Kaniko/Ansible); what's in scope here vs the operator's.
 - [capability-enum.md](capability-enum.md) — the three places a `cap:` enum entry must touch (enum → generated vocab → hand-added viewer icon).
-- [architecture-process-sync.md](architecture-process-sync.md) — the two-way sync between `architecture-process/` and the operator's `~/.claude/` producer-onboarding files.
+- [arch-plugin.md](arch-plugin.md) — the `arch/` Claude Code plugin that packages the producer-onboarding tooling (seed skill, update agents, manual, validator) and installs into `~/.claude/`.
 
 ## Not topic docs
 

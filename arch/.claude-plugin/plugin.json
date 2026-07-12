@@ -1,0 +1,11 @@
+{
+  "name": "arch",
+  "version": "0.1.0",
+  "description": "webathome.org federated Architecture-as-Code producer tooling: seed a repo's first architecture artifact, keep it in sync, and validate. Bundles the producer manual, the starter skeleton, the CLAUDE.md snippet, and the validator script.",
+  "author": {
+    "name": "Pieter van Ginkel"
+  },
+  "homepage": "https://architecture.webathome.org/",
+  "repository": "https://github.com/pvginkel/Architecture",
+  "keywords": ["architecture", "architecture-as-code", "archimate", "producer", "webathome"]
+}

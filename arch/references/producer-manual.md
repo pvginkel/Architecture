@@ -1,12 +1,12 @@
 # Architecture producer manual
 
-This is the operator-side reference for becoming a producer in the
-webathome.org federated architecture system. It lives at
-`~/.claude/architecture/producer-manual.md`. The `/seed-architecture`
-skill (first-version authoring) and the `update-architecture` /
-`update-architecture-generated` agents read it from there on startup.
+This is the reference for becoming a producer in the webathome.org
+federated architecture system. It is bundled in the `arch` plugin as
+`references/producer-manual.md`. The `/arch:seed-architecture` skill
+(first-version authoring) and the `update-architecture` /
+`update-architecture-generated` agents read it on startup.
 Producer repos copy `arch-validate.py` into `scripts/arch-validate.py`
-for their Jenkinsfile to call; everything else is operator-side.
+for their Jenkinsfile to call; everything else ships in the plugin.
 
 ## What you're producing and why
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Seed-architecture runner — launches a headless `claude` inside a cloned repo
-to author its first architecture artifact via the /seed-architecture skill.
+to author its first architecture artifact via the /arch:seed-architecture skill.
 
 Generalized from DesignAssistant/scripts/claude_session.py: instead of a fixed
 project enum it takes an arbitrary repo directory, runs one prompt to completion,

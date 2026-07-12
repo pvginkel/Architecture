@@ -57,7 +57,7 @@ CONVENTIONS = """\
 1. `{arch_dir}/architecture.yaml` — `producer: {producer}`. The product(s), the
    exposed service+interface(s), capability realizations (only if it genuinely
    provides one — most realize none), and the outbound consumption edges above.
-2. `scripts/arch-validate.py` — copy from `~/.claude/architecture/arch-validate.py`, `chmod +x`.
+2. `scripts/arch-validate.py` — copy from the `arch` plugin's `scripts/arch-validate.py`, `chmod +x`.
 3. Validate until clean: `./scripts/arch-validate.py {validate_glob}` must exit 0
    (cross-producer dangling refs are acceptable and reported, not failing).
 4. `{jenkinsfile}` at {jenkinsfile_loc} — EXACTLY this house style:
@@ -89,7 +89,7 @@ CONVENTIONS = """\
    }}
    ```
 
-5. Append the block from `~/.claude/architecture/claude-md-snippet.md` to this
+5. Append the block from the `arch` plugin's `assets/claude-md-snippet.md` to this
    repo's `CLAUDE.md` (it may be a symlink to `AGENTS.md` — appending follows the
    link, which is fine), replacing `<ARCH-PATH>` with `{arch_dir}/architecture.yaml`.
 6. `{arch_dir}/SEED-NOTES.md` — every non-trivial decision: included/excluded and
@@ -114,11 +114,11 @@ HEADLESS — no human is available mid-run, so make best-effort modeling decisio
 and log assumptions/uncertainties in SEED-NOTES rather than blocking.
 
 # Read first
-1. `~/.claude/architecture/producer-manual.md` — authoritative vocabulary, ID
+1. The `arch` plugin's `references/producer-manual.md` — authoritative vocabulary, ID
    grammar, element kinds, inclusion rule, relations/triple matrix, boundBy.
 2. This repo's `CLAUDE.md`/`AGENTS.md`, `README.md`, `docs/`.
 
-Then run the `/seed-architecture` skill's method (survey via parallel Explore
+Then run the `/arch:seed-architecture` skill's method (survey via parallel Explore
 agents → author → validate). Use the Skill tool to load it. SKIP its interactive
 triage step — decide yourself and log to SEED-NOTES. Default borderline elements
 to `out` per the inclusion rule.
