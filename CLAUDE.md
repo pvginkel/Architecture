@@ -11,7 +11,7 @@ Architecture is a federated **Architecture-as-Code** system for [webathome.org](
 - **`viewer/`** — the React + ReactFlow + ELK viewer (Vite, TypeScript, npm) that renders the merged dataset.
 - **`service/`** — the Express + TypeScript service (npm) that serves the viewer bundle and the published dataset/API.
 - **`schema/`** — the v0.1 metaschema + enums (source of the generated JSON Schemas + viewer vocab).
-- **`arch/`** — the `arch` Claude Code plugin packaging the operator-side producer-onboarding tooling (the `/arch:seed-architecture` skill, the `update-architecture` agents, the producer manual, the starter skeleton, the validator), installed into `~/.claude/` from here (see [`docs/arch-plugin.md`](docs/arch-plugin.md)).
+- **`arch/`** — the `arch` Claude Code plugin packaging the operator-side producer-onboarding tooling (the `/arch:seed-architecture` skill, the `arch:update-architecture` / `arch:update-architecture-generated` agents, the producer manual, the starter skeleton, the validator), installed into `~/.claude/` from here (see [`docs/arch-plugin.md`](docs/arch-plugin.md)).
 
 A separate **specs repo** at `../ArchitectureSpecs` holds slice documentation and per-feature planning artifacts (change-request bundles, slices, the decision index). Slices live under `slices/` grouped by lifecycle state — pending at the top, `completed/` / `deferred/` / `cancelled/` for the rest; see its README.
 

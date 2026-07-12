@@ -1,6 +1,6 @@
 ---
 name: update-architecture-generated
-description: Incrementally updates a *generated* architecture producer (e.g. HelmCharts, DockerImages) to reflect repo changes since its annotations were last touched. Unlike the stock update-architecture agent, this one NEVER edits the generated `docs/architecture/*.yaml` — those are build outputs. It edits the per-element annotation layer and, when needed, the generator (`tools/gen-architecture.py`), then re-runs the generator and validates. Use on repos that build their architecture artifact from source via a generator + annotations; use stock `update-architecture` for repos that hand-maintain the YAML.
+description: Incrementally updates a *generated* architecture producer (e.g. HelmCharts, DockerImages) to reflect repo changes since its annotations were last touched. Unlike the stock arch:update-architecture agent, this one NEVER edits the generated `docs/architecture/*.yaml` — those are build outputs. It edits the per-element annotation layer and, when needed, the generator (`tools/gen-architecture.py`), then re-runs the generator and validates. Use on repos that build their architecture artifact from source via a generator + annotations; use stock `arch:update-architecture` for repos that hand-maintain the YAML.
 tools: Read, Edit, Write, Glob, Grep, Bash
 ---
 
@@ -13,7 +13,7 @@ it by hand.** The source of truth is the **annotation layer** plus the
 
 If this repo's architecture YAML is hand-authored (no generator, no
 annotation convention), stop and tell the operator to use the stock
-`update-architecture` agent instead.
+`arch:update-architecture` agent instead.
 
 ## Inputs
 

@@ -1,13 +1,13 @@
 ---
 name: seed-architecture
-description: Author the FIRST architecture artifact for a repo joining the webathome.org federated Architecture-as-Code system. Surveys the repo by fanning out parallel Explore sub-agents, detects hand-authored vs generated mode, triages candidate elements with the operator, then drafts docs/architecture/*.yaml (or the annotation layer + generator for a generated producer) and validates. Use ONCE per repo to seed it. For incremental upkeep afterwards use the update-architecture / update-architecture-generated agents instead. Trigger when onboarding a repo as a producer, "seed/bootstrap the architecture", or creating a producer's first architecture.yaml.
+description: Author the FIRST architecture artifact for a repo joining the webathome.org federated Architecture-as-Code system. Surveys the repo by fanning out parallel Explore sub-agents, detects hand-authored vs generated mode, triages candidate elements with the operator, then drafts docs/architecture/*.yaml (or the annotation layer + generator for a generated producer) and validates. Use ONCE per repo to seed it. For incremental upkeep afterwards use the arch:update-architecture / arch:update-architecture-generated agents instead. Trigger when onboarding a repo as a producer, "seed/bootstrap the architecture", or creating a producer's first architecture.yaml.
 ---
 
 # seed-architecture
 
 Author a producer's **first** architecture artifact end-to-end: survey →
 triage → author → validate. Once seeded, hand the repo off to the
-`update-architecture` (hand-authored) or `update-architecture-generated`
+`arch:update-architecture` (hand-authored) or `arch:update-architecture-generated`
 (generated) agent for incremental upkeep — this skill is one-shot.
 
 ## Why this is a skill, not a sub-agent

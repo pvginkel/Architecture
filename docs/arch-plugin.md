@@ -47,16 +47,21 @@ by running, from a checkout of this repo:
 /plugin install arch@architecture
 ```
 
-The marketplace source is a **local path**, so the plugin is read live from this checkout —
-editing files under `arch/` takes effect without reinstalling (if a refresh is ever needed,
-`/plugin marketplace update architecture`). Installing from the local checkout does **not**
-require the repo to be pushed first. For a throwaway session without installing at all,
-`claude --plugin-dir arch` loads it for that session only.
+Installing **snapshots** the plugin into
+`~/.claude/plugins/cache/architecture/arch/<version>/`, pinned to the repo's current commit —
+it is a copy, not a live reference. After editing files under `arch/`, run
+`/plugin marketplace update architecture` to re-snapshot (and restart the session if a changed
+skill doesn't reappear — skills register at session start, not reliably on `/reload-plugins`).
+Installing from the local checkout does **not** require the repo to be pushed first. For a
+throwaway session that loads the plugin live from the working tree, `claude --plugin-dir arch`.
 
-Component invocation once installed: the skill is `/arch:seed-architecture` (skills are
-plugin-namespaced); the agents are referenced by their bare names `update-architecture` /
-`update-architecture-generated` (plugin agents are not namespaced, and a same-named
-`.claude/agents/` file would override the plugin's).
+Component invocation once installed differs by kind. The **agents** are available *only*
+namespaced — `arch:update-architecture` / `arch:update-architecture-generated`; the bare names
+do not resolve, so every reference that spawns them (the producer `CLAUDE.md` snippet, the
+manual, the agents' cross-references) uses the `arch:` form. The **skill** resolves *either*
+way — `/seed-architecture` and `/arch:seed-architecture` both select it — so references to it
+may use whichever reads best. (A same-named `.claude/agents/` file in a repo would override
+the plugin's agent of that name.)
 
 ## Editing
 

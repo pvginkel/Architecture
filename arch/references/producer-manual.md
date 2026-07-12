@@ -3,8 +3,8 @@
 This is the reference for becoming a producer in the webathome.org
 federated architecture system. It is bundled in the `arch` plugin as
 `references/producer-manual.md`. The `/arch:seed-architecture` skill
-(first-version authoring) and the `update-architecture` /
-`update-architecture-generated` agents read it on startup.
+(first-version authoring) and the `arch:update-architecture` /
+`arch:update-architecture-generated` agents read it on startup.
 Producer repos copy `arch-validate.py` into `scripts/arch-validate.py`
 for their Jenkinsfile to call; everything else ships in the plugin.
 
@@ -492,7 +492,7 @@ Two sanctioned authoring modes — pick by how structured the repo is:
   emits the YAML in CI. The repo + annotations are the source of truth;
   the YAML is a build artifact you **don't commit** (regenerate it — see
   Jenkins integration). Ids are uuid5-from-natural-key (see ID grammar);
-  the `update-architecture-generated` agent maintains it.
+  the `arch:update-architecture-generated` agent maintains it.
 
 **As-deployed granularity.** A generated producer may model running
 containers — an operational, more-than-textbook deployment view. This is
