@@ -15,7 +15,6 @@ icon: Map
 # include-listed, so they survive those gates (include overrides them) while the
 # fan-out does not.
 include:
-  - app:design-assistant-portal,a7ca11ae-6279-4b7b-86b5-c7f137fd352b # Design Assistant
   - app:webathome-org,e0e6bf35-4c35-4e0e-a8f2-16f3eb019741 # webathome.org
   - app:electronics-inventory,9a37e1d4-5b2c-4f6a-8e3d-1c0b9a8f7e6d # Electronics Inventory
   - app:iotsupport-app,bbc500fd-ef66-4d82-846c-cd0357cb03f7 # IoT Support
