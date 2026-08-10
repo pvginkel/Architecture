@@ -30,9 +30,6 @@ producers:
   - id: iotsupport-app
     jenkinsJob: AaC/IoTSupport
     defaultLogo: iot-support
-  - id: iotsupport-ui
-    jenkinsJob: AaC/IoTSupportUI
-    defaultLogo: iot-support
   - id: dhcpapp
     jenkinsJob: AaC/DHCPApp
     defaultLogo: dnsmasq
