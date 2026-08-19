@@ -24,9 +24,6 @@ producers:
   - id: electronics-inventory
     jenkinsJob: AaC/ElectronicsInventory
     defaultLogo: electronics-inventory
-  - id: electronics-inventory-ui
-    jenkinsJob: AaC/ElectronicsInventoryUI
-    defaultLogo: electronics-inventory
   - id: iotsupport-app
     jenkinsJob: AaC/IoTSupport
     defaultLogo: iot-support
