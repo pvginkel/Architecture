@@ -84,6 +84,9 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
-    allowedHosts: ["wrkdev"],
+    // The KubeCoder environment publishes this port at
+    // https://viewer.<env-id>.home; the leading dot allows any .home host, so
+    // the entry does not have to be re-pinned per environment.
+    allowedHosts: [".home"],
   },
 });

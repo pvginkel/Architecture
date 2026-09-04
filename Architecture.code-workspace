@@ -1,24 +1,44 @@
 {
 	"folders": [
 		{
-			"name": "Architecture",
 			"path": "."
 		},
 		{
-			"name": "ArchitectureSpecs",
 			"path": "../ArchitectureSpecs"
 		},
 		{
-			"name": "Ansible-2",
-			"path": "../Ansible-2"
+			"path": "../Home"
 		},
 		{
-			"name": "HelmCharts-2",
-			"path": "../HelmCharts-2"
+			"path": "../HelmCharts"
 		},
 		{
-			"name": "DockerImages",
+			"path": "../Ansible"
+		},
+		{
 			"path": "../DockerImages"
 		}
-	]
+	],
+	"tasks": {
+		"version": "2.0.0",
+		"tasks": [
+			{
+				"label": "Dev Services",
+				"type": "shell",
+				"command": "scripts/dev.sh",
+				"options": {
+					"cwd": "${workspaceFolder}"
+				},
+				"icon": { "id": "server-process" },
+				"problemMatcher": [],
+				"presentation": {
+					"panel": "dedicated",
+					"reveal": "always",
+					"focus": true,
+					"showReuseMessage": false
+				},
+				"isBackground": true
+			}
+		]
+	}
 }
