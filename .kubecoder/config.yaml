@@ -1,0 +1,79 @@
+# The Architecture environment.
+#
+# Primary repo: Architecture (Architecture-as-Code pipeline + viewer + service).
+# The environment is wider than this repo: it also carries Home (the app
+# switcher, a consumer of the AaC metadata) and the reference repos whose
+# architecture.yaml files this pipeline federates. `tools:` is therefore the
+# union of what all of those need, not just what Architecture needs.
+
+repos:
+  # The specs repo: slices, change-request bundles, the decision index.
+  - url: https://github.com/pvginkel/ArchitectureSpecs
+    shared: true
+
+  # Home — the app switcher. Its backend consolidates the curated apps.yaml with
+  # the federated architecture model, so it is worked on alongside this repo. Its
+  # dev scripts read ../HelmCharts/charts/homeapps/files, which is why HelmCharts
+  # has to land at /work/HelmCharts.
+  - url: https://github.com/pvginkel/Home
+
+  # Producer repos this pipeline federates, read (and occasionally edited) here.
+  - url: https://github.com/pvginkel/HelmCharts
+  - url: https://github.com/pvginkel/Ansible
+  - url: https://github.com/pvginkel/DockerImages
+
+capabilities:
+  github: rw
+
+tools:
+  # Node and Python in one sidecar. Architecture alone would take `python` +
+  # `frontend`, but Home's dev scripts (scripts/dev.sh, scripts/dev-web.sh) build
+  # the extension with npm and run the backend with uv in a single process tree,
+  # which needs both toolsets in one container.
+  - use: modern-app
+
+# Both repos' deliverable is a container image, and neither is built locally
+# otherwise — Jenkins builds them with helmCharts.kaniko. This is here so a
+# Dockerfile change can be proven in-env:
+#   kaniko --destination registry:5000/architecture:dev
+# It is deliberately not wired into `kc project build`: the image build is a
+# poetry install plus two npm ci's, far too slow for a per-task gate.
+imageBuilder: true
+
+secrets:
+  # track_build.py, for following a pushed AaC/Architecture build.
+  JENKINS_TOKEN: jenkins-token
+
+packages: []
+
+setup:
+  - kc project setup
+
+preamble:
+  instructions: |
+    This environment holds the Architecture-as-Code pipeline (Architecture) and
+    the app switcher that consumes its output (Home), alongside the producer
+    repos it federates: HelmCharts, Ansible and DockerImages.
+
+    Everything builds through `kc project` — the toolchain lives in the
+    `modern-app` sidecar, so ad-hoc poetry/npm commands need `cexec modern-app`.
+
+    tools/ha-fleet/gen-ha-fleet.py cannot run here: HA_URL/HA_TOKEN are not in
+    the secret catalog. That producer runs only in its Jenkins job
+    (Jenkinsfile.ha-fleet), which reads the token from OpenBao.
+
+ports:
+  # The viewer's Vite dev server (`scripts/dev.sh`). Home's extension dev server
+  # uses the same number.
+  - name: viewer
+    port: 5173
+    type: http
+    sslOffload: true
+
+  # The Architecture service. Home's backend also defaults to 8080.
+  - name: service
+    port: 8080
+    type: http
+    sslOffload: true
+
+homeOverlays: []

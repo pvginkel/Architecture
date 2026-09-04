@@ -1,0 +1,43 @@
+projects:
+  root:
+    description: >-
+      Architecture — federated Architecture-as-Code for webathome.org: the merge
+      pipeline, the viewer that renders it, and the service that publishes both.
+    jenkins: AaC/Architecture
+    # The root Poetry env exists only for the code-health grader under tools/.
+    setup: cexec modern-app poetry install --no-interaction
+
+  tooling:
+    description: >-
+      Python merge pipeline (collect → generate → validate) plus the metaschema
+      codegen. Poetry, ruff, mypy strict, pytest.
+    setup: cexec modern-app poetry install --no-interaction
+    # --check fails when the committed schema/v0.1/generated/ tree and the viewer
+    # vocab are stale against subset.yaml and the vendored ArchiMate sources. The
+    # Dockerfile runs the same command as its first stage.
+    build: cexec modern-app poetry run python generate.py --check
+    test:
+      - cexec modern-app poetry run python validate.py meta
+      - cexec modern-app poetry run pytest
+    lint:
+      - cexec modern-app poetry run ruff check .
+      - cexec modern-app poetry run mypy .
+
+  viewer:
+    description: >-
+      React + ReactFlow + ELK viewer (Vite, TypeScript) that renders the merged
+      dataset. `npm run build` type-checks with tsc --noEmit before bundling.
+    setup: cexec modern-app npm ci
+    build: cexec modern-app npm run build
+    test: cexec modern-app npm test
+
+  service:
+    description: >-
+      Express + TypeScript service that serves the viewer bundle, the published
+      dataset and the POST /api/validate endpoint. `npm run build` is tsc.
+    setup: cexec modern-app npm ci
+    build: cexec modern-app npm run build
+    test: cexec modern-app npm test
+
+# No `lint` on viewer/service: neither has a linter configured, and their builds
+# already run tsc. Adding one is a decision, not an oversight.
