@@ -4,8 +4,19 @@ projects:
       Architecture — federated Architecture-as-Code for webathome.org: the merge
       pipeline, the viewer that renders it, and the service that publishes both.
     jenkins: AaC/Architecture
-    # The root Poetry env exists only for the code-health grader under tools/.
-    setup: cexec modern-app poetry install --no-interaction
+    # No setup: the root Poetry env existed only for the code-health grader,
+    # which /dev:onboard retired along with the root pyproject.toml.
+    #
+    # Root's testable asset is docs/architecture/ — this repo's own published
+    # architecture artifact, which the collector federates like any producer's.
+    # Until now nothing checked it before CI: a broken self-producer file only
+    # surfaced in the Jenkins collector stage. validate.py checks one artifact
+    # against schema/v0.1/architecture.schema.yaml offline, so the loop below is
+    # a cheap local gate on the files a root-targeted phase actually edits. It
+    # borrows tooling's Poetry env, which `kc project setup` installs.
+    test: >-
+      cexec modern-app sh -c 'cd tooling && for f in ../docs/architecture/*.yaml;
+      do poetry run python validate.py "$f" || exit 1; done'
 
   tooling:
     description: >-
