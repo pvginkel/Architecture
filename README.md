@@ -195,9 +195,13 @@ The image serves the rendered `USAGE.md` at its root, the diagram at `/viewer/`,
 image can only be pushed and deployed, not run locally — always use the `:dev` tag for local
 builds, since Jenkins owns `registry:5000/architecture_viewer:latest` and the numbered tags.
 
-A local kaniko build skips the collector (no producer artifacts in context); the merged
-dataset is produced in CI by the Jenkinsfile, which clears the `producer-artifacts/`
-exclusion so the `run-collector` stage sees them.
+A local build cannot complete, by design. `producer-artifacts/` is `.dockerignore`d so a
+developer can never bundle stray fixtures into an image, and now that every producer is
+registered in `pipeline-producers.yaml` the `run-collector` stage fails discovery on the
+first missing producer directory. It still gets through the schema check and both `npm`
+builds, which is what makes it worth running as a Dockerfile smoke test. The complete image
+is a CI-only artifact: the Jenkinsfile populates `producer-artifacts/` with `copyArtifacts`
+and clears the `.dockerignore` exclusion before kaniko runs.
 
 ## Deployment
 

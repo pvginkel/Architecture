@@ -34,10 +34,12 @@ tools:
 
 # Both repos' deliverable is a container image, and neither is built locally
 # otherwise — Jenkins builds them with helmCharts.kaniko. This is here so a
-# Dockerfile change can be proven in-env:
+# Dockerfile change can be smoke-tested in-env:
 #   kaniko --destination registry:5000/architecture:dev
-# It is deliberately not wired into `kc project build`: the image build is a
-# poetry install plus two npm ci's, far too slow for a per-task gate.
+# Deliberately not wired into `kc project build`, because for Architecture it
+# cannot pass: the run-collector stage needs a producer-artifacts/ tree that only
+# the Jenkinsfile assembles. The build does exercise the schema check and both
+# npm builds before it gets there, which is what makes it a useful smoke test.
 imageBuilder: true
 
 secrets:
