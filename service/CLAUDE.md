@@ -8,7 +8,7 @@ the homelab.
 ## Sandbox environment
 
 - The monorepo is at `/work/Architecture`. Dev agents work scoped to `service/` but commit to the single shared repo.
-- Node + **npm** (`service/package.json`, `package-lock.json`), `tsc` + Vitest. Run commands from `service/`: `npm ci`, then `npm run <script>`.
+- Node + **npm** (`service/package.json`, `package-lock.json`), `tsc` + Vitest. The Node toolchain lives in the `modern-app` tool sidecar; run commands from `service/` as `cexec modern-app npm run <script>`. `kc project setup --project service` does the `npm ci`.
 
 ## Design philosophy
 
@@ -34,13 +34,13 @@ This subproject's design + conventions live in **`docs/`**, indexed by **`docs/i
 Before committing, verify:
 
 ```bash
-npm run build      # tsc (type-check + build)
+kc project build --project service     # tsc (type-check + build)
 ```
 
 Individual tools:
 
 ```bash
-npm test           # vitest + supertest
+kc project test --project service      # vitest + supertest
 ```
 
 ## Decision-making

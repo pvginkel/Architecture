@@ -8,7 +8,7 @@ Schemas + the viewer vocab from the v0.1 metaschema (`generate.py`), and validat
 ## Sandbox environment
 
 - The monorepo is at `/work/Architecture`. Dev agents work scoped to `tooling/` but commit to the single shared repo.
-- Python ≥3.11, **Poetry** (`tooling/pyproject.toml`, `package-mode = false`). Run commands from `tooling/`: `poetry install` once, then `poetry run <cmd>`.
+- Python ≥3.11, **Poetry** (`tooling/pyproject.toml`, `package-mode = false`). Poetry lives in the `modern-app` tool sidecar; run commands from `tooling/` as `cexec modern-app poetry run <cmd>`. `kc project setup --project tooling` does the install.
 
 ## Design philosophy
 
@@ -36,15 +36,15 @@ This subproject's design + conventions live in **`docs/`**, indexed by **`docs/i
 Before committing, verify:
 
 ```bash
-poetry run ruff check . && poetry run mypy .
+kc project lint --project tooling
 ```
 
 Individual tools:
 
 ```bash
-poetry run pytest          # tests
-poetry run ruff check .    # lint
-poetry run mypy .          # types (strict)
+cexec modern-app poetry run pytest          # tests
+cexec modern-app poetry run ruff check .    # lint
+cexec modern-app poetry run mypy .          # types (strict)
 ```
 
 ## Decision-making

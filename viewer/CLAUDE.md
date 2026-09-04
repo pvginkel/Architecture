@@ -8,7 +8,7 @@ and iframe-embedded into webathome.org.
 ## Sandbox environment
 
 - The monorepo is at `/work/Architecture`. Dev agents work scoped to `viewer/` but commit to the single shared repo.
-- Node + **npm** (`viewer/package.json`, `package-lock.json`), Vite + Vitest. Run commands from `viewer/`: `npm ci`, then `npm run <script>`.
+- Node + **npm** (`viewer/package.json`, `package-lock.json`), Vite + Vitest. The Node toolchain lives in the `modern-app` tool sidecar; run commands from `viewer/` as `cexec modern-app npm run <script>`. `kc project setup --project viewer` does the `npm ci`.
 
 ## Design philosophy
 
@@ -36,13 +36,13 @@ This subproject's design + conventions live in **`docs/`**, indexed by **`docs/i
 Before committing, verify:
 
 ```bash
-npm run build      # tsc --noEmit && vite build (type-check + build)
+kc project build --project viewer      # tsc --noEmit && vite build (type-check + build)
 ```
 
 Individual tools:
 
 ```bash
-npm test           # vitest
+kc project test --project viewer       # vitest
 ```
 
 ## Decision-making

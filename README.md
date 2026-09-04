@@ -167,32 +167,37 @@ in [`USAGE.md`](./USAGE.md), which is also served live at
 ## Develop
 
 ```
-./scripts/dev.sh        # Vite dev server at http://localhost:5173/viewer/
+./scripts/dev.sh        # Vite dev server at https://viewer.<env-id>.home/viewer/
 ```
 
-Regenerate schemas + viewer vocab after editing `subset.yaml` or the enums:
+The standing gates run through `kc project build`, `kc project test` and `kc project lint`
+(optionally with `--project tooling|viewer|service`); the commands below are for iterating on
+the generator directly. Regenerate schemas + viewer vocab after editing `subset.yaml` or the
+enums:
 
 ```
-cd tooling && poetry run python generate.py          # writes generated/ + viewer vocab
-cd tooling && poetry run python generate.py --check   # CI: fail if anything is stale
-cd tooling && poetry run python validate.py meta      # self-validate every schema
-cd tooling && poetry run python tests/run_fixtures.py # collector end-to-end fixtures
-cd viewer  && npm run build                            # tsc --noEmit && vite build
+cd tooling && cexec modern-app poetry run python generate.py          # writes generated/ + viewer vocab
+cd tooling && cexec modern-app poetry run python generate.py --check   # CI: fail if anything is stale
+cd tooling && cexec modern-app poetry run python validate.py meta      # self-validate every schema
+cd tooling && cexec modern-app poetry run python tests/run_fixtures.py # collector end-to-end fixtures
+cd viewer  && cexec modern-app npm run build                            # tsc --noEmit && vite build
 ```
 
 ## Build the container
 
 ```
-docker build -t architecture .
-docker run --rm -p 8080:8080 architecture
-# http://localhost:8080/         rendered USAGE.md
-# http://localhost:8080/viewer/  the diagram
-# curl :8080/healthz /metrics /data/v0.1/architecture.json /schema/v0.1/architecture.schema.yaml
+kaniko --destination registry:5000/architecture:dev
 ```
 
-A developer `docker build` skips the collector (no producer artifacts in context);
-the merged dataset is produced in CI by the Jenkinsfile, which clears the
-`producer-artifacts/` exclusion so the `run-collector` stage sees them.
+The image serves the rendered `USAGE.md` at its root, the diagram at `/viewer/`, and
+`/healthz`, `/metrics`, `/data/v0.1/architecture.json` and
+`/schema/v0.1/architecture.schema.yaml`. There is no container runtime in the pod, so the
+image can only be pushed and deployed, not run locally — always use the `:dev` tag for local
+builds, since Jenkins owns `registry:5000/architecture_viewer:latest` and the numbered tags.
+
+A local kaniko build skips the collector (no producer artifacts in context); the merged
+dataset is produced in CI by the Jenkinsfile, which clears the `producer-artifacts/`
+exclusion so the `run-collector` stage sees them.
 
 ## Deployment
 

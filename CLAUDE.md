@@ -76,11 +76,11 @@ When the user asks to add something, create a card in the Triage **Inbox** tagge
 
 ## Push notifications
 
-Use `python3 tools/ai_workflow/send_message.py --title "<title>" "<message>"` to send push notifications to the user's phone.
+Call the **`notification` MCP tool** with a `message` string to send push notifications to the user's phone.
 
 - During slice runs, notification rules are defined in `/run-slice`.
 - Outside of slice runs, send a notification when the task took or is expected to take **over 10 minutes**. Notify on completion or when blocked and needing user input.
-- When the user says "send me a message", "let me know", or "notify me", they mean a push notification via this script.
+- When the user says "send me a message", "let me know", or "notify me", they mean a push notification via this tool.
 
 ## Key documentation
 
