@@ -826,7 +826,7 @@ def stamp_inherited_logos(
         if entry is None:
             return None
         kind, elem = entry
-        own = elem.get("logo")
+        own: str | None = elem.get("logo")
         if own:
             resolved[eid] = own
             return own
@@ -842,7 +842,8 @@ def stamp_inherited_logos(
             if r:
                 resolved[eid] = r
                 return r
-        dl = default_for.get(elem.get("producer"))
+        producer: str | None = elem.get("producer")
+        dl = default_for.get(producer) if producer else None
         if dl:
             resolved[eid] = dl
             return dl

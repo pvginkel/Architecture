@@ -36,12 +36,6 @@ kc project test       # root artifact validation, tooling pytest + validate.py m
 Both must be green. `kc project build` is also what preflight demands, so a red build here means
 the slice never should have reached this phase.
 
-**On `kc project lint`:** `tooling`'s `mypy .` is **known red** — two pre-existing errors in
-`collect.py` (tracked as a triage card, not caused by any slice). It predates the pipeline and CI
-has never run mypy. Do not treat it as a regression from this slice; do check that the count has
-not *grown*, and if the slice touched `tooling/` at all, that clearing it was in scope. Once the
-card is fixed, delete this paragraph.
-
 ## 2. Live checks
 
 Both surfaces are exercised in this environment. Do both whenever the slice touched `viewer/`,
