@@ -12,10 +12,9 @@ the homelab.
 
 ## Design philosophy
 
-- **Clean breaking changes.** Greenfield, no external consumers — fix callers instead of adding shims.
-- **No tombstones.** Delete replaced code completely — no commented-out code, no dead re-exports, no "see X instead" stubs.
-- **No defensive coding.** No try/catch that swallows errors, no drop-the-request-keep-serving paths, no silent fallbacks for inputs the schema/validator already guards. Boundary validation (the dataset/schema, request input) is the *point*; fail loudly. Prefer obvious-now failure over silent-corruption-later.
-- **Testability is critical.** Every change ships with a test; a feature without one is incomplete.
+The change-discipline rules — clean breaking changes, no tombstones, no defensive coding,
+testability — are in [`../docs/change-discipline.md`](../docs/change-discipline.md), which states
+what each of them means for this subproject specifically.
 
 ## Specs repo
 

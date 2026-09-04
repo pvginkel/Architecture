@@ -1,0 +1,19 @@
+# What the dev pipeline reads about this project.
+# Schema: ${CLAUDE_PLUGIN_ROOT}/docs/project-contract.md
+
+spec_repo = "../ArchitectureSpecs"
+design_philosophy = "docs/change-discipline.md"
+
+[test_phase]
+# Local verification, not deploy verification: this repo's only deployment is
+# production, and there is no dev instance to roll. The doc pushes (the driver
+# checks that it did) and then follows the CI build the push triggers.
+strategy = "docs/slice-test-plan.md"
+
+[doc_phase]
+plan = "docs/slice-doc-plan.md"
+
+[push]
+enabled = true
+
+# No [devlock]: with no dev instance, nothing contends over one.

@@ -12,10 +12,9 @@ Schemas + the viewer vocab from the v0.1 metaschema (`generate.py`), and validat
 
 ## Design philosophy
 
-- **Clean breaking changes.** Greenfield, no external consumers — fix callers instead of adding shims.
-- **No tombstones.** Delete replaced code completely — no "moved to X" comments, no stubs, no deprecated aliases.
-- **No defensive coding.** No try/except that swallows errors, no drop-the-bad-input-keep-going paths, no null-guards for conditions the metaschema/framework already prevents. Boundary validation (the metaschema, producer input) is the *point*; fail loudly. Prefer obvious-now failure over silent-corruption-later.
-- **Testability is critical.** Every change ships with a test; a feature without one is incomplete.
+The change-discipline rules — clean breaking changes, no tombstones, no defensive coding,
+testability — are in [`../docs/change-discipline.md`](../docs/change-discipline.md), which states
+what each of them means for this subproject specifically.
 
 ## Specs repo
 
