@@ -30,9 +30,6 @@ producers:
   - id: dhcpapp
     jenkinsJob: AaC/DHCPApp
     defaultLogo: dnsmasq
-  - id: dhcpapp-ui
-    jenkinsJob: AaC//DHCPAppUI
-    defaultLogo: dnsmasq
   - id: zigbee-control
     jenkinsJob: AaC/ZigbeeControl
     defaultLogo: zigbee2mqtt
