@@ -33,9 +33,6 @@ producers:
   - id: zigbee-control
     jenkinsJob: AaC/ZigbeeControl
     defaultLogo: zigbee2mqtt
-  - id: zigbee-control-ui
-    jenkinsJob: AaC/ZigbeeControlUI
-    defaultLogo: zigbee2mqtt
   - id: design-assistant
     jenkinsJob: AaC/DesignAssistant
     defaultLogo: design-assistant
