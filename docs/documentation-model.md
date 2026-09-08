@@ -65,7 +65,5 @@ practice:
   updating) its row in the decision index. Same act, one more output.
 - **`/run-slice`** verifies at close-out that the docs match what was actually built, and reconciles
   if the implementation diverged from the authored decision.
-- **`/update-docs`** seeds a scope from nothing and reconciles drift in bulk — on demand, or with a
-  hint to focus. It is how the set was first built and how it is swept for staleness.
 
 A change that alters the design or a convention is not done until the docs reflect it.

@@ -31,7 +31,7 @@ dataset shape changed a system-level thing, whichever component's code moved.
 
 Note that the three subproject indexes are currently near-empty — those scopes have an `index.md`
 and little else. That is a real state, not a gap this phase closes: seed a scope only where **this
-slice's** design needs a home, and leave the rest to a `/update-docs` sweep.
+slice's** design needs a home, and leave the rest to a later docs sweep.
 
 ### 2. The decision index
 

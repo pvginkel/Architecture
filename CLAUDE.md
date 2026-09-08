@@ -51,9 +51,6 @@ the contract is `.aiworkflowrc` and `.kubecoder/project.yaml`. The specs repo at
 `../ArchitectureSpecs` holds slices and the decision index; it is a separate git repo, so commit
 there separately.
 
-This repo's own skills, beyond the plugin's: `/update-docs` (reconcile the doc set) and
-`/ux-design`.
-
 Issue tracking follows the host convention; this project's owner tag is **`Architecture`**.
 
 ## Documentation

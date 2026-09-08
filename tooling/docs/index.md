@@ -6,9 +6,8 @@ Cross-cutting and system-level design lives in the [root docs](../../docs/index.
 
 ## Topic docs
 
-_None yet — adoption baseline (2026-06-26). Seed this scope with `/update-docs` (it builds a scope
-from nothing and reconciles drift), or add a topic doc and list it here as conventions get written
-down._
+_None yet — adoption baseline (2026-06-26). Add a topic doc and list it here as conventions get
+written down._
 
 ## Maintaining this index
 
