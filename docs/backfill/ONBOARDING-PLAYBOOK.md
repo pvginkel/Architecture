@@ -233,7 +233,7 @@ Written into the working tree; never committed by the seed session:
 ### Recurring decisions worth pre-asking the operator
 - Pure-frontend service modeling (yes, model it) · frontend→gateway edges (keep) ·
   capability mapping for shared infra · external SaaS as `svc:` not `cap:` ·
-  `introduced` = first commit · snippet → AGENTS.md when no CLAUDE.md.
+  `introduced` = first commit.
 
 ---
 
@@ -279,9 +279,6 @@ producer and look for the same hint across producers.)
   `plugin/`+`server/`) monorepos; gitblit HEAD has split them into single-app repos
   with the frontend in a separate `*UI` repo. Always trust gitblit HEAD + clone fresh.
 - **Shallow clone breaks the `introduced` date** — full clones only.
-- **`CLAUDE.md` is frequently a symlink → `AGENTS.md`** in these repos; the snippet
-  lands in `AGENTS.md` (fine). Repos with no CLAUDE.md get one created or the snippet
-  in AGENTS.md.
 - **Account session limit**: a parallel fleet of headless `claude` sessions can trip
   the account session/usage limit mid-run ("You've hit your session limit"). Keep
   `--max` modest, and be ready to **hand-author** a stuck producer in the main
