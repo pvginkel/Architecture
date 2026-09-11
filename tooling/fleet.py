@@ -23,6 +23,7 @@ import argparse
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import tomllib
@@ -227,10 +228,41 @@ def _dirty(clone: Path) -> list[str]:
     return git(clone, "status", "--porcelain").splitlines()
 
 
+def _git_mode(path: Path) -> str:
+    return "100755" if path.stat().st_mode & stat.S_IXUSR else "100644"
+
+
+def kit_conflicts(kit: Path, clone: Path, files: list[Path]) -> list[str]:
+    """The kit paths the clone's HEAD tracks with another blob or mode than the kit's."""
+    paths = {f".claude/{rel.as_posix()}": kit / rel for rel in files}
+    tracked = {}
+    for line in git(clone, "ls-tree", "-r", "HEAD", "--", *paths).splitlines():
+        entry, path = line.split("\t", 1)
+        mode, _, blob = entry.split()
+        tracked[path] = (mode, blob)
+    names = sorted(tracked)
+    blobs = git(clone, "hash-object", "--no-filters", "--", *(str(paths[n]) for n in names))
+    return [
+        name
+        for name, blob in zip(names, blobs.split(), strict=True)
+        if tracked[name] != (_git_mode(paths[name]), blob)
+    ]
+
+
 def stage_kit(kit: Path, clone: Path) -> None:
-    """Copy the kit into `clone/.claude/` and exclude it; refuse a conflicting tracked file."""
+    """Copy the kit into `clone/.claude/` and exclude it; refuse a conflicting tracked file.
+
+    The refusal comes before any copy, so a refused clone keeps its tracked
+    files and every later run reports the same conflict.
+    """
+    files = kit_files(kit)
+    conflicts = kit_conflicts(kit, clone, files)
+    if conflicts:
+        raise ProducerError(
+            "the repo tracks kit files that differ from the kit: " + ", ".join(conflicts)
+        )
     staged = []
-    for rel in kit_files(kit):
+    for rel in files:
         dest = clone / ".claude" / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(kit / rel, dest)
@@ -247,8 +279,7 @@ def stage_kit(kit: Path, clone: Path) -> None:
     dirty = _dirty(clone)
     if dirty:
         raise ProducerError(
-            "the repo tracks kit files with different content: "
-            + "; ".join(line.strip() for line in dirty)
+            "staging the kit left the clone dirty: " + "; ".join(line.strip() for line in dirty)
         )
 
 

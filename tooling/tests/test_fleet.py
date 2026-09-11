@@ -351,18 +351,29 @@ def test_staging_an_existing_clone_fetches_and_excludes_each_path_once(tmp_path:
     assert all(exclude.count(f"/.claude/{rel}") == 1 for rel in KIT)
 
 
-def test_a_tracked_file_conflicting_with_the_kit_is_refused(tmp_path: Path) -> None:
-    Remote(tmp_path, REPO).commit(
-        {
-            "docs/architecture/a.yaml": _envelope(ID),
-            ".claude/agents/update-architecture.md": "the producer's own agent\n",
-        }
-    )
-    with pytest.raises(fleet.ProducerError) as failure:
-        fleet.prepare(_fleet(tmp_path), REPO)
-    assert str(failure.value) == (
-        "the repo tracks kit files with different content: M .claude/agents/update-architecture.md"
-    )
+@pytest.mark.parametrize(
+    "tracked",
+    [
+        {"agents/update-architecture.md": "the producer's own agent\n"},
+        {"architecture/arch-validate.py": KIT["architecture/arch-validate.py"]},
+    ],
+    ids=["content", "mode"],
+)
+def test_a_tracked_file_conflicting_with_the_kit_is_refused_every_run_untouched(
+    tmp_path: Path, tracked: dict[str, str]
+) -> None:
+    files = {f".claude/{rel}": text for rel, text in tracked.items()}
+    Remote(tmp_path, REPO).commit({"docs/architecture/a.yaml": _envelope(ID), **files})
+    f = _fleet(tmp_path)
+    clone = f.clones / "NewsFilter"
+    for _ in range(2):
+        with pytest.raises(fleet.ProducerError) as failure:
+            fleet.prepare(f, REPO)
+        assert str(failure.value) == (
+            f"the repo tracks kit files that differ from the kit: {', '.join(files)}"
+        )
+        assert _git(clone, "status", "--porcelain") == ""
+        assert {name: (clone / name).read_text() for name in files} == files
 
 
 def test_a_repo_tracking_the_kit_identically_is_staged(tmp_path: Path) -> None:
@@ -372,6 +383,30 @@ def test_a_repo_tracking_the_kit_identically_is_staged(tmp_path: Path) -> None:
         executable=(".claude/architecture/arch-validate.py",),
     )
     clone = fleet.prepare(_fleet(tmp_path), "pvginkel/Architecture")
+    assert _git(clone.path, "status", "--porcelain") == ""
+
+
+def test_the_self_producer_refused_for_an_unpushed_kit_edit_stages_once_it_is_pushed(
+    tmp_path: Path,
+) -> None:
+    repo = "pvginkel/Architecture"
+    remote = Remote(tmp_path, repo)
+    remote.commit(
+        {
+            **{f".claude/{rel}": text for rel, text in KIT.items()},
+            "docs/architecture/a.yaml": _envelope("architecture"),
+        },
+        executable=(".claude/architecture/arch-validate.py",),
+    )
+    f = _fleet(tmp_path)
+    fleet.prepare(f, repo)
+    (f.kit / "agents/update-architecture.md").write_text("edited agent\n")
+    with pytest.raises(
+        fleet.ProducerError, match=r"differ from the kit: \.claude/agents/update-architecture\.md$"
+    ):
+        fleet.prepare(f, repo)
+    remote.commit({".claude/agents/update-architecture.md": "edited agent\n"})
+    clone = fleet.prepare(f, repo)
     assert _git(clone.path, "status", "--porcelain") == ""
 
 
