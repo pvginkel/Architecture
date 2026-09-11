@@ -43,7 +43,7 @@ producers:
     jenkinsJob: AaC/NewsFilter
     defaultLogo: newsfilter
   - id: scantopdf-server
-    jenkinsJob: AaC/ScanToPdf
+    jenkinsJob: AaC/ScanToPdfServer
     defaultLogo: scantopdf
   - id: webathome-org
     jenkinsJob: AaC/Webathome
