@@ -53,8 +53,9 @@ a time:
 2. **Stage the kit.** The kit's files are copied into the clone's `.claude/` and listed in
    `.git/info/exclude`, so the clone stays clean and no staged file can end up in a session's
    commit. A repo that tracks its own file at a kit path with different content is refused before
-   anything is copied — a producer's own agent is never overwritten. (This repo is a producer too;
-   its tracked kit is what gets staged, so it matches.)
+   anything is copied — a producer's own agent is never overwritten. (This repo is a producer too,
+   and what gets staged is this checkout's `.claude/` on disk, not what it has pushed: an
+   uncommitted or unpushed kit edit refuses producer `architecture` until it is pushed.)
 3. **Pick the base.** The watermark is the last commit that touched the sources at `origin/HEAD`;
    the base is the later of that and the producer's `reviewed` commit in the state file. A base
    equal to the head means *current* — nothing to judge, no session.

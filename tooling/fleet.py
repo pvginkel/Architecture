@@ -302,8 +302,9 @@ class FixRound:
 class Outcome:
     """One producer's result from `update`; `reviewed` is the commit its state advances to,
     None to leave the recorded one. An update's commits are delivered as `push`, then `fixes`.
-    `issues` is what the producer leaves for the operator, one item per line of the report's
-    Unresolved section."""
+    `issues` is what went wrong for this producer, one item per string; the report's Unresolved
+    section and the exit code count `unresolved_items(outcome)`, which adds the sessions' own
+    `Skipped:` judgment calls to it."""
 
     producer: Producer
     status: str

@@ -53,6 +53,7 @@ tooling/       # Python (Poetry)
   validate.py          local validation CLI (incl. `meta` self-check)
   collect.py           federation collector: merge · cross-check · derive · inline views
   _arch.py             shared validator used by both validate.py and collect.py
+  fleet.py             the central architecture update: scan · stage · update the producer repos
   tests/               fixture-driven end-to-end collector tests (run_fixtures.py)
 service/       # Node + Express (TypeScript), vitest
   src/                 routes: validate, static, usage, metrics, csp; schema loader; error-translate
@@ -229,7 +230,7 @@ Self-hosted homelab: Kubernetes, Jenkins, Kaniko, Ansible. The Helm chart lives 
 ## Status & open threads
 
 The system is built and live end-to-end: schema, validation service, federation
-pipeline, ~20 onboarded producers, and the data-driven viewer. Remaining items are
+pipeline, 30 onboarded producers, and the data-driven viewer. Remaining items are
 deferred design decisions (logo single-sourcing, producer-supplied logos in the
 image, a canonical service↔interface idiom) tracked in [`docs/todo.md`](docs/todo.md).
 
