@@ -23,6 +23,15 @@ properties:
             Producer id. Kebab-case. Doubles as the directory name under
             producer-artifacts/<id>/.
           pattern: ^[a-z][a-z0-9-]*$
+        repo:
+          type: string
+          description: |
+            GitHub repository holding the producer's architecture sources, as
+            `owner/name` (e.g., `pvginkel/Ansible`) — the repository the
+            producer's AaC job checks out. Not a URL and no `.git` suffix.
+            Omit only for a producer whose artifact no repository's sources
+            maintain (home-automation-fleet, generated from the live fleet).
+          pattern: ^[A-Za-z0-9][A-Za-z0-9-]*/(?!.*\.git$)[A-Za-z0-9._-]+$
         jenkinsJob:
           type: string
           description: |

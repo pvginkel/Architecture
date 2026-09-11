@@ -7,84 +7,112 @@
 
 producers:
   - id: ansible
+    repo: pvginkel/Ansible
     jenkinsJob: AaC/Ansible
   - id: architecture
+    repo: pvginkel/Architecture
   - id: home-automation-fleet
     # Daily HA-fleet snapshot — its own scheduled job (Jenkinsfile.ha-fleet),
     # not build-triggered. Job name has spaces; rename the job + this value to
     # AaC/HomeAutomationFleet if the upstream-trigger join is ever fussy.
+    # No `repo`: the artifact is generated from the live fleet, not from
+    # sources in a producer repo.
     jenkinsJob: AaC/Home Assistant Fleet
   - id: helm-charts
+    repo: pvginkel/HelmCharts
     jenkinsJob: AaC/HelmCharts
   - id: docker-images
+    repo: pvginkel/DockerImages
     jenkinsJob: AaC/DockerImages
   - id: ssegateway
+    repo: pvginkel/SSEGateway
     jenkinsJob: AaC/SSEGateway
     defaultLogo: sse-gateway
   - id: electronics-inventory
+    repo: pvginkel/ElectronicsInventory
     jenkinsJob: AaC/ElectronicsInventory
     defaultLogo: electronics-inventory
   - id: iotsupport-app
+    repo: pvginkel/IoTSupport
     jenkinsJob: AaC/IoTSupport
     defaultLogo: iot-support
   - id: dhcpapp
+    repo: pvginkel/DHCPApp
     jenkinsJob: AaC/DHCPApp
     defaultLogo: dnsmasq
   - id: zigbee-control
+    repo: pvginkel/ZigbeeControl
     jenkinsJob: AaC/ZigbeeControl
     defaultLogo: zigbee2mqtt
-  - id: design-assistant
-    jenkinsJob: AaC/DesignAssistant
-    defaultLogo: design-assistant
   - id: ginbov-nl
+    repo: pvginkel/Ginbov
     jenkinsJob: AaC/Ginbov
     defaultLogo: ginbov-nl
   - id: newsfilter
+    repo: pvginkel/NewsFilter
     jenkinsJob: AaC/NewsFilter
     defaultLogo: newsfilter
   - id: scantopdf-server
+    repo: pvginkel/ScanToPdfServer
     jenkinsJob: AaC/ScanToPdfServer
     defaultLogo: scantopdf
   - id: webathome-org
+    repo: pvginkel/Webathome
     jenkinsJob: AaC/Webathome
     defaultLogo: webathome
   - id: mydownloads-server
+    repo: pvginkel/MyDownloadsServer
     jenkinsJob: AaC/MyDownloadsServer
     defaultLogo: mydownloads
   - id: gitblit-mcp-server
+    repo: pvginkel/GitblitMCPServer
     jenkinsJob: AaC/GitblitMCPServer
     defaultLogo: gitblit
   - id: gitblit-initializer
+    repo: pvginkel/GitblitMCPSupportPlugin
     jenkinsJob: AaC/GitblitMCPSupportPlugin
     defaultLogo: gitblit
   # ── batch 2: ESP32 firmware, Android clients, kiosk, intercom server ──
   - id: calendar-display
+    repo: pvginkel/CalendarDisplay
     jenkinsJob: AaC/CalendarDisplay
   - id: doorbell-receiver
+    repo: pvginkel/DoorbellReceiver
     jenkinsJob: AaC/DoorbellReceiver
   - id: gesture-device
+    repo: pvginkel/GestureDevice
     jenkinsJob: AaC/GestureDevice
   - id: underfloor-heating-controller
+    repo: pvginkel/UnderfloorHeatingController
     jenkinsJob: AaC/UnderfloorHeatingController
   - id: somfy-remote
+    repo: pvginkel/SomfyRemote
     jenkinsJob: AaC/SomfyRemote
   - id: paper-clock
+    repo: pvginkel/PaperClock
     jenkinsJob: AaC/PaperClock
   - id: intercom
+    repo: pvginkel/Intercom
     jenkinsJob: AaC/Intercom
   - id: infra-statistics-display
+    repo: pvginkel/InfraStatisticsDisplay
     jenkinsJob: AaC/InfraStatisticsDisplay
   - id: intercom-server
+    repo: pvginkel/IntercomServer
     jenkinsJob: AaC/IntercomServer
     defaultLogo: intercom-server
   - id: scantopdf-client
+    repo: pvginkel/ScanToPdfClient
     jenkinsJob: AaC/ScanToPdfClient
     defaultLogo: scantopdf
   - id: mydownloads-client
+    repo: pvginkel/MyDownloadsClient
     jenkinsJob: AaC/MyDownloadsClient
     defaultLogo: mydownloads
   - id: kitchen-display
+    repo: pvginkel/KitchenDisplay
     jenkinsJob: AaC/KitchenDisplay
   - id: kubecoder
+    repo: pvginkel/KubeCoder
     jenkinsJob: AaC/KubeCoder
     defaultLogo: kubecoder
