@@ -38,9 +38,6 @@ secrets:
 
 packages: []
 
-setup:
-  - kc project setup
-
 preamble:
   instructions: |
     This environment holds the Architecture-as-Code pipeline (Architecture)
