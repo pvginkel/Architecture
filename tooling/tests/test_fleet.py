@@ -577,6 +577,15 @@ if verb == "create-headless":
         sys.exit(1)
     print(f"fake-{count('create-headless')}")
 elif verb == "send":
+    # Installed before anything else in this branch (turn/JSON parsing, the prompt-file
+    # read, record()'s own file I/O) so a SIGINT is handled the same way no matter how
+    # slow this interpreter is to start up on a loaded machine: it no longer has to land
+    # while we're inside a `time.sleep()` try/except to be caught correctly.
+    def on_interrupt(signum, frame):
+        record(interrupted=True)
+        sys.exit(130)
+
+    signal.signal(signal.SIGINT, on_interrupt)
     turn = json.loads(Path(os.environ["FAKE_KC_TURNS"]).read_text())[count("send")]
     record(prompt=Path(args[args.index("--prompt-file") + 1]).read_text())
     if turn.get("ignore_interrupt"):
@@ -587,11 +596,7 @@ elif verb == "send":
         Path(path).write_text(text)
         subprocess.run(["git", "add", path], check=True)
         subprocess.run(["git", "commit", "--quiet", "-m", f"architecture: {path}"], check=True)
-    try:
-        time.sleep(turn.get("sleep", 0))
-    except KeyboardInterrupt:
-        record(interrupted=True)
-        sys.exit(130)
+    time.sleep(turn.get("sleep", 0))
     Path(args[args.index("--response-file") + 1]).write_text(turn.get("response", ""))
     sys.exit(turn.get("exit", 0))
 elif verb == "status":
