@@ -27,8 +27,8 @@ agent, `send` under a timeout this tool enforces, `status` for the session
 id, and `end` always.
 
 An update's commits are pushed to the default branch, and each job the push
-starts (every Jenkins job whose SCM checks out the repo and which a GitHub
-push trigger starts, the registry's AaC job first) is followed with
+starts (every enabled Jenkins job whose SCM checks out the repo and which a
+GitHub push trigger starts, the registry's AaC job first) is followed with
 `track_build.py`. A job green before the push and red after it resumes the
 update session to fix it, FIX_ROUNDS times at most. Jenkins is `$JENKINS_URL`
 as `$JENKINS_USER`, by default JENKINS_URL and JENKINS_USER below;
@@ -856,13 +856,17 @@ class Jenkins:
         """Each GitHub repo, as lowercase `owner/name`, with the jobs a push to it starts.
 
         A job whose SCM checks the repo out but which carries no PUSH_TRIGGER is
-        started by a timer or by hand, never by the push: track_build.py would
-        wait for a build of the pushed commit that never appears and exit 3.
+        started by a timer or by hand, never by the push, and a disabled job
+        refuses to be scheduled while keeping its trigger in `config.xml`:
+        track_build.py would wait for a build of the pushed commit that never
+        appears and exit 3.
         """
         if self._index is None:
             index: dict[str, set[str]] = {}
             for job in self._jobs(""):
                 config = ET.fromstring(self.get(f"{job_path(job)}/config.xml"))
+                if config.findtext("disabled") == "true":
+                    continue
                 if next(config.iter(PUSH_TRIGGER), None) is None:
                     continue
                 for url in config.iterfind(".//userRemoteConfigs/*/url"):

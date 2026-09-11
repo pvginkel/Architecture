@@ -1050,6 +1050,7 @@ JOB_CONFIG = """\
     </scm>
     <scriptPath>Jenkinsfile.architecture</scriptPath>
   </definition>
+  <disabled>{disabled}</disabled>
 </flow-definition>
 """
 
@@ -1057,13 +1058,13 @@ JOB_CONFIG = """\
 class FakeJenkins:
     """Canned Jenkins REST responses under a placeholder host, in place of urlopen.
 
-    A job carries its SCM URL, its last completed result (None: never built)
-    and the trigger in its config; the folders are the job names' prefixes, at
-    any depth.
+    A job carries its SCM URL, its last completed result (None: never built),
+    the trigger in its config and whether it is disabled; the folders are the
+    job names' prefixes, at any depth.
     """
 
     def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        self.jobs: dict[str, tuple[str, str | None, str]] = {}
+        self.jobs: dict[str, tuple[str, str | None, str, bool]] = {}
         self.paths: list[str] = []
         self.remote: Path | None = None
         self.remote_at_read: list[str] = []
@@ -1074,9 +1075,14 @@ class FakeJenkins:
         monkeypatch.setattr(urllib.request, "urlopen", self.urlopen)
 
     def job(
-        self, name: str, scm: str = SCM, last: str | None = "SUCCESS", trigger: str = PUSH_TRIGGER
+        self,
+        name: str,
+        scm: str = SCM,
+        last: str | None = "SUCCESS",
+        trigger: str = PUSH_TRIGGER,
+        disabled: bool = False,
     ) -> None:
-        self.jobs[name] = (scm, last, trigger)
+        self.jobs[name] = (scm, last, trigger, disabled)
 
     def _listing(self, folder: str) -> list[dict[str, Any]]:
         prefix = f"{folder}/" if folder else ""
@@ -1101,8 +1107,9 @@ class FakeJenkins:
         name = "/".join(parts[1:-1:2])
         body: Any
         if path.endswith("/config.xml") and name in self.jobs:
-            scm, _, trigger = self.jobs[name]
-            return io.BytesIO(JOB_CONFIG.format(url=scm, trigger=trigger).encode())
+            scm, _, trigger, disabled = self.jobs[name]
+            config = JOB_CONFIG.format(url=scm, trigger=trigger, disabled=str(disabled).lower())
+            return io.BytesIO(config.encode())
         if path.endswith("/api/json") and name in self.jobs:
             assert tree == "lastCompletedBuild[result]"
             if self.remote is not None:
@@ -1324,14 +1331,18 @@ def test_a_job_the_push_does_not_start_is_not_tracked(
     tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, tracker: FakeTracker
 ) -> None:
     scheduled = "AaC/Home Assistant Fleet"
+    retired = "Firmware/NewsFilter"
     f = _updated(tmp_path, kc, jenkins)
     jenkins.job(JOB)
     jenkins.job(scheduled, trigger=TIMER_TRIGGER)
-    tracker.play({JOB: [_built(42)], scheduled: [{"error": "no build of the commit appeared"}]})
+    jenkins.job(retired, disabled=True)
+    stalls = [{"error": "no build of the commit appeared"}]
+    tracker.play({JOB: [_built(42)], scheduled: stalls, retired: stalls})
     outcome = _deliver(f)
     assert tracker.calls() == [(JOB, _pushed(tmp_path))]
     assert "/job/AaC/job/Home Assistant Fleet/config.xml" in jenkins.paths
     assert "/job/AaC/job/Home Assistant Fleet/api/json" not in jenkins.paths
+    assert "/job/Firmware/job/NewsFilter/api/json" not in jenkins.paths
     assert (outcome.unresolved, outcome.detail) == (
         False,
         "1 delta applied, 1 commit, validator clean. Skipped: none",
