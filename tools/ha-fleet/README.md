@@ -73,8 +73,8 @@ state; the gap report goes to stderr.
 
 The pipeline is `Jenkinsfile.ha-fleet` (at the repo root): a standalone job,
 separate from the main AaC pipeline, that runs the generator, validates the
-output against the validation service (`scripts/arch-validate.py` — fails without
-publishing on a non-zero exit), and archives
+output against the validation service (`.claude/architecture/arch-validate.py` —
+fails without publishing on a non-zero exit), and archives
 `out/architecture/home-automation-fleet.yaml` (under an `architecture/` path so
 the main pipeline's `copyArtifacts` filter `**/architecture/**/*.yaml` picks it
 up — same contract as every other producer; no commit-back).

@@ -24,8 +24,10 @@ and `docs/`.
   merged dataset.
 - **`service/`** — the Express + TypeScript service (npm) serving the viewer bundle and the
   published dataset/API. Its image is the deliverable.
-- **`arch/`** — the `arch` Claude Code plugin packaging the producer-onboarding tooling, installed
-  into `~/.claude/` from here (see [`docs/arch-plugin.md`](docs/arch-plugin.md)).
+- **`.claude/`** — the producer-side kit (manual, skeleton, validator, seed skill, the triage and
+  update agents) that `tooling/fleet.py` stages into each producer clone, plus the
+  `architecture-update` skill that runs it (see
+  [`docs/architecture-update.md`](docs/architecture-update.md)).
 
 Everything builds through `kc project`; the toolchain lives in the `modern-app` sidecar, so ad-hoc
 poetry/npm commands need `cexec modern-app`.
@@ -68,5 +70,5 @@ authorship.
 - [`docs/change-discipline.md`](docs/change-discipline.md) — the change rules every code change obeys.
 - [`docs/capability-enum.md`](docs/capability-enum.md) — the three places a `cap:` enum entry must touch. Easy to forget; it has bitten us.
 - [`docs/deployment.md`](docs/deployment.md) — the self-hosted K8s/Jenkins context the container ships into.
-- [`docs/arch-plugin.md`](docs/arch-plugin.md) — the `arch/` producer-onboarding plugin.
+- [`docs/architecture-update.md`](docs/architecture-update.md) — the central architecture update: `tooling/fleet.py` and the kit under `.claude/`.
 - `../ArchitectureSpecs/decisions.md` — the thin `DNNN` decision index.

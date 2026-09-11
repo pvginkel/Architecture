@@ -158,7 +158,7 @@ ARCHITECTURE_VALIDATE_URL=http://localhost:8080/api/validate \
 The script is a single-file Python 3 program that uses only the standard
 library — runs on any `python:slim` image or system `python3`, no `pip
 install` step. Updates are coordinated by re-copying from this repo
-(`scripts/arch-validate.py`).
+(`.claude/architecture/arch-validate.py`).
 
 ## `$schema` pragma
 

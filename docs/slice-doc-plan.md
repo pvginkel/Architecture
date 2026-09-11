@@ -52,11 +52,11 @@ It is a separate git repo: commit there separately.
 
 ### 4. The producer manual, when the contract moved
 
-`arch/references/producer-manual.md` is what producer repos are onboarded against, and
-`arch/assets/architecture.yaml` is the skeleton they start from. A slice that changed
+`.claude/architecture/producer-manual.md` is what producer repos are onboarded against, and
+`.claude/architecture/architecture.yaml` is the skeleton they start from. A slice that changed
 `schema/v0.1/`, the enums, or what a valid `architecture.yaml` looks like has changed what
-producers must write — update both, and see [`arch-plugin.md`](arch-plugin.md) for how the plugin
-is packaged.
+producers must write — update both, and see
+[`architecture-update.md`](architecture-update.md) for how that kit reaches the producers.
 
 ### 5. The capability enum's third place
 

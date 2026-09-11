@@ -5,7 +5,8 @@ system, and the spec for the **device generator** that IoT Support will grow to 
 physical fleet and its realized dependency edges.
 
 Audience: whoever builds the IoT Support architecture generator. Authoritative vocabulary
-is the `arch` plugin's `references/producer-manual.md`; this is the device-fleet-specific layer.
+is `.claude/architecture/producer-manual.md` in the Architecture repo; this is the
+device-fleet-specific layer.
 
 ---
 

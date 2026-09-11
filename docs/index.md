@@ -15,10 +15,16 @@ be assembled without opening them all.
 - [slice-doc-plan.md](slice-doc-plan.md) — which doc surfaces a shipped slice must bring up to date, and in what order.
 - [deployment.md](deployment.md) — the self-hosted stack the container artifact ships into (K8s/Jenkins/Kaniko/Ansible); what's in scope here vs the operator's.
 - [capability-enum.md](capability-enum.md) — the three places a `cap:` enum entry must touch (enum → generated vocab → hand-added viewer icon).
-- [arch-plugin.md](arch-plugin.md) — the `arch/` Claude Code plugin that packages the producer-onboarding tooling (seed skill, update agents, manual, validator) and installs into `~/.claude/`.
+- [architecture-update.md](architecture-update.md) — the central architecture update: `tooling/fleet.py`, the producer-side kit under `.claude/` it stages into each clone, the triage and update sessions, the tracked builds, and the run's report.
 
 ## Not topic docs
 
 `docs/architecture/*.yaml` is this repo's **own** published architecture artifact (the
 self-producer dataset), not workflow documentation. `docs/backfill/` and
 `docs/iotsupport-iot-architecture-guidance.md` are likewise data/guidance, not topic docs.
+
+`.claude/` is the producer-side kit itself — the producer manual, the starter skeleton,
+`arch-validate.py`, the `seed-architecture` skill and the two architecture agents — plus the
+`architecture-update` skill that drives the fleet from here. It is working material the central
+architecture update stages into each producer clone, described by
+[architecture-update.md](architecture-update.md) rather than being documentation of its own.

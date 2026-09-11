@@ -233,6 +233,9 @@ pipeline, ~20 onboarded producers, and the data-driven viewer. Remaining items a
 deferred design decisions (logo single-sourcing, producer-supplied logos in the
 image, a canonical service↔interface idiom) tracked in [`docs/todo.md`](docs/todo.md).
 
-The operator-side onboarding workflow (producer manual, seeding skill, update
-agents) is packaged as the `arch` Claude Code plugin under `arch/`, installed into
-the operator's `~/.claude/` from this repo — see [`CLAUDE.md`](./CLAUDE.md).
+The operator-side workflow (producer manual, seeding skill, triage and update
+agents) lives under `.claude/` in this repo, and `tooling/fleet.py` is the central
+architecture update: it stages that kit into a clone of each producer repo, brings
+drifted artifacts back into sync through headless sessions, pushes, and tracks the
+builds the push starts — see
+[`docs/architecture-update.md`](docs/architecture-update.md).
