@@ -21,8 +21,9 @@ tools:
 #   kaniko --destination registry:5000/architecture:dev
 # Deliberately not wired into `kc project build`, because it cannot pass: the
 # run-collector stage needs a producer-artifacts/ tree that only the Jenkinsfile
-# assembles. The build does exercise the schema check and both npm builds before
-# it gets there, which is what makes it a useful smoke test.
+# assembles. The build does exercise the schema check, both npm builds and the
+# tooling, viewer and service suites before it gets there, which is what makes
+# it a useful smoke test.
 imageBuilder: true
 
 secrets:

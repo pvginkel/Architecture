@@ -198,9 +198,10 @@ builds, since Jenkins owns `registry:5000/architecture_viewer:latest` and the nu
 A local build cannot complete, by design. `producer-artifacts/` is `.dockerignore`d so a
 developer can never bundle stray fixtures into an image, and now that every producer is
 registered in `pipeline-producers.yaml` the `run-collector` stage fails discovery on the
-first missing producer directory. It still gets through the schema check and both `npm`
-builds, which is what makes it worth running as a Dockerfile smoke test. The complete image
-is a CI-only artifact: the Jenkinsfile populates `producer-artifacts/` with `copyArtifacts`
+first missing producer directory. It still gets through the schema check, both `npm` builds
+and the `tooling`, `viewer` and `service` suites, which the Dockerfile runs in the stages
+before it, so it is worth running as a Dockerfile smoke test. The complete image is a
+CI-only artifact: the Jenkinsfile populates `producer-artifacts/` with `copyArtifacts`
 and clears the `.dockerignore` exclusion before kaniko runs.
 
 ## Deployment
