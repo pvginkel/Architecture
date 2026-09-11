@@ -1023,9 +1023,23 @@ JOB = "AaC/NewsFilter"
 APP = "NewsFilter/NewsFilter"
 SCM = f"https://github.com/{REPO}.git"
 
+PUSH_TRIGGER = (
+    "<com.cloudbees.jenkins.GitHubPushTrigger><spec/></com.cloudbees.jenkins.GitHubPushTrigger>"
+)
+TIMER_TRIGGER = (
+    "<hudson.triggers.TimerTrigger><spec>H 3 * * *</spec></hudson.triggers.TimerTrigger>"
+)
+
 JOB_CONFIG = """\
 <?xml version='1.1' encoding='UTF-8'?>
 <flow-definition plugin="workflow-job">
+  <properties>
+    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+      <triggers>
+        {trigger}
+      </triggers>
+    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+  </properties>
   <definition class="org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition">
     <scm class="hudson.plugins.git.GitSCM">
       <userRemoteConfigs>
@@ -1043,12 +1057,13 @@ JOB_CONFIG = """\
 class FakeJenkins:
     """Canned Jenkins REST responses under a placeholder host, in place of urlopen.
 
-    A job carries its SCM URL and its last completed result (None: never
-    built); the folders are the job names' prefixes, at any depth.
+    A job carries its SCM URL, its last completed result (None: never built)
+    and the trigger in its config; the folders are the job names' prefixes, at
+    any depth.
     """
 
     def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        self.jobs: dict[str, tuple[str, str | None]] = {}
+        self.jobs: dict[str, tuple[str, str | None, str]] = {}
         self.paths: list[str] = []
         self.remote: Path | None = None
         self.remote_at_read: list[str] = []
@@ -1058,8 +1073,10 @@ class FakeJenkins:
         monkeypatch.delenv("JENKINS_USER", raising=False)
         monkeypatch.setattr(urllib.request, "urlopen", self.urlopen)
 
-    def job(self, name: str, scm: str = SCM, last: str | None = "SUCCESS") -> None:
-        self.jobs[name] = (scm, last)
+    def job(
+        self, name: str, scm: str = SCM, last: str | None = "SUCCESS", trigger: str = PUSH_TRIGGER
+    ) -> None:
+        self.jobs[name] = (scm, last, trigger)
 
     def _listing(self, folder: str) -> list[dict[str, Any]]:
         prefix = f"{folder}/" if folder else ""
@@ -1084,7 +1101,8 @@ class FakeJenkins:
         name = "/".join(parts[1:-1:2])
         body: Any
         if path.endswith("/config.xml") and name in self.jobs:
-            return io.BytesIO(JOB_CONFIG.format(url=self.jobs[name][0]).encode())
+            scm, _, trigger = self.jobs[name]
+            return io.BytesIO(JOB_CONFIG.format(url=scm, trigger=trigger).encode())
         if path.endswith("/api/json") and name in self.jobs:
             assert tree == "lastCompletedBuild[result]"
             if self.remote is not None:
@@ -1207,13 +1225,16 @@ def _pushed(tmp_path: Path) -> str:
 def test_the_job_index_reads_every_folder_level_once_per_run(jenkins: FakeJenkins) -> None:
     jenkins.job(JOB)
     jenkins.job("Apps/Web/NewsFilter", "https://github.com/pvginkel/newsfilter")
-    jenkins.job("AaC/Home Assistant Fleet", "https://github.com/pvginkel/Architecture.git")
+    jenkins.job(
+        "AaC/Home Assistant Fleet",
+        "https://github.com/pvginkel/Architecture.git",
+        trigger=TIMER_TRIGGER,
+    )
     jenkins.job("Standalone", "https://github.com/pvginkel/PaperClock.git")
     jenkins.job("Mirrors/Elsewhere", "https://git.example.invalid/pvginkel/NewsFilter.git")
     client = fleet.Jenkins.from_env()
     assert client.jobs_by_repo() == {
         "pvginkel/newsfilter": (JOB, "Apps/Web/NewsFilter"),
-        "pvginkel/architecture": ("AaC/Home Assistant Fleet",),
         "pvginkel/paperclock": ("Standalone",),
     }
     read = len(jenkins.paths)
@@ -1223,6 +1244,7 @@ def test_the_job_index_reads_every_folder_level_once_per_run(jenkins: FakeJenkin
     assert "/job/AaC/job/Home Assistant Fleet/config.xml" in jenkins.paths
     assert fleet.tracked_jobs(JOB, REPO, client) == [JOB, "Apps/Web/NewsFilter"]
     assert fleet.tracked_jobs(None, "pvginkel/PaperClock", client) == ["Standalone"]
+    assert fleet.tracked_jobs("AaC/Home Assistant Fleet", "pvginkel/Architecture", client) == []
 
 
 def test_the_jenkins_address_defaults_in_the_tool_and_the_environment_overrides_it(
@@ -1296,6 +1318,24 @@ def test_an_update_is_pushed_and_each_tracked_job_followed_once_at_the_pushed_co
         "outcome": f"updated: {outcome.detail}",
     }
     assert kc.verbs() == SESSION * 2
+
+
+def test_a_job_the_push_does_not_start_is_not_tracked(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, tracker: FakeTracker
+) -> None:
+    scheduled = "AaC/Home Assistant Fleet"
+    f = _updated(tmp_path, kc, jenkins)
+    jenkins.job(JOB)
+    jenkins.job(scheduled, trigger=TIMER_TRIGGER)
+    tracker.play({JOB: [_built(42)], scheduled: [{"error": "no build of the commit appeared"}]})
+    outcome = _deliver(f)
+    assert tracker.calls() == [(JOB, _pushed(tmp_path))]
+    assert "/job/AaC/job/Home Assistant Fleet/config.xml" in jenkins.paths
+    assert "/job/AaC/job/Home Assistant Fleet/api/json" not in jenkins.paths
+    assert (outcome.unresolved, outcome.detail) == (
+        False,
+        "1 delta applied, 1 commit, validator clean. Skipped: none",
+    )
 
 
 def test_a_build_red_before_the_push_is_pre_existing_and_never_resumes_the_session(

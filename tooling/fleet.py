@@ -26,12 +26,13 @@ The sessions are headless `kc` sessions driven as the dev plugin's
 agent, `send` under a timeout this tool enforces, `status` for the session
 id, and `end` always.
 
-An update's commits are pushed to the default branch, and each tracked job
-(the registry's AaC job, and every Jenkins job whose SCM checks out the repo)
-is followed with `track_build.py`. A job green before the push and red after
-it resumes the update session to fix it, FIX_ROUNDS times at most. Jenkins is
-`$JENKINS_URL` as `$JENKINS_USER`, by default JENKINS_URL and JENKINS_USER
-below; `$JENKINS_TOKEN` is the only credential.
+An update's commits are pushed to the default branch, and each job the push
+starts (every Jenkins job whose SCM checks out the repo and which a GitHub
+push trigger starts, the registry's AaC job first) is followed with
+`track_build.py`. A job green before the push and red after it resumes the
+update session to fix it, FIX_ROUNDS times at most. Jenkins is `$JENKINS_URL`
+as `$JENKINS_USER`, by default JENKINS_URL and JENKINS_USER below;
+`$JENKINS_TOKEN` is the only credential.
 """
 
 from __future__ import annotations
@@ -97,6 +98,7 @@ TRACKER = "track_build.py"
 FIX_ROUNDS = 2
 GREEN = "SUCCESS"
 GITHUB_REPO = re.compile(r"https://github\.com/([A-Za-z0-9._-]+/[A-Za-z0-9._-]+?)(?:\.git)?/?")
+PUSH_TRIGGER = "com.cloudbees.jenkins.GitHubPushTrigger"
 SUMMARY = "=== Build tracking summary ==="
 SUMMARY_ROW = re.compile(r"(.+?)\s+#(\d+)\s+(\S+)\s.*")
 SUMMARY_LOG = re.compile(r"\s*↳ full log: (.+)")
@@ -851,11 +853,18 @@ class Jenkins:
                 yield item["fullName"]
 
     def jobs_by_repo(self) -> dict[str, tuple[str, ...]]:
-        """Each GitHub repo, as lowercase `owner/name`, with the jobs whose SCM checks it out."""
+        """Each GitHub repo, as lowercase `owner/name`, with the jobs a push to it starts.
+
+        A job whose SCM checks the repo out but which carries no PUSH_TRIGGER is
+        started by a timer or by hand, never by the push: track_build.py would
+        wait for a build of the pushed commit that never appears and exit 3.
+        """
         if self._index is None:
             index: dict[str, set[str]] = {}
             for job in self._jobs(""):
                 config = ET.fromstring(self.get(f"{job_path(job)}/config.xml"))
+                if next(config.iter(PUSH_TRIGGER), None) is None:
+                    continue
                 for url in config.iterfind(".//userRemoteConfigs/*/url"):
                     if repo := GITHUB_REPO.fullmatch((url.text or "").strip()):
                         index.setdefault(repo[1].lower(), set()).add(job)
@@ -869,9 +878,9 @@ class Jenkins:
 
 
 def tracked_jobs(job: str | None, repo: str, jenkins: Jenkins) -> list[str]:
-    """The registry's AaC job, then every other job whose SCM checks out `repo`."""
-    indexed = jenkins.jobs_by_repo().get(repo.lower(), ())
-    return ([job] if job else []) + [j for j in indexed if j != job]
+    """The jobs a push to `repo` starts, the registry's AaC job first."""
+    started = jenkins.jobs_by_repo().get(repo.lower(), ())
+    return ([job] if job in started else []) + [j for j in started if j != job]
 
 
 def parse_track_summary(stdout: str) -> tuple[Build, ...]:
