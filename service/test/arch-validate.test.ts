@@ -9,7 +9,7 @@ import { loadSchemas } from "../src/schema-loader.js";
 const exec = promisify(execFile);
 
 const REPO_ROOT = path.resolve(__dirname, "../..");
-const SCRIPT = path.join(REPO_ROOT, "scripts", "arch-validate.py");
+const SCRIPT = path.join(REPO_ROOT, ".claude", "architecture", "arch-validate.py");
 const EXAMPLES = path.join(REPO_ROOT, "schema", "v0.1", "examples");
 
 let server: Server;
@@ -60,7 +60,7 @@ function runWithStdin(args: string[], input: string, endpoint: string): Promise<
   });
 }
 
-describe("scripts/arch-validate.py", () => {
+describe(".claude/architecture/arch-validate.py", () => {
   it("exits 0 on a valid YAML artifact", async () => {
     const r = await run([path.join(EXAMPLES, "valid-minimal.yaml")]);
     expect(r.code).toBe(0);

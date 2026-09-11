@@ -1,14 +1,20 @@
 ---
 name: seed-architecture
-description: Author the FIRST architecture artifact for a repo joining the webathome.org federated Architecture-as-Code system. Surveys the repo by fanning out parallel Explore sub-agents, detects hand-authored vs generated mode, triages candidate elements with the operator, then drafts docs/architecture/*.yaml (or the annotation layer + generator for a generated producer) and validates. Use ONCE per repo to seed it. For incremental upkeep afterwards use the arch:update-architecture / arch:update-architecture-generated agents instead. Trigger when onboarding a repo as a producer, "seed/bootstrap the architecture", or creating a producer's first architecture.yaml.
+description: Author the FIRST architecture artifact for a repo joining the webathome.org federated Architecture-as-Code system. Surveys the repo by fanning out parallel Explore sub-agents, detects hand-authored vs generated mode, triages candidate elements with the operator, then drafts docs/architecture/*.yaml (or the annotation layer + generator for a generated producer) and validates. Use ONCE per repo to seed it, in a clone staged by the Architecture repo's `tooling/fleet.py stage`. Incremental upkeep afterwards is the central architecture update's job, not this skill's. Trigger when onboarding a repo as a producer, "seed/bootstrap the architecture", or creating a producer's first architecture.yaml.
 ---
 
 # seed-architecture
 
 Author a producer's **first** architecture artifact end-to-end: survey →
-triage → author → validate. Once seeded, hand the repo off to the
-`arch:update-architecture` (hand-authored) or `arch:update-architecture-generated`
-(generated) agent for incremental upkeep — this skill is one-shot.
+triage → author → validate. This skill is one-shot: once the producer is
+registered, the central architecture update in the Architecture repo
+(`tooling/fleet.py update`) keeps its artifact current.
+
+Run it in a clone of the producer repo with the kit staged. In the
+Architecture repo, `python3 tooling/fleet.py stage <Repo>` clones (or
+fetches) the repo into `/tmp/architecture-update/repos/<Repo>` and stages
+`.claude/` there without starting a session; start the session in that
+clone.
 
 ## Why this is a skill, not a sub-agent
 
@@ -21,7 +27,7 @@ never from inside another agent.
 
 ## Read first (do not skip)
 
-1. `${CLAUDE_PLUGIN_ROOT}/references/producer-manual.md` — the full manual.
+1. `.claude/architecture/producer-manual.md` — the full manual.
    Vocabulary, **ID grammar**, **Element kinds**, **Inclusion rule**,
    **Ownership conventions**, **Generated producers**, the `boundBy` section
    and its deployer-side resolution mechanics. Your tagging and authoring
@@ -29,9 +35,8 @@ never from inside another agent.
 2. `CLAUDE.md` at repo root — what this repo owns end-to-end.
 3. `README.md` and any `docs/` that describe architecture, phases, runbooks.
 
-The starter skeleton is at `${CLAUDE_PLUGIN_ROOT}/assets/architecture.yaml`; the
-validator at `${CLAUDE_PLUGIN_ROOT}/scripts/arch-validate.py` (the repo copies it to
-`scripts/arch-validate.py`).
+The starter skeleton is at `.claude/architecture/architecture.yaml`; the
+validator at `.claude/architecture/arch-validate.py`.
 
 ## Step 1 — Detect the mode
 
@@ -127,7 +132,7 @@ the coarsest honest granularity).
 ## Step 5 — Validate
 
 ```bash
-./scripts/arch-validate.py docs/architecture/*.yaml
+.claude/architecture/arch-validate.py docs/architecture/*.yaml
 ```
 
 Iterate until clean. For a generated producer, also **regenerate twice and
@@ -138,9 +143,22 @@ diff** — a clean producer is byte-identical (catches non-deterministic ids).
 Per the manual's **Jenkins integration** and **Registration** sections: add
 validate + archive steps (generated producers add a generate step first and
 don't commit the YAML, ideally in a dedicated `Jenkinsfile.architecture`
-isolated from the deploy pipeline); then PR `pipeline-producers.yaml` in
-pvginkel/Architecture. Confirm one build archives + validates before
-registering.
+isolated from the deploy pipeline), with the validator copied from
+`.claude/architecture/arch-validate.py` to the repo's own
+`scripts/arch-validate.py` for CI to call. Push the seeded commits once the
+operator approves: the central update refuses a clone with unpushed commits.
+Confirm one build archives + validates, then PR `pipeline-producers.yaml` in
+pvginkel/Architecture with the producer's `id`, `jenkinsJob` and `repo`
+(GitHub `owner/name`; without it the central update does not manage the
+producer).
+
+A generated producer, or one whose artifact lives outside
+`docs/architecture/`, also needs a `.architecturerc` at its repo root so the
+central update knows what the artifact is made of: `generated: true` for a
+generated producer, `sources` (git pathspecs; the default is
+`:(glob)**/docs/architecture/**`) and `instructions` (free text handed to the
+update sessions: where the annotations live, what the generator derives from
+them, what the artifact leaves out).
 
 ## Constraints
 

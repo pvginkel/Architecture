@@ -73,7 +73,7 @@ withVault([vaultSecrets: [
                     // transport/server error; either fails the build here,
                     // before the archive stage, so an invalid snapshot is never
                     // published.
-                    sh 'python3 scripts/arch-validate.py tools/ha-fleet/out/architecture/home-automation-fleet.yaml'
+                    sh 'python3 .claude/architecture/arch-validate.py tools/ha-fleet/out/architecture/home-automation-fleet.yaml'
                 }
             }
 

@@ -4,7 +4,7 @@
 # except `schemaVersion` and `producer` is optional at the envelope
 # level. Per-element required fields are enforced by the validator —
 # run
-#   ./scripts/arch-validate architecture.yaml
+#   .claude/architecture/arch-validate.py docs/architecture/*.yaml
 # after each edit until it's clean.
 #
 # IDs:

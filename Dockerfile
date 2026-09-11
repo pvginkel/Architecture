@@ -55,8 +55,9 @@ RUN npm run build && npm test
 # ---- stage 3: service ----
 FROM node:20-alpine AS build-service
 # The suite reaches out of service/ into the repo: the schema/ tree, USAGE.md,
-# and scripts/arch-validate.py, which it spawns (stdlib-only Python). So this
-# stage lays those out where they sit in the repo, and carries python3.
+# and .claude/architecture/arch-validate.py, which it spawns (stdlib-only
+# Python). So this stage lays those out where they sit in the repo, and carries
+# python3.
 RUN apk add --no-cache python3
 WORKDIR /work/service
 COPY service/package*.json ./
@@ -64,7 +65,7 @@ RUN npm ci
 COPY service/ ./
 COPY schema/ /work/schema/
 COPY USAGE.md /work/USAGE.md
-COPY scripts/arch-validate.py /work/scripts/arch-validate.py
+COPY .claude/architecture/arch-validate.py /work/.claude/architecture/arch-validate.py
 RUN npm run build && npm test
 
 # ---- stage 4: federation collector ----

@@ -1,12 +1,14 @@
 # Architecture producer manual
 
 This is the reference for becoming a producer in the webathome.org
-federated architecture system. It is bundled in the `arch` plugin as
-`references/producer-manual.md`. The `/arch:seed-architecture` skill
-(first-version authoring) and the `arch:update-architecture` /
-`arch:update-architecture-generated` agents read it on startup.
-Producer repos copy `arch-validate.py` into `scripts/arch-validate.py`
-for their Jenkinsfile to call; everything else ships in the plugin.
+federated architecture system. It lives in the Architecture repo at
+`.claude/architecture/producer-manual.md`, beside the starter skeleton
+and `arch-validate.py`; the central architecture update stages that
+directory into each producer clone it works in. The `seed-architecture`
+skill (first-version authoring) and the `triage-architecture` and
+`update-architecture` agents read it on startup. Producer repos copy
+`arch-validate.py` into `scripts/arch-validate.py` for their
+Jenkinsfile to call.
 
 ## What you're producing and why
 
@@ -492,7 +494,8 @@ Two sanctioned authoring modes — pick by how structured the repo is:
   emits the YAML in CI. The repo + annotations are the source of truth;
   the YAML is a build artifact you **don't commit** (regenerate it — see
   Jenkins integration). Ids are uuid5-from-natural-key (see ID grammar);
-  the `arch:update-architecture-generated` agent maintains it.
+  the `update-architecture` agent's generated mode maintains the
+  annotation layer and never runs the generator.
 
 **As-deployed granularity.** A generated producer may model running
 containers — an operational, more-than-textbook deployment view. This is
@@ -691,6 +694,7 @@ producers:
   # … other entries …
   - id: <kebab-id>                  # matches the bare kebab in this repo's architecture YAML producer: key
     jenkinsJob: <Jenkins job path>  # e.g. ansible/master, HelmCharts/master
+    repo: <owner>/<name>            # GitHub repo the central architecture update clones
 ```
 
 The next Architecture pipeline run picks the new entry up and wires
