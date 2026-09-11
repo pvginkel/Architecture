@@ -12,12 +12,18 @@ canned turns.
 from __future__ import annotations
 
 import ast
+import base64
 import dataclasses
+import email.message
+import io
 import json
 import os
 import stat
 import subprocess
 import sys
+import urllib.error
+import urllib.parse
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -575,6 +581,8 @@ elif verb == "send":
     sys.exit(turn.get("exit", 0))
 elif verb == "status":
     record()
+    if os.environ.get("FAKE_KC_NO_STATUS"):
+        sys.exit(1)
     print(json.dumps({"sessionId": "sid-" + args[2], "state": "idle"}))
 else:
     record()
@@ -829,14 +837,18 @@ def test_an_update_verdict_runs_the_update_session_with_its_brief(
         "- Default branch: main\n"
         "\nThe repo's instructions, verbatim from its `.architecturerc`:\n\n(none)\n"
     )
-    assert (outcome.status, outcome.reviewed, outcome.unresolved) == (fleet.UPDATED, None, False)
+    pushed = _git(clone, "rev-parse", "HEAD")
+    assert (outcome.status, outcome.reviewed, outcome.unresolved) == (fleet.UPDATED, pushed, False)
     assert outcome.detail == "1 delta applied, 1 commit, validator clean. Skipped: none"
     assert outcome.triage == fleet.Verdict(True, "The app now consumes a queue.")
     assert outcome.update is not None
     assert outcome.update.session_id == "sid-fake-1"
     assert outcome.update.commits == (_git(clone, "log", "-1", "--format=%h %s"),)
     assert outcome.update.commits[0].endswith(" architecture: docs/architecture/a.yaml")
-    assert _state(f) == {ID: {"date": "2026-09-11", "outcome": f"updated: {outcome.detail}"}}
+    assert outcome.push == fleet.Push(pushed, ())
+    assert _state(f) == {
+        ID: {"reviewed": pushed, "date": "2026-09-11", "outcome": f"updated: {outcome.detail}"}
+    }
 
 
 def test_an_update_with_nothing_to_apply_advances_reviewed(tmp_path: Path, kc: FakeKc) -> None:
@@ -875,12 +887,13 @@ def test_an_unparseable_verdict_runs_the_update_session(tmp_path: Path, kc: Fake
 def test_an_update_session_that_does_not_finish_cleanly_is_unresolved(
     tmp_path: Path, kc: FakeKc, turn: dict[str, Any], detail: str
 ) -> None:
-    f, _, _ = _stale(tmp_path)
+    f, _, head = _stale(tmp_path)
     kc.play(UPDATE, turn)
     outcome = _update(f)
     detail = detail.format(clone=tmp_path / "clones" / "NewsFilter")
     assert (outcome.status, outcome.detail, outcome.reviewed) == (fleet.FAILED, detail, None)
     assert outcome.unresolved
+    assert _git(tmp_path / "remotes" / f"{REPO}.git", "rev-parse", "main") == head
     assert _state(f) == {ID: {"date": "2026-09-11", "outcome": f"failed: {detail}"}}
 
 
@@ -990,13 +1003,503 @@ def test_the_state_is_recorded_as_each_producer_finishes(
     update_producer = fleet.update_producer
 
     def killed_at_the_second(
-        fl: fleet.Fleet, producer: fleet.Producer, reviewed: str | None
+        fl: fleet.Fleet, producer: fleet.Producer, reviewed: str | None, jenkins: fleet.Jenkins
     ) -> fleet.Outcome:
         if producer.id == "paper-clock":
             raise Killed
-        return update_producer(fl, producer, reviewed)
+        return update_producer(fl, producer, reviewed, jenkins)
 
     monkeypatch.setattr(fleet, "update_producer", killed_at_the_second)
     with pytest.raises(Killed):
         fleet.run(["update"], f, NOW)
     assert list(_state(f)) == [ID]
+
+
+# ---- fleet.py update: the push, the tracked builds, the fix loop ----
+
+JENKINS = "https://jenkins.example.invalid"
+TOKEN = "test-token"
+JOB = "AaC/NewsFilter"
+APP = "NewsFilter/NewsFilter"
+SCM = f"https://github.com/{REPO}.git"
+
+JOB_CONFIG = """\
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job">
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsScmFlowDefinition">
+    <scm class="hudson.plugins.git.GitSCM">
+      <userRemoteConfigs>
+        <hudson.plugins.git.UserRemoteConfig>
+          <url>{url}</url>
+        </hudson.plugins.git.UserRemoteConfig>
+      </userRemoteConfigs>
+    </scm>
+    <scriptPath>Jenkinsfile.architecture</scriptPath>
+  </definition>
+</flow-definition>
+"""
+
+
+class FakeJenkins:
+    """Canned Jenkins REST responses under a placeholder host, in place of urlopen.
+
+    A job carries its SCM URL and its last completed result (None: never
+    built); the folders are the job names' prefixes, at any depth.
+    """
+
+    def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        self.jobs: dict[str, tuple[str, str | None]] = {}
+        self.paths: list[str] = []
+        self.remote: Path | None = None
+        self.remote_at_read: list[str] = []
+        self.down = False
+        monkeypatch.setenv("JENKINS_URL", JENKINS)
+        monkeypatch.setenv("JENKINS_TOKEN", TOKEN)
+        monkeypatch.delenv("JENKINS_USER", raising=False)
+        monkeypatch.setattr(urllib.request, "urlopen", self.urlopen)
+
+    def job(self, name: str, scm: str = SCM, last: str | None = "SUCCESS") -> None:
+        self.jobs[name] = (scm, last)
+
+    def _listing(self, folder: str) -> list[dict[str, Any]]:
+        prefix = f"{folder}/" if folder else ""
+        children: dict[str, dict[str, Any]] = {}
+        for name in self.jobs:
+            if name.startswith(prefix):
+                child, _, rest = name[len(prefix) :].partition("/")
+                children[child] = {"fullName": prefix + child, **({"jobs": []} if rest else {})}
+        return list(children.values())
+
+    def urlopen(self, request: urllib.request.Request, timeout: float) -> io.BytesIO:
+        credentials = base64.b64encode(f"admin:{TOKEN}".encode()).decode()
+        assert request.get_header("Authorization") == f"Basic {credentials}"
+        if self.down:
+            raise urllib.error.URLError("no route to host")
+        url = urllib.parse.urlsplit(request.full_url)
+        assert f"{url.scheme}://{url.netloc}" == JENKINS
+        path = urllib.parse.unquote(url.path)
+        tree = urllib.parse.parse_qs(url.query).get("tree", [""])[0]
+        self.paths.append(path)
+        parts = path.strip("/").split("/")
+        name = "/".join(parts[1:-1:2])
+        body: Any
+        if path.endswith("/config.xml") and name in self.jobs:
+            return io.BytesIO(JOB_CONFIG.format(url=self.jobs[name][0]).encode())
+        if path.endswith("/api/json") and name in self.jobs:
+            assert tree == "lastCompletedBuild[result]"
+            if self.remote is not None:
+                self.remote_at_read.append(_git(self.remote, "rev-parse", "main"))
+            last = self.jobs[name][1]
+            body = {"lastCompletedBuild": None if last is None else {"result": last}}
+        elif path.endswith("/api/json") and (not name or self._listing(name)):
+            assert tree == "jobs[fullName,jobs[fullName]]"
+            body = {"jobs": self._listing(name)}
+        else:
+            raise urllib.error.HTTPError(
+                request.full_url, 404, "Not Found", email.message.Message(), None
+            )
+        return io.BytesIO(json.dumps(body).encode())
+
+
+@pytest.fixture(autouse=True)
+def jenkins(monkeypatch: pytest.MonkeyPatch) -> FakeJenkins:
+    return FakeJenkins(monkeypatch)
+
+
+FAKE_TRACKER = """\
+import json, os, sys
+from pathlib import Path
+
+job, commit = sys.argv[1], sys.argv[sys.argv.index("--hash") + 1]
+log = Path(os.environ["FAKE_TRACKER_LOG"])
+calls = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+turns = json.loads(Path(os.environ["FAKE_TRACKER_PLAN"]).read_text())[job]
+turn = turns[sum(call["job"] == job for call in calls)]
+with log.open("a") as f:
+    f.write(json.dumps({"job": job, "hash": commit}) + "\\n")
+print(f"[12:00:00] Resolving {job} build for commit {commit}", file=sys.stderr)
+if "error" in turn:
+    print(f"error: {turn['error']}", file=sys.stderr)
+    sys.exit(3)
+print("=== Build tracking summary ===")
+for name, number, result in turn["builds"]:
+    print(f"{name:<24}  #{number:<4}  {result:<8}   1m 2s  {os.environ['JENKINS_URL']}/")
+    if result != "SUCCESS":
+        path = Path(os.environ["FAKE_TRACKER_LOGS"]) / f"{name.replace('/', '_')}_{number}.log"
+        print(f"{'':<24}  {'':<5}  \\u21b3 full log: {path}")
+print()
+red = sum(result != "SUCCESS" for _, _, result in turn["builds"])
+print(f"Result: {red} of {len(turn['builds'])} tracked build(s) did NOT succeed.")
+sys.exit(1 if red else 0)
+"""
+
+
+class FakeTracker:
+    """A `track_build.py` on PATH that plays one canned result per call per job."""
+
+    def __init__(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        bin_dir = tmp_path / "tracker-bin"
+        bin_dir.mkdir()
+        tracker = bin_dir / "track_build.py"
+        tracker.write_text(f"#!{sys.executable}\n{FAKE_TRACKER}")
+        tracker.chmod(0o755)
+        self.log = tmp_path / "tracker.jsonl"
+        self.logs = tmp_path / "tracker-logs"
+        self.plan = tmp_path / "tracker-plan.json"
+        monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+        monkeypatch.setenv("FAKE_TRACKER_LOG", str(self.log))
+        monkeypatch.setenv("FAKE_TRACKER_LOGS", str(self.logs))
+        monkeypatch.setenv("FAKE_TRACKER_PLAN", str(self.plan))
+        self.play({})
+
+    def play(self, turns: dict[str, list[dict[str, Any]]]) -> None:
+        self.plan.write_text(json.dumps(turns))
+
+    def calls(self) -> list[tuple[str, str]]:
+        if not self.log.exists():
+            return []
+        calls = [json.loads(line) for line in self.log.read_text().splitlines()]
+        return [(call["job"], call["hash"]) for call in calls]
+
+
+@pytest.fixture(autouse=True)
+def tracker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FakeTracker:
+    return FakeTracker(tmp_path, monkeypatch)
+
+
+HANDOFF = "1 delta applied, 1 commit, validator clean.\nSkipped: none\n"
+HANDED_OFF = fleet.Handoff(1, 1, "validator clean", None, "none")
+
+
+def _edit(note: str) -> dict[str, str]:
+    return {"docs/architecture/a.yaml": _envelope(ID) + f"# {note}\n"}
+
+
+def _fix(round_: int) -> dict[str, Any]:
+    return {"commit": _edit(f"fix {round_}"), "response": HANDOFF}
+
+
+def _built(number: int, job: str = JOB, result: str = "SUCCESS") -> dict[str, Any]:
+    return {"builds": [[job, number, result]]}
+
+
+def _updated(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, *fixes: dict[str, Any]
+) -> fleet.Fleet:
+    """A stale producer whose update session commits, and a fix session per `fixes`."""
+    remote = Remote(tmp_path, REPO)
+    remote.commit({"docs/architecture/a.yaml": _envelope(ID)})
+    remote.commit({"src/app.py": "app\n"})
+    jenkins.remote = remote.bare
+    kc.play(UPDATE, {"commit": _edit("the queue"), "response": HANDOFF}, *fixes)
+    return _fleet(tmp_path, {"id": ID, "repo": REPO, "jenkinsJob": JOB})
+
+
+def _deliver(f: fleet.Fleet) -> fleet.Outcome:
+    [outcome] = fleet.update(f, fleet.load_registry(f.registry), NOW)
+    return outcome
+
+
+def _pushed(tmp_path: Path) -> str:
+    return _git(tmp_path / "remotes" / f"{REPO}.git", "rev-parse", "main")
+
+
+def test_the_job_index_reads_every_folder_level_once_per_run(jenkins: FakeJenkins) -> None:
+    jenkins.job(JOB)
+    jenkins.job("Apps/Web/NewsFilter", "https://github.com/pvginkel/newsfilter")
+    jenkins.job("AaC/Home Assistant Fleet", "https://github.com/pvginkel/Architecture.git")
+    jenkins.job("Standalone", "https://github.com/pvginkel/PaperClock.git")
+    jenkins.job("Mirrors/Elsewhere", "https://git.example.invalid/pvginkel/NewsFilter.git")
+    client = fleet.Jenkins.from_env()
+    assert client.jobs_by_repo() == {
+        "pvginkel/newsfilter": (JOB, "Apps/Web/NewsFilter"),
+        "pvginkel/architecture": ("AaC/Home Assistant Fleet",),
+        "pvginkel/paperclock": ("Standalone",),
+    }
+    read = len(jenkins.paths)
+    client.jobs_by_repo()
+    assert len(jenkins.paths) == read
+    assert "/job/Apps/job/Web/api/json" in jenkins.paths
+    assert "/job/AaC/job/Home Assistant Fleet/config.xml" in jenkins.paths
+    assert fleet.tracked_jobs(JOB, REPO, client) == [JOB, "Apps/Web/NewsFilter"]
+    assert fleet.tracked_jobs(None, "pvginkel/PaperClock", client) == ["Standalone"]
+
+
+def test_the_jenkins_address_defaults_in_the_tool_and_the_environment_overrides_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("JENKINS_URL")
+    default = fleet.Jenkins.from_env()
+    assert (default.base, default.user, default.token) == (
+        fleet.JENKINS_URL,
+        fleet.JENKINS_USER,
+        TOKEN,
+    )
+    monkeypatch.setenv("JENKINS_URL", f"{JENKINS}/")
+    monkeypatch.setenv("JENKINS_USER", "robot")
+    overridden = fleet.Jenkins.from_env()
+    assert (overridden.base, overridden.user) == (JENKINS, "robot")
+
+
+def test_the_tracker_summary_names_each_build_and_a_failed_ones_log() -> None:
+    stdout = (
+        "=== Build tracking summary ===\n"
+        "AaC/Home Assistant Fleet  #12   SUCCESS    1m 02s  https://ci.example.invalid/12/\n"
+        "AaC/Architecture          #340  FAILURE    3m 10s  https://ci.example.invalid/340/\n"
+        "                                ↳ full log: /tmp/track_build/AaC_Architecture_340.log\n"
+        "\n"
+        "Events:\n"
+        "  - AaC/Architecture #339 was superseded by #340\n"
+        "\n"
+        "Result: 1 of 2 tracked build(s) did NOT succeed.\n"
+    )
+    assert fleet.parse_track_summary(stdout) == (
+        fleet.Build("AaC/Home Assistant Fleet", 12, "SUCCESS"),
+        fleet.Build(
+            "AaC/Architecture", 340, "FAILURE", "/tmp/track_build/AaC_Architecture_340.log"
+        ),
+    )
+    assert fleet.parse_track_summary("error: authentication failed (401)\n") == ()
+
+
+def test_an_update_is_pushed_and_each_tracked_job_followed_once_at_the_pushed_commit(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, tracker: FakeTracker
+) -> None:
+    f = _updated(tmp_path, kc, jenkins)
+    jenkins.job(JOB)
+    jenkins.job(APP)
+    jenkins.job("AaC/PaperClock", "https://github.com/pvginkel/PaperClock.git")
+    tracker.play({JOB: [_built(42)], APP: [_built(7, APP)]})
+    before = _pushed(tmp_path)
+    outcome = _deliver(f)
+    pushed = _pushed(tmp_path)
+    assert pushed == _git(tmp_path / "clones" / "NewsFilter", "rev-parse", "HEAD") != before
+    assert jenkins.remote_at_read == [before, before]
+    assert tracker.calls() == [(JOB, pushed), (APP, pushed)]
+    assert outcome.push == fleet.Push(
+        pushed,
+        (
+            fleet.Tracked(JOB, "SUCCESS", 0, (fleet.Build(JOB, 42, "SUCCESS"),), ""),
+            fleet.Tracked(APP, "SUCCESS", 0, (fleet.Build(APP, 7, "SUCCESS"),), ""),
+        ),
+    )
+    assert (outcome.status, outcome.reviewed, outcome.unresolved, outcome.fixes) == (
+        fleet.UPDATED,
+        pushed,
+        False,
+        (),
+    )
+    assert outcome.detail == "1 delta applied, 1 commit, validator clean. Skipped: none"
+    assert _state(f)[ID] == {
+        "reviewed": pushed,
+        "date": "2026-09-11",
+        "outcome": f"updated: {outcome.detail}",
+    }
+    assert kc.verbs() == SESSION * 2
+
+
+def test_a_build_red_before_the_push_is_pre_existing_and_never_resumes_the_session(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, tracker: FakeTracker
+) -> None:
+    f = _updated(tmp_path, kc, jenkins)
+    jenkins.job(JOB, last="FAILURE")
+    jenkins.job(APP, last=None)
+    tracker.play({JOB: [_built(42, result="FAILURE")], APP: [_built(7, APP, "FAILURE")]})
+    outcome = _deliver(f)
+    assert kc.verbs() == SESSION * 2
+    assert (outcome.reviewed, outcome.unresolved, outcome.fixes) == (
+        _pushed(tmp_path),
+        True,
+        (),
+    )
+    assert outcome.detail == (
+        "1 delta applied, 1 commit, validator clean. Skipped: none; "
+        "AaC/NewsFilter red, pre-existing: FAILURE before the push; "
+        "NewsFilter/NewsFilter red; it had no completed build before the push"
+    )
+
+
+def test_a_tracker_that_cannot_finish_is_operational_and_unresolved(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, tracker: FakeTracker
+) -> None:
+    f = _updated(tmp_path, kc, jenkins)
+    jenkins.job(JOB)
+    tracker.play({JOB: [{"error": "authentication failed (401)"}]})
+    outcome = _deliver(f)
+    assert kc.verbs() == SESSION * 2
+    assert outcome.push == fleet.Push(
+        _pushed(tmp_path),
+        (fleet.Tracked(JOB, "SUCCESS", 3, (), "error: authentication failed (401)"),),
+    )
+    assert outcome.unresolved and outcome.reviewed == _pushed(tmp_path)
+    assert outcome.detail.endswith(
+        "; AaC/NewsFilter tracking failed: error: authentication failed (401)"
+    )
+
+
+def test_a_build_the_change_broke_resumes_the_update_session_and_is_pushed_again(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, tracker: FakeTracker
+) -> None:
+    f = _updated(tmp_path, kc, jenkins, _fix(1))
+    jenkins.job(JOB)
+    downstream = {"builds": [[JOB, 42, "SUCCESS"], ["AaC/Architecture", 90, "FAILURE"]]}
+    tracker.play({JOB: [downstream, _built(43)]})
+    outcome = _deliver(f)
+    clone = tmp_path / "clones" / "NewsFilter"
+    (_, first), (_, second) = tracker.calls()
+    assert second == _pushed(tmp_path) == _git(clone, "rev-parse", "HEAD")
+    assert kc.verbs() == SESSION * 3
+    assert kc.creates()[2] == [
+        "--cwd", str(clone),
+        "--resume", "sid-fake-1",
+        "--agent", "update-architecture", "--model", "opus", "--reasoning-effort", "xhigh",
+    ]
+    log = tracker.logs / "AaC_Architecture_90.log"
+    assert kc.prompts()[2] == (
+        f"Since the push of your commits (up to {first}), Jenkins is red where it was green "
+        "before them: `AaC/NewsFilter`. Assume your commits broke it; fix, commit, do not push. "
+        "End with your two-line handoff, covering this round.\n\n"
+        "The failed builds, each with its console log:\n\n"
+        f"- Job: AaC/Architecture\n  Build: #90 (FAILURE)\n  Log: {log}\n"
+    )
+    assert outcome.push == fleet.Push(
+        first,
+        (
+            fleet.Tracked(
+                JOB,
+                "SUCCESS",
+                1,
+                (
+                    fleet.Build(JOB, 42, "SUCCESS"),
+                    fleet.Build("AaC/Architecture", 90, "FAILURE", str(log)),
+                ),
+                "",
+            ),
+        ),
+    )
+    assert outcome.fixes == (
+        fleet.FixRound(
+            (JOB,),
+            HANDED_OFF,
+            (_git(clone, "log", "-1", "--format=%h %s"),),
+            None,
+            fleet.Push(
+                second, (fleet.Tracked(JOB, "SUCCESS", 0, (fleet.Build(JOB, 43, "SUCCESS"),), ""),)
+            ),
+            "sid-fake-2",
+        ),
+    )
+    assert (outcome.status, outcome.reviewed, outcome.unresolved) == (
+        fleet.UPDATED,
+        second,
+        False,
+    )
+
+
+def test_the_fix_loop_stops_after_two_rounds_and_a_job_still_red_is_unresolved(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, tracker: FakeTracker
+) -> None:
+    f = _updated(tmp_path, kc, jenkins, _fix(1), _fix(2), _fix(3))
+    jenkins.job(JOB)
+    tracker.play({JOB: [_built(n, result="FAILURE") for n in (42, 43, 44)]})
+    outcome = _deliver(f)
+    pushes = [commit for _, commit in tracker.calls()]
+    assert len(pushes) == 3
+    assert pushes[-1] == _pushed(tmp_path)
+    assert kc.verbs() == SESSION * 4
+    assert [c[c.index("--resume") + 1] for c in kc.creates() if "--resume" in c] == [
+        "sid-fake-1",
+        "sid-fake-2",
+    ]
+    assert [fix.push.commit for fix in outcome.fixes if fix.push] == pushes[1:]
+    assert (outcome.reviewed, outcome.unresolved) == (pushes[-1], True)
+    assert outcome.detail.endswith("; AaC/NewsFilter still red after 2 fix rounds")
+    assert _state(f)[ID]["reviewed"] == pushes[-1]
+
+
+def test_a_fix_round_that_commits_nothing_ends_the_loop_unresolved(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, tracker: FakeTracker
+) -> None:
+    f = _updated(tmp_path, kc, jenkins, NOTHING)
+    jenkins.job(JOB)
+    tracker.play({JOB: [_built(42, result="FAILURE")]})
+    outcome = _deliver(f)
+    assert len(tracker.calls()) == 1
+    assert kc.verbs() == SESSION * 3
+    [fix] = outcome.fixes
+    assert (fix.jobs, fix.commits, fix.failure, fix.push) == (
+        (JOB,),
+        (),
+        "the update session made no commit",
+        None,
+    )
+    assert outcome.detail.endswith(
+        "; fix round 1: the update session made no commit; "
+        "AaC/NewsFilter still red after 1 fix round"
+    )
+
+
+def test_an_update_session_whose_id_is_unknown_is_not_resumed(
+    tmp_path: Path,
+    kc: FakeKc,
+    jenkins: FakeJenkins,
+    tracker: FakeTracker,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("FAKE_KC_NO_STATUS", "1")
+    f = _updated(tmp_path, kc, jenkins)
+    jenkins.job(JOB)
+    tracker.play({JOB: [_built(42, result="FAILURE")]})
+    outcome = _deliver(f)
+    assert kc.verbs() == SESSION * 2
+    assert outcome.unresolved
+    assert outcome.detail.endswith(
+        "; fix round 1: the update session has no id to resume; "
+        "AaC/NewsFilter still red after 1 fix round"
+    )
+
+
+@pytest.mark.parametrize("cause", ["no token", "unreachable"])
+def test_jenkins_the_tool_cannot_read_leaves_the_commits_unpushed(
+    tmp_path: Path,
+    kc: FakeKc,
+    jenkins: FakeJenkins,
+    tracker: FakeTracker,
+    monkeypatch: pytest.MonkeyPatch,
+    cause: str,
+) -> None:
+    f = _updated(tmp_path, kc, jenkins)
+    jenkins.job(JOB)
+    head = _pushed(tmp_path)
+    if cause == "no token":
+        monkeypatch.delenv("JENKINS_TOKEN")
+    else:
+        jenkins.down = True
+    outcome = _deliver(f)
+    clone = tmp_path / "clones" / "NewsFilter"
+    assert _pushed(tmp_path) == head
+    assert tracker.calls() == []
+    assert (outcome.status, outcome.reviewed, outcome.unresolved) == (fleet.FAILED, None, True)
+    assert outcome.detail.endswith(f"; the commits stay unpushed in {clone}")
+    assert outcome.detail.startswith(
+        "Jenkins: JENKINS_TOKEN is not set"
+        if cause == "no token"
+        else f"Jenkins: cannot reach {JENKINS}/api/json"
+    )
+    assert outcome.update is not None and outcome.update.commits
+
+
+def test_a_rejected_push_is_unresolved_and_tracks_nothing(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, tracker: FakeTracker
+) -> None:
+    f = _updated(tmp_path, kc, jenkins)
+    jenkins.job(JOB)
+    head = _pushed(tmp_path)
+    hook = tmp_path / "remotes" / f"{REPO}.git" / "hooks" / "pre-receive"
+    hook.write_text("#!/bin/sh\necho 'protected branch' >&2\nexit 1\n")
+    hook.chmod(0o755)
+    outcome = _deliver(f)
+    assert _pushed(tmp_path) == head
+    assert tracker.calls() == []
+    assert (outcome.status, outcome.reviewed, outcome.unresolved) == (fleet.FAILED, None, True)
+    assert outcome.detail.startswith("git push failed: ")

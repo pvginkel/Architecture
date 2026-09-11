@@ -7,7 +7,8 @@
                                              it; starts no session
     python3 tooling/fleet.py update [<id>…]  each stale producer, or the named ones, one at a
                                              time: a triage session, then unless it says skip
-                                             an update session in the clone
+                                             an update session in the clone, then the push of
+                                             its commits and the builds the push starts
 
 It runs with the dev container's python3, so it imports only the standard
 library and PyYAML.
@@ -24,11 +25,20 @@ The sessions are headless `kc` sessions driven as the dev plugin's
 `run_kc_session` drives them: `create-headless` in the clone with the staged
 agent, `send` under a timeout this tool enforces, `status` for the session
 id, and `end` always.
+
+An update's commits are pushed to the default branch, and each tracked job
+(the registry's AaC job, and every Jenkins job whose SCM checks out the repo)
+is followed with `track_build.py`. A job green before the push and red after
+it resumes the update session to fix it, FIX_ROUNDS times at most. Jenkins is
+`$JENKINS_URL` as `$JENKINS_USER`, by default JENKINS_URL and JENKINS_USER
+below; `$JENKINS_TOKEN` is the only credential.
 """
 
 from __future__ import annotations
 
 import argparse
+import base64
+import itertools
 import json
 import os
 import re
@@ -39,10 +49,15 @@ import subprocess
 import sys
 import tempfile
 import tomllib
+import urllib.error
+import urllib.parse
+import urllib.request
+import xml.etree.ElementTree as ET
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -75,6 +90,16 @@ HANDOFF = re.compile(
     r"(validator clean|validation by the AaC build|stopped: (.+))\."
 )
 SKIPPED_LINE = re.compile(r"Skipped: (.+)")
+
+JENKINS_URL = "https://jenkins.webathome.org"
+JENKINS_USER = "admin"
+TRACKER = "track_build.py"
+FIX_ROUNDS = 2
+GREEN = "SUCCESS"
+GITHUB_REPO = re.compile(r"https://github\.com/([A-Za-z0-9._-]+/[A-Za-z0-9._-]+?)(?:\.git)?/?")
+SUMMARY = "=== Build tracking summary ==="
+SUMMARY_ROW = re.compile(r"(.+?)\s+#(\d+)\s+(\S+)\s.*")
+SUMMARY_LOG = re.compile(r"\s*↳ full log: (.+)")
 
 
 class ProducerError(Exception):
@@ -109,6 +134,7 @@ class Fleet:
 class Producer:
     id: str
     repo: str | None
+    job: str | None = None
 
 
 @dataclass(frozen=True)
@@ -201,9 +227,65 @@ class UpdateResult:
 
 
 @dataclass(frozen=True)
+class Build:
+    """One build in track_build.py's summary; `log` is the console log it wrote for a build that
+    did not succeed."""
+
+    job: str
+    number: int
+    result: str
+    log: str | None = None
+
+
+@dataclass(frozen=True)
+class Tracked:
+    """One tracked job after a push: its last completed result before the first push (None when
+    it had none), track_build.py's exit code, the builds of its chain, and why the tracker could
+    not finish (empty when it could)."""
+
+    job: str
+    before: str | None
+    code: int
+    builds: tuple[Build, ...]
+    reason: str
+
+    @property
+    def green(self) -> bool:
+        return self.code == 0
+
+    @property
+    def red(self) -> bool:
+        return self.code == 1
+
+    @property
+    def attributed(self) -> bool:
+        """Green before the push and red after it: the change broke it."""
+        return self.red and self.before == GREEN
+
+
+@dataclass(frozen=True)
+class Push:
+    commit: str
+    tracked: tuple[Tracked, ...]
+
+
+@dataclass(frozen=True)
+class FixRound:
+    """One resumed update session: the attributed jobs it was handed, its handoff and commits,
+    and either why it stopped short of a push or the push; `session_id` is the next round's."""
+
+    jobs: tuple[str, ...]
+    handoff: Handoff | None
+    commits: tuple[str, ...]
+    failure: str | None
+    push: Push | None
+    session_id: str | None
+
+
+@dataclass(frozen=True)
 class Outcome:
     """One producer's result from `update`; `reviewed` is the commit its state advances to,
-    None to leave the recorded one."""
+    None to leave the recorded one. An update's commits are delivered as `push`, then `fixes`."""
 
     producer: Producer
     status: str
@@ -212,6 +294,8 @@ class Outcome:
     unresolved: bool = False
     triage: Verdict | None = None
     update: UpdateResult | None = None
+    push: Push | None = None
+    fixes: tuple[FixRound, ...] = ()
 
     @property
     def state_outcome(self) -> str:
@@ -233,7 +317,10 @@ def spec_repo_from(aiworkflowrc: Path) -> Path:
 
 
 def load_registry(path: Path) -> list[Producer]:
-    return [Producer(p["id"], p.get("repo")) for p in yaml.safe_load(path.read_text())["producers"]]
+    return [
+        Producer(p["id"], p.get("repo"), p.get("jenkinsJob"))
+        for p in yaml.safe_load(path.read_text())["producers"]
+    ]
 
 
 def load_reviewed(spec_repo: Path) -> dict[str, str]:
@@ -561,10 +648,13 @@ def _session_id(name: str, cwd: Path) -> str | None:
     return session_id or None
 
 
-def run_session(cwd: Path, agent: Agent, prompt: str) -> Session:
-    """Drive one headless session in `cwd` to the end of its turn, and end it."""
-    args = ["session", "create-headless", "--cwd", str(cwd), "--agent", agent.name]
-    args += ["--model", agent.model]
+def run_session(cwd: Path, agent: Agent, prompt: str, resume: str | None = None) -> Session:
+    """Drive one headless session in `cwd` to the end of its turn, and end it; `resume` is the
+    claude session it continues."""
+    args = ["session", "create-headless", "--cwd", str(cwd)]
+    if resume:
+        args += ["--resume", resume]
+    args += ["--agent", agent.name, "--model", agent.model]
     if agent.effort:
         args += ["--reasoning-effort", agent.effort]
     created = _kc(cwd, *args)
@@ -668,6 +758,23 @@ def _dispatch(scan: Scan, agent: Agent, prompt: str) -> Session:
     return run_session(scan.clone.path, agent, prompt)
 
 
+def _commits(clone: Path, since: str) -> tuple[str, ...]:
+    """The commits on HEAD after `since`, `<short sha> <subject>`, oldest first."""
+    return tuple(git(clone, "log", "--reverse", "--format=%h %s", f"{since}..HEAD").splitlines())
+
+
+def _finished(clone: Path, response: str) -> Handoff | str:
+    """The handoff of an update session that exited 0, or why it still did not finish."""
+    handoff = parse_handoff(response)
+    if _dirty(clone):
+        return f"the update session left uncommitted changes in {clone}"
+    if handoff is None:
+        return "the update session's final two lines are not its handoff"
+    if handoff.stopped:
+        return f"the update session stopped: {handoff.stopped}"
+    return handoff
+
+
 def judge(scan: Scan) -> Outcome:
     """Triage the stale producer and, unless triage says skip, run the update session."""
     producer, clone = scan.producer, scan.clone
@@ -682,24 +789,229 @@ def judge(scan: Scan) -> Outcome:
         detail = f"update session {session.failure}"
         return Outcome(producer, FAILED, detail, unresolved=True, triage=verdict)
     handoff = parse_handoff(session.response)
-    log = git(clone.path, "log", "--reverse", "--format=%h %s", f"{clone.head}..HEAD")
-    result = UpdateResult(clone, session.session_id, handoff, tuple(log.splitlines()))
-    if _dirty(clone.path):
-        detail = f"the update session left uncommitted changes in {clone.path}"
-    elif handoff is None:
-        detail = "the update session's final two lines are not its handoff"
-    elif handoff.stopped:
-        detail = f"the update session stopped: {handoff.stopped}"
-    elif result.commits:
-        return Outcome(producer, UPDATED, handoff.text, triage=verdict, update=result)
-    else:
-        return Outcome(
-            producer, NOTHING, handoff.text, reviewed=clone.head, triage=verdict, update=result
+    result = UpdateResult(clone, session.session_id, handoff, _commits(clone.path, clone.head))
+    finished = _finished(clone.path, session.response)
+    if isinstance(finished, str):
+        return Outcome(producer, FAILED, finished, unresolved=True, triage=verdict, update=result)
+    if result.commits:
+        return Outcome(producer, UPDATED, finished.text, triage=verdict, update=result)
+    return Outcome(
+        producer, NOTHING, finished.text, reviewed=clone.head, triage=verdict, update=result
+    )
+
+
+def job_path(job: str) -> str:
+    """A job's full name, `Folder/Job`, as its Jenkins URL path, `job/Folder/job/Job`."""
+    return "job/" + "/job/".join(urllib.parse.quote(part) for part in job.split("/"))
+
+
+class Jenkins:
+    """Jenkins' REST API, read as track_build.py reads it; the job index is built once."""
+
+    def __init__(self, base: str, user: str, token: str | None) -> None:
+        self.base = base.rstrip("/")
+        self.user = user
+        self.token = token
+        self._index: dict[str, tuple[str, ...]] | None = None
+
+    @classmethod
+    def from_env(cls) -> Jenkins:
+        return cls(
+            os.environ.get("JENKINS_URL", JENKINS_URL),
+            os.environ.get("JENKINS_USER", JENKINS_USER),
+            os.environ.get("JENKINS_TOKEN"),
         )
-    return Outcome(producer, FAILED, detail, unresolved=True, triage=verdict, update=result)
+
+    def get(self, path: str) -> bytes:
+        if not self.token:
+            raise ProducerError("Jenkins: JENKINS_TOKEN is not set")
+        url = f"{self.base}/{path}"
+        request = urllib.request.Request(url)
+        credentials = base64.b64encode(f"{self.user}:{self.token}".encode()).decode()
+        request.add_header("Authorization", f"Basic {credentials}")
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                body: bytes = response.read()
+        except urllib.error.HTTPError as e:
+            raise ProducerError(f"Jenkins: HTTP {e.code} for {url}") from None
+        except OSError as e:
+            raise ProducerError(f"Jenkins: cannot reach {url}: {e}") from None
+        return body
+
+    def _api(self, path: str, tree: str) -> Any:
+        return json.loads(self.get(f"{path}api/json?{urllib.parse.urlencode({'tree': tree})}"))
+
+    def _jobs(self, folder: str) -> Iterator[str]:
+        """The full names of the jobs under `folder` (`job/…/`, or "" for the root), at any
+        folder depth."""
+        for item in self._api(folder, "jobs[fullName,jobs[fullName]]")["jobs"]:
+            if "jobs" in item:
+                yield from self._jobs(f"{job_path(item['fullName'])}/")
+            else:
+                yield item["fullName"]
+
+    def jobs_by_repo(self) -> dict[str, tuple[str, ...]]:
+        """Each GitHub repo, as lowercase `owner/name`, with the jobs whose SCM checks it out."""
+        if self._index is None:
+            index: dict[str, set[str]] = {}
+            for job in self._jobs(""):
+                config = ET.fromstring(self.get(f"{job_path(job)}/config.xml"))
+                for url in config.iterfind(".//userRemoteConfigs/*/url"):
+                    if repo := GITHUB_REPO.fullmatch((url.text or "").strip()):
+                        index.setdefault(repo[1].lower(), set()).add(job)
+            self._index = {repo: tuple(sorted(jobs)) for repo, jobs in index.items()}
+        return self._index
+
+    def last_result(self, job: str) -> str | None:
+        """The result of the job's last completed build, None when it has none."""
+        build = self._api(f"{job_path(job)}/", "lastCompletedBuild[result]")["lastCompletedBuild"]
+        return None if build is None else str(build["result"])
 
 
-def update_producer(fleet: Fleet, producer: Producer, reviewed: str | None) -> Outcome:
+def tracked_jobs(job: str | None, repo: str, jenkins: Jenkins) -> list[str]:
+    """The registry's AaC job, then every other job whose SCM checks out `repo`."""
+    indexed = jenkins.jobs_by_repo().get(repo.lower(), ())
+    return ([job] if job else []) + [j for j in indexed if j != job]
+
+
+def parse_track_summary(stdout: str) -> tuple[Build, ...]:
+    """The builds track_build.py's summary lists, a failed one with the log it names."""
+    lines = stdout.splitlines()
+    if SUMMARY not in lines:
+        return ()
+    builds: list[Build] = []
+    for line in itertools.takewhile(bool, lines[lines.index(SUMMARY) + 1 :]):
+        if log := SUMMARY_LOG.fullmatch(line):
+            builds[-1] = replace(builds[-1], log=log[1])
+        elif row := SUMMARY_ROW.fullmatch(line):
+            builds.append(Build(row[1], int(row[2]), row[3]))
+    return tuple(builds)
+
+
+def _tracker_reason(proc: subprocess.CompletedProcess[str]) -> str:
+    results = [line for line in proc.stdout.splitlines() if line.startswith("Result: ")]
+    return results[-1].removeprefix("Result: ") if results else _last_line(proc)
+
+
+def track(producer: Producer, job: str, before: str | None, commit: str) -> Tracked:
+    """Follow the build of `commit` in `job`, and the builds it starts, to their end."""
+    print(f"{producer.id}: tracking {job}", file=sys.stderr, flush=True)
+    proc = subprocess.run(
+        [TRACKER, job, "--hash", commit], capture_output=True, encoding="utf-8", check=False
+    )
+    sys.stderr.write(proc.stderr)
+    reason = "" if proc.returncode in (0, 1) else _tracker_reason(proc)
+    return Tracked(job, before, proc.returncode, parse_track_summary(proc.stdout), reason)
+
+
+def push_and_track(producer: Producer, clone: Clone, before: dict[str, str | None]) -> Push:
+    """Push HEAD to the default branch and track each job in `before` at the pushed commit."""
+    git(clone.path, "push", "--quiet", "origin", f"HEAD:{clone.branch}")
+    commit = git(clone.path, "rev-parse", "HEAD").strip()
+    print(f"{producer.id}: pushed {commit[:12]} to {clone.branch}", file=sys.stderr, flush=True)
+    return Push(commit, tuple(track(producer, job, was, commit) for job, was in before.items()))
+
+
+def fix_prompt(broken: list[Tracked], pushed: str) -> str:
+    builds = "".join(
+        f"- Job: {build.job}\n  Build: #{build.number} ({build.result})\n  Log: {build.log}\n"
+        for tracked in broken
+        for build in tracked.builds
+        if build.result != GREEN
+    )
+    return (
+        f"Since the push of your commits (up to {pushed}), Jenkins is red where it was green "
+        f"before them: {', '.join(f'`{t.job}`' for t in broken)}. Assume your commits broke it; "
+        "fix, commit, do not push. End with your two-line handoff, covering this round.\n\n"
+        "The failed builds, each with its console log:\n\n" + builds
+    )
+
+
+def fix_round(
+    producer: Producer,
+    clone: Clone,
+    session_id: str | None,
+    broken: list[Tracked],
+    pushed: str,
+    before: dict[str, str | None],
+) -> FixRound:
+    """Resume the update session on the builds its commits broke, then push and track again."""
+    jobs = tuple(t.job for t in broken)
+    if session_id is None:
+        return FixRound(jobs, None, (), "the update session has no id to resume", None, None)
+    print(f"{producer.id}: resuming the update session to fix {', '.join(jobs)}", file=sys.stderr)
+    session = run_session(clone.path, UPDATE, fix_prompt(broken, pushed), resume=session_id)
+    handoff = parse_handoff(session.response)
+    commits = _commits(clone.path, pushed)
+    if session.failure:
+        failure = f"update session {session.failure}"
+    elif isinstance(finished := _finished(clone.path, session.response), str):
+        failure = finished
+    elif not commits:
+        failure = "the update session made no commit"
+    else:
+        try:
+            push = push_and_track(producer, clone, before)
+        except ProducerError as e:
+            failure = str(e)
+        else:
+            return FixRound(jobs, handoff, commits, None, push, session.session_id)
+    if commits:
+        failure += f"; its commits stay unpushed in {clone.path}"
+    return FixRound(jobs, handoff, commits, failure, None, session.session_id)
+
+
+def build_issue(tracked: Tracked, rounds: int) -> str | None:
+    """What an unresolved tracked job tells the operator, None for a green one."""
+    if tracked.green:
+        return None
+    if not tracked.red:
+        return f"{tracked.job} tracking failed: {tracked.reason}"
+    if tracked.attributed:
+        return f"{tracked.job} still red after {rounds} fix round{'' if rounds == 1 else 's'}"
+    if tracked.before is None:
+        return f"{tracked.job} red; it had no completed build before the push"
+    return f"{tracked.job} red, pre-existing: {tracked.before} before the push"
+
+
+def deliver(outcome: Outcome, update: UpdateResult, repo: str, jenkins: Jenkins) -> Outcome:
+    """Push the update session's commits and track the builds the push starts.
+
+    A job green before the push and red after it resumes the session to fix
+    it, FIX_ROUNDS times at most. Any other red build, a tracker that could not
+    finish and a fix round that stopped short of a push are unresolved.
+    """
+    producer, clone = outcome.producer, update.clone
+    try:
+        jobs = tracked_jobs(producer.job, repo, jenkins)
+        before = {job: jenkins.last_result(job) for job in jobs}
+        first = push_and_track(producer, clone, before)
+    except ProducerError as e:
+        detail = f"{e}; the commits stay unpushed in {clone.path}"
+        return replace(outcome, status=FAILED, detail=detail, unresolved=True)
+    push, session_id = first, update.session_id
+    fixes: list[FixRound] = []
+    while len(fixes) < FIX_ROUNDS and (broken := [t for t in push.tracked if t.attributed]):
+        fix = fix_round(producer, clone, session_id, broken, push.commit, before)
+        fixes.append(fix)
+        if fix.push is None:
+            break
+        push, session_id = fix.push, fix.session_id
+    issues = [f"fix round {n}: {fix.failure}" for n, fix in enumerate(fixes, 1) if fix.failure]
+    issues += [issue for t in push.tracked if (issue := build_issue(t, len(fixes)))]
+    return replace(
+        outcome,
+        detail="; ".join([outcome.detail, *issues]),
+        reviewed=push.commit,
+        unresolved=bool(issues),
+        push=first,
+        fixes=tuple(fixes),
+    )
+
+
+def update_producer(
+    fleet: Fleet, producer: Producer, reviewed: str | None, jenkins: Jenkins
+) -> Outcome:
     if producer.repo is None:
         return Outcome(producer, UNMANAGED)
     try:
@@ -707,16 +1019,20 @@ def update_producer(fleet: Fleet, producer: Producer, reviewed: str | None) -> O
         if result.current:
             return Outcome(producer, CURRENT, reviewed=result.clone.head)
         check_agents(result.clone.path)
-        return judge(result)
+        outcome = judge(result)
     except ProducerError as e:
         return Outcome(producer, FAILED, str(e), unresolved=True)
+    if outcome.status != UPDATED or outcome.update is None:
+        return outcome
+    return deliver(outcome, outcome.update, producer.repo, jenkins)
 
 
 def update(fleet: Fleet, producers: list[Producer], now: datetime) -> Iterator[Outcome]:
     """Each producer in turn; its state is recorded before its outcome is yielded."""
     reviewed = load_reviewed(fleet.spec_repo)
+    jenkins = Jenkins.from_env()
     for producer in producers:
-        outcome = update_producer(fleet, producer, reviewed.get(producer.id))
+        outcome = update_producer(fleet, producer, reviewed.get(producer.id), jenkins)
         if producer.repo is not None:
             record_state(fleet.spec_repo, outcome, now.date().isoformat())
         yield outcome
