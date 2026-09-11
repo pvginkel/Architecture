@@ -148,6 +148,21 @@ def _envelope(producer: str) -> str:
     return f'schemaVersion: "0.1"\nproducer: {producer}\n'
 
 
+def _specs(tmp_path: Path) -> Path:
+    """The specs repo the run writes to: a work tree with a bare origin to push to."""
+    specs, bare = tmp_path / "specs", tmp_path / "specs.git"
+    bare.mkdir()
+    _git(bare, "init", "--quiet", "--bare", "-b", "main")
+    specs.mkdir()
+    _git(specs, "init", "--quiet", "-b", "main")
+    _git(specs, "remote", "add", "origin", str(bare))
+    (specs / "README.md").write_text("the specs repo\n")
+    _git(specs, "add", "README.md")
+    _git(specs, "commit", "--quiet", "-m", "the specs repo")
+    _git(specs, "push", "--quiet", "-u", "origin", "main")
+    return specs
+
+
 def _fleet(tmp_path: Path, *producers: dict[str, str]) -> fleet.Fleet:
     kit = tmp_path / "kit"
     for rel, text in {**KIT, "skills/architecture-update/SKILL.md": "operator-side\n"}.items():
@@ -160,7 +175,7 @@ def _fleet(tmp_path: Path, *producers: dict[str, str]) -> fleet.Fleet:
         registry=registry,
         kit=kit,
         clones=tmp_path / "clones",
-        spec_repo=tmp_path / "specs",
+        spec_repo=_specs(tmp_path),
         remote_base=f"file://{tmp_path / 'remotes'}",
     )
 
@@ -783,9 +798,11 @@ def test_a_skip_verdict_advances_reviewed_without_an_update_session(
     assert _state(f) == {
         ID: {"reviewed": head, "date": "2026-09-11", "outcome": "skipped: Only CI housekeeping."}
     }
-    assert capsys.readouterr().out == (
-        "newsfilter  pvginkel/NewsFilter  skipped            Only CI housekeeping.\n"
-    )
+    assert capsys.readouterr().out.splitlines() == [
+        "newsfilter  pvginkel/NewsFilter  skipped            Only CI housekeeping.",
+        f"report: {f.spec_repo / fleet.report_file(NOW)}",
+        "unresolved: 0",
+    ]
 
 
 def test_the_triage_prompt_carries_the_brief_and_the_instructions_verbatim(
@@ -939,7 +956,12 @@ def test_a_failed_triage_is_unresolved_keeps_reviewed_and_the_run_moves_on(
         "triage session timed out after 1 s",
         "paper-clock            pvginkel/PaperClock  skipped            Only CI housekeeping.",
         "home-automation-fleet  -                    not fleet-managed",
+        f"report: {f.spec_repo / fleet.report_file(NOW)}",
+        "unresolved: 1",
     ]
+
+
+MISSING_AGENT = "agent definition(s) missing from the clone: .claude/agents/update-architecture.md"
 
 
 def test_a_clone_missing_an_agent_stops_the_producer_before_any_session(
@@ -950,8 +972,8 @@ def test_a_clone_missing_an_agent_stops_the_producer_before_any_session(
     assert _update(f) == fleet.Outcome(
         PRODUCER,
         fleet.FAILED,
-        "agent definition(s) missing from the clone: .claude/agents/update-architecture.md",
-        unresolved=True,
+        MISSING_AGENT,
+        issues=(MISSING_AGENT,),
     )
     assert kc.calls() == []
 
@@ -977,7 +999,11 @@ def test_update_takes_only_the_named_producers(
         tmp_path, {"id": ID, "repo": REPO}, {"id": "paper-clock", "repo": "pvginkel/PaperClock"}
     )
     assert fleet.run(["update", "paper-clock"], f, NOW) == 0
-    assert capsys.readouterr().out == "paper-clock  pvginkel/PaperClock  current\n"
+    assert capsys.readouterr().out.splitlines() == [
+        "paper-clock  pvginkel/PaperClock  current",
+        f"report: {f.spec_repo / fleet.report_file(NOW)}",
+        "unresolved: 0",
+    ]
     assert list(_state(f)) == ["paper-clock"]
 
 
@@ -1554,3 +1580,167 @@ def test_a_rejected_push_is_unresolved_and_tracks_nothing(
     assert tracker.calls() == []
     assert (outcome.status, outcome.reviewed, outcome.unresolved) == (fleet.FAILED, None, True)
     assert outcome.detail.startswith("git push failed: ")
+
+
+# ---- fleet.py update: the report, the state and the specs repo ----
+
+GOLDEN = Path(__file__).resolve().parent / "golden"
+
+
+def _canned() -> list[fleet.Outcome]:
+    """One of every outcome a run reaches, as `update` builds them, with stable shas."""
+    app = "NewsFilter/NewsFilter"
+    clone = fleet.Clone(Path("/tmp/architecture-update/repos/NewsFilter"), "main", "b" * 40)
+    handoff = fleet.Handoff(2, 1, "validator clean", None, "the queue's retry topology")
+    session = fleet.UpdateResult(clone, "sid-1", handoff, ("1111111 architecture: the queue",))
+    broke = fleet.Tracked(
+        JOB,
+        "SUCCESS",
+        1,
+        (
+            fleet.Build(JOB, 42, "SUCCESS"),
+            fleet.Build("AaC/Architecture", 90, "FAILURE", "/tmp/jenkins/AaC_Architecture_90.log"),
+        ),
+        "",
+    )
+    never_built = fleet.Tracked(
+        app, None, 1, (fleet.Build(app, 7, "FAILURE", "/tmp/jenkins/NewsFilter_7.log"),), ""
+    )
+    fixed = fleet.FixRound(
+        (JOB,),
+        fleet.Handoff(1, 1, "validator clean", None, "none"),
+        ("2222222 architecture: the queue's retry limit",),
+        None,
+        fleet.Push(
+            "d" * 40,
+            (fleet.Tracked(JOB, "SUCCESS", 0, (fleet.Build(JOB, 43, "SUCCESS"),), ""), never_built),
+        ),
+        "sid-1",
+    )
+    issue = "NewsFilter/NewsFilter red; it had no completed build before the push"
+    refused = "unpushed commits in /tmp/architecture-update/repos/PaperClock: push or discard"
+    nothing = fleet.Handoff(0, 0, "validation by the AaC build", None, "none")
+    return [
+        fleet.Outcome(
+            fleet.Producer(ID, REPO, JOB),
+            fleet.UPDATED,
+            f"{handoff.text}; {issue}",
+            reviewed="d" * 40,
+            issues=(issue,),
+            triage=fleet.Verdict(True, "The app now consumes a queue."),
+            update=session,
+            push=fleet.Push("c" * 40, (broke, never_built)),
+            fixes=(fixed,),
+        ),
+        fleet.Outcome(
+            fleet.Producer("paper-clock", "pvginkel/PaperClock"),
+            fleet.FAILED,
+            refused,
+            issues=(refused,),
+        ),
+        fleet.Outcome(
+            fleet.Producer("dhcp-app", "pvginkel/DHCPApp"),
+            fleet.NOTHING,
+            nothing.text,
+            reviewed="e" * 40,
+            triage=fleet.Verdict(True, "The backend gained a lease exporter."),
+            update=fleet.UpdateResult(clone, "sid-2", nothing, ()),
+        ),
+        fleet.Outcome(
+            fleet.Producer("somfy-remote", "pvginkel/SomfyRemote"),
+            fleet.SKIPPED,
+            "Only CI housekeeping.",
+            reviewed="f" * 40,
+            triage=fleet.Verdict(False, "Only CI housekeeping."),
+        ),
+        fleet.Outcome(
+            fleet.Producer("kitchen-display", "pvginkel/KitchenDisplay"),
+            fleet.CURRENT,
+            reviewed="a" * 40,
+        ),
+        fleet.Outcome(fleet.Producer("home-automation-fleet", None), fleet.UNMANAGED),
+    ]
+
+
+def test_the_report_and_the_state_read_as_their_goldens(tmp_path: Path) -> None:
+    f = _fleet(tmp_path)
+    outcomes = _canned()
+    for outcome in outcomes:
+        if outcome.producer.repo is not None:
+            fleet.record_state(f.spec_repo, outcome, NOW.date().isoformat())
+    report = fleet.write_report(f, outcomes, NOW)
+    assert report == f.spec_repo / "architecture-updates" / "2026-09-11T1430.md"
+    assert report.read_text() == (GOLDEN / "report.md").read_text()
+    assert (f.spec_repo / fleet.STATE_FILE).read_text() == (GOLDEN / "state.yaml").read_text()
+
+
+def test_a_run_commits_and_pushes_the_report_and_the_state_and_nothing_else(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, tracker: FakeTracker
+) -> None:
+    f = _updated(tmp_path, kc, jenkins)
+    jenkins.job(JOB)
+    tracker.play({JOB: [_built(42)]})
+    staged = f.spec_repo / "slices" / "003" / "plan.md"
+    staged.parent.mkdir(parents=True)
+    staged.write_text("the dev pipeline's own work\n")
+    _git(f.spec_repo, "add", "slices")
+    assert fleet.run(["update"], f, NOW) == 0
+    assert _git(f.spec_repo, "show", "--name-only", "--format=%s", "HEAD").splitlines() == [
+        "Architecture update 2026-09-11T1430",
+        "",
+        str(fleet.report_file(NOW)),
+        str(fleet.STATE_FILE),
+    ]
+    assert _git(f.spec_repo, "rev-parse", "HEAD") == _git(
+        tmp_path / "specs.git", "rev-parse", "main"
+    )
+    assert _git(f.spec_repo, "status", "--porcelain") == "A  slices/003/plan.md"
+    report = (f.spec_repo / fleet.report_file(NOW)).read_text()
+    assert "## newsfilter — updated" in report
+    assert f"- Builds:\n  - `{JOB}`: green — `{JOB}` #42 SUCCESS\n" in report
+    assert report.endswith("## Unresolved\n\nNothing.\n")
+
+
+def test_the_update_sessions_judgment_calls_close_the_report_unresolved(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, tracker: FakeTracker
+) -> None:
+    f = _updated(tmp_path, kc, jenkins)
+    judged = "2 deltas applied, 1 commit, validator clean.\nSkipped: the queue's retry topology\n"
+    kc.play(UPDATE, {"commit": _edit("the queue"), "response": judged})
+    jenkins.job(JOB)
+    tracker.play({JOB: [_built(42)]})
+    assert fleet.run(["update"], f, NOW) == 1
+    assert _state(f)[ID]["outcome"] == (
+        "updated: 2 deltas applied, 1 commit, validator clean. "
+        "Skipped: the queue's retry topology"
+    )
+    assert (f.spec_repo / fleet.report_file(NOW)).read_text().endswith(
+        "## Unresolved\n\n- `newsfilter`: the session skipped: the queue's retry topology\n"
+    )
+
+
+def test_a_specs_repo_the_run_cannot_push_leaves_the_report_committed(
+    tmp_path: Path, kc: FakeKc, capsys: pytest.CaptureFixture[str]
+) -> None:
+    Remote(tmp_path, REPO).commit({"docs/architecture/a.yaml": _envelope(ID)})
+    f = _fleet(tmp_path, {"id": ID, "repo": REPO})
+    hook = tmp_path / "specs.git" / "hooks" / "pre-receive"
+    hook.write_text("#!/bin/sh\necho 'protected branch' >&2\nexit 1\n")
+    hook.chmod(0o755)
+    assert fleet.run(["update"], f, NOW) == 1
+    assert "publishing the report failed: git push failed: " in capsys.readouterr().err
+    assert _git(f.spec_repo, "log", "-1", "--format=%s") == "Architecture update 2026-09-11T1430"
+    assert (f.spec_repo / fleet.report_file(NOW)).exists()
+
+
+def test_a_run_over_a_producer_without_a_repo_commits_the_report_alone(
+    tmp_path: Path, kc: FakeKc
+) -> None:
+    f = _fleet(tmp_path, {"id": "home-automation-fleet"})
+    assert fleet.run(["update"], f, NOW) == 0
+    assert not (f.spec_repo / fleet.STATE_FILE).exists()
+    assert _git(f.spec_repo, "show", "--name-only", "--format=%s", "HEAD").splitlines() == [
+        "Architecture update 2026-09-11T1430",
+        "",
+        str(fleet.report_file(NOW)),
+    ]

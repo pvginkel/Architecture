@@ -33,6 +33,10 @@ GitHub push trigger starts, the registry's AaC job first) is followed with
 update session to fix it, FIX_ROUNDS times at most. Jenkins is `$JENKINS_URL`
 as `$JENKINS_USER`, by default JENKINS_URL and JENKINS_USER below;
 `$JENKINS_TOKEN` is the only credential.
+
+The run writes its report beside the state file, commits both by name because
+the specs repo's working tree is shared with the dev pipeline, and pushes. It
+exits 1 when the report's Unresolved section has anything in it.
 """
 
 from __future__ import annotations
@@ -72,7 +76,8 @@ RC_FILE = ".architecturerc"
 RC_KEYS = frozenset({"generated", "sources", "instructions"})
 DEFAULT_SOURCES = (":(glob)**/docs/architecture/**",)
 
-STATE_FILE = Path("architecture-updates/state.yaml")
+UPDATES = Path("architecture-updates")
+STATE_FILE = UPDATES / "state.yaml"
 
 EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 REPO_ARG = re.compile(r"[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)?")
@@ -106,6 +111,10 @@ SUMMARY_LOG = re.compile(r"\s*↳ full log: (.+)")
 
 class ProducerError(Exception):
     """A producer the run reports as failed, with the reason, and moves past."""
+
+
+def counted(n: int, noun: str) -> str:
+    return f"{n} {noun}{'' if n == 1 else 's'}"
 
 
 @dataclass(frozen=True)
@@ -212,10 +221,15 @@ class Handoff:
     skipped: str
 
     @property
+    def summary(self) -> str:
+        return (
+            f"{counted(self.deltas, 'delta')} applied, "
+            f"{counted(self.commits, 'commit')}, {self.validation}."
+        )
+
+    @property
     def text(self) -> str:
-        deltas = f"{self.deltas} delta{'' if self.deltas == 1 else 's'}"
-        commits = f"{self.commits} commit{'' if self.commits == 1 else 's'}"
-        return f"{deltas} applied, {commits}, {self.validation}. Skipped: {self.skipped}"
+        return f"{self.summary} Skipped: {self.skipped}"
 
 
 @dataclass(frozen=True)
@@ -287,17 +301,23 @@ class FixRound:
 @dataclass(frozen=True)
 class Outcome:
     """One producer's result from `update`; `reviewed` is the commit its state advances to,
-    None to leave the recorded one. An update's commits are delivered as `push`, then `fixes`."""
+    None to leave the recorded one. An update's commits are delivered as `push`, then `fixes`.
+    `issues` is what the producer leaves for the operator, one item per line of the report's
+    Unresolved section."""
 
     producer: Producer
     status: str
     detail: str = ""
     reviewed: str | None = None
-    unresolved: bool = False
+    issues: tuple[str, ...] = ()
     triage: Verdict | None = None
     update: UpdateResult | None = None
     push: Push | None = None
     fixes: tuple[FixRound, ...] = ()
+
+    @property
+    def unresolved(self) -> bool:
+        return bool(self.issues)
 
     @property
     def state_outcome(self) -> str:
@@ -782,19 +802,22 @@ def judge(scan: Scan) -> Outcome:
     producer, clone = scan.producer, scan.clone
     triage = _dispatch(scan, TRIAGE, triage_prompt(scan))
     if triage.failure:
-        return Outcome(producer, FAILED, f"triage session {triage.failure}", unresolved=True)
+        detail = f"triage session {triage.failure}"
+        return Outcome(producer, FAILED, detail, issues=(detail,))
     verdict = parse_verdict(triage.response)
     if not verdict.update:
         return Outcome(producer, SKIPPED, verdict.reason, reviewed=clone.head, triage=verdict)
     session = _dispatch(scan, UPDATE, update_prompt(scan))
     if session.failure:
         detail = f"update session {session.failure}"
-        return Outcome(producer, FAILED, detail, unresolved=True, triage=verdict)
+        return Outcome(producer, FAILED, detail, issues=(detail,), triage=verdict)
     handoff = parse_handoff(session.response)
     result = UpdateResult(clone, session.session_id, handoff, _commits(clone.path, clone.head))
     finished = _finished(clone.path, session.response)
     if isinstance(finished, str):
-        return Outcome(producer, FAILED, finished, unresolved=True, triage=verdict, update=result)
+        return Outcome(
+            producer, FAILED, finished, issues=(finished,), triage=verdict, update=result
+        )
     if result.commits:
         return Outcome(producer, UPDATED, finished.text, triage=verdict, update=result)
     return Outcome(
@@ -1001,7 +1024,7 @@ def deliver(outcome: Outcome, update: UpdateResult, repo: str, jenkins: Jenkins)
         first = push_and_track(producer, clone, before)
     except ProducerError as e:
         detail = f"{e}; the commits stay unpushed in {clone.path}"
-        return replace(outcome, status=FAILED, detail=detail, unresolved=True)
+        return replace(outcome, status=FAILED, detail=detail, issues=(detail,))
     push, session_id = first, update.session_id
     fixes: list[FixRound] = []
     while len(fixes) < FIX_ROUNDS and (broken := [t for t in push.tracked if t.attributed]):
@@ -1016,7 +1039,7 @@ def deliver(outcome: Outcome, update: UpdateResult, repo: str, jenkins: Jenkins)
         outcome,
         detail="; ".join([outcome.detail, *issues]),
         reviewed=push.commit,
-        unresolved=bool(issues),
+        issues=tuple(issues),
         push=first,
         fixes=tuple(fixes),
     )
@@ -1034,7 +1057,7 @@ def update_producer(
         check_agents(result.clone.path)
         outcome = judge(result)
     except ProducerError as e:
-        return Outcome(producer, FAILED, str(e), unresolved=True)
+        return Outcome(producer, FAILED, str(e), issues=(str(e),))
     if outcome.status != UPDATED or outcome.update is None:
         return outcome
     return deliver(outcome, outcome.update, producer.repo, jenkins)
@@ -1049,6 +1072,119 @@ def update(fleet: Fleet, producers: list[Producer], now: datetime) -> Iterator[O
         if producer.repo is not None:
             record_state(fleet.spec_repo, outcome, now.date().isoformat())
         yield outcome
+
+
+def report_file(now: datetime) -> Path:
+    """The run's report in the specs repo, one per run: `<YYYY-MM-DD>T<HHMM>.md`."""
+    return UPDATES / f"{now:%Y-%m-%d}T{now:%H%M}.md"
+
+
+def unresolved_items(outcome: Outcome) -> list[str]:
+    """What the producer leaves for the operator: its issues and the sessions' judgment calls."""
+    handoffs = [outcome.update.handoff if outcome.update else None]
+    handoffs += [fix.handoff for fix in outcome.fixes]
+    skipped = [h.skipped for h in handoffs if h is not None and h.skipped.strip().lower() != "none"]
+    return [*outcome.issues, *(f"the session skipped: {s}" for s in skipped)]
+
+
+def _build_line(build: Build) -> str:
+    log = f" (log: {build.log})" if build.log else ""
+    return f"`{build.job}` #{build.number} {build.result}{log}"
+
+
+def _tracked_line(tracked: Tracked) -> str:
+    if tracked.green:
+        result = "green"
+    elif not tracked.red:
+        result = f"not tracked: {tracked.reason}"
+    elif tracked.attributed:
+        result = "red, green before the push"
+    elif tracked.before is None:
+        result = "red, with no completed build before the push"
+    else:
+        result = f"red, {tracked.before} before the push"
+    builds = ", ".join(_build_line(build) for build in tracked.builds)
+    return f"- `{tracked.job}`: {result}" + (f" — {builds}" if builds else "")
+
+
+def _session_lines(
+    handoff: Handoff | None, commits: tuple[str, ...], push: Push | None
+) -> list[str]:
+    """One session's handoff, the commits it made and the builds their push started."""
+    lines = []
+    if handoff is not None:
+        lines += [f"- Handoff: {handoff.summary}", f"- Skipped: {handoff.skipped}"]
+    if commits:
+        where = f"pushed as `{push.commit[:12]}`" if push is not None else "unpushed"
+        lines.append(f"- {counted(len(commits), 'commit')}, {where}:")
+        lines += [f"  - `{commit}`" for commit in commits]
+    if push is not None and push.tracked:
+        lines.append("- Builds:")
+        lines += [f"  {_tracked_line(tracked)}" for tracked in push.tracked]
+    return lines
+
+
+def _producer_lines(outcome: Outcome) -> list[str]:
+    heading = f"## {outcome.producer.id} — {outcome.status}"
+    body = []
+    if outcome.producer.repo is not None:
+        body.append(f"- Repo: `{outcome.producer.repo}`")
+    if outcome.triage is not None:
+        body.append(
+            f"- Triage: {'update' if outcome.triage.update else 'skip'} — {outcome.triage.reason}"
+        )
+    if outcome.status == FAILED:
+        body.append(f"- Failed: {outcome.detail}")
+    if outcome.update is not None:
+        body += _session_lines(outcome.update.handoff, outcome.update.commits, outcome.push)
+    for number, fix in enumerate(outcome.fixes, 1):
+        jobs = ", ".join(f"`{job}`" for job in fix.jobs)
+        body += ["", f"### Fix round {number} — {jobs}", ""]
+        if fix.failure is not None:
+            body.append(f"- Stopped: {fix.failure}")
+        body += _session_lines(fix.handoff, fix.commits, fix.push)
+    return [heading, "", *body, ""] if body else [heading, ""]
+
+
+def render_report(outcomes: list[Outcome], now: datetime) -> str:
+    """The run's report: a section per producer, closing with what needs the operator."""
+    items = [(o.producer.id, item) for o in outcomes for item in unresolved_items(o)]
+    tally = ", ".join(
+        f"{sum(o.status == status for o in outcomes)} {status}"
+        for status in dict.fromkeys(o.status for o in outcomes)
+    )
+    closing = counted(len(items), "unresolved item") if items else "Nothing unresolved"
+    lines = [
+        f"# Architecture update — {now:%Y-%m-%d %H:%M}",
+        "",
+        f"{counted(len(outcomes), 'producer')}: {tally}. {closing}.",
+        "",
+    ]
+    for outcome in outcomes:
+        lines += _producer_lines(outcome)
+    lines += ["## Unresolved", ""]
+    lines += [f"- `{producer}`: {item}" for producer, item in items] or ["Nothing."]
+    return "\n".join([*lines, ""])
+
+
+def write_report(fleet: Fleet, outcomes: list[Outcome], now: datetime) -> Path:
+    path = fleet.spec_repo / report_file(now)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(render_report(outcomes, now))
+    return path
+
+
+def publish(fleet: Fleet, now: datetime) -> None:
+    """Commit the run's report and the state file to the specs repo and push.
+
+    The specs repo's working tree is shared with the dev pipeline, so the two
+    paths are staged and committed by name and nothing else is touched.
+    """
+    paths = [str(p) for p in (report_file(now), STATE_FILE) if (fleet.spec_repo / p).exists()]
+    git(fleet.spec_repo, "add", "--", *paths)
+    message = f"Architecture update {now:%Y-%m-%dT%H%M}"
+    git(fleet.spec_repo, "commit", "--quiet", "-m", message, "--", *paths)
+    git(fleet.spec_repo, "push", "--quiet")
 
 
 def resolve_repo(fleet: Fleet, name: str) -> str:
@@ -1088,13 +1224,22 @@ def cmd_stage(fleet: Fleet, name: str) -> int:
 def cmd_update(fleet: Fleet, producers: list[Producer], now: datetime) -> int:
     id_width = max((len(p.id) for p in producers), default=0)
     repo_width = max((len(p.repo or "-") for p in producers), default=0)
-    unresolved = False
+    outcomes = []
     for outcome in update(fleet, producers, now):
         p = outcome.producer
         line = f"{p.id:<{id_width}}  {p.repo or '-':<{repo_width}}  {outcome.status:<17}"
         print(f"{line}  {outcome.detail}".rstrip(), flush=True)
-        unresolved |= outcome.unresolved
-    return 1 if unresolved else 0
+        outcomes.append(outcome)
+    report = write_report(fleet, outcomes, now)
+    items = [item for outcome in outcomes for item in unresolved_items(outcome)]
+    print(f"report: {report}")
+    print(f"unresolved: {len(items)}")
+    try:
+        publish(fleet, now)
+    except ProducerError as e:
+        print(f"publishing the report failed: {e}", file=sys.stderr)
+        return 1
+    return 1 if items else 0
 
 
 def run(argv: list[str], fleet: Fleet, now: datetime) -> int:
