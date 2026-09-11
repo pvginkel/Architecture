@@ -11,10 +11,10 @@ registered, the central architecture update in the Architecture repo
 (`tooling/fleet.py update`) keeps its artifact current.
 
 Run it in a clone of the producer repo with the kit staged. In the
-Architecture repo, `python3 tooling/fleet.py stage <Repo>` clones (or
-fetches) the repo into `/tmp/architecture-update/repos/<Repo>` and stages
-`.claude/` there without starting a session; start the session in that
-clone.
+Architecture repo, `python3 tooling/fleet.py stage <owner>/<Repo>` clones
+(or fetches) the repo into `/tmp/architecture-update/repos/<Repo>` and
+stages `.claude/` there without starting a session; start the session in
+that clone.
 
 ## Why this is a skill, not a sub-agent
 

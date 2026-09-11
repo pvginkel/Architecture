@@ -27,6 +27,10 @@
 # ---- stage 1: schema sanity ----
 FROM python:3.13-slim AS check-schemas
 WORKDIR /work
+# git: test_fleet.py builds git repos under tmp_path.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir poetry
 COPY tooling/pyproject.toml tooling/poetry.lock ./tooling/
 # With the dev group: pytest, ruff and mypy run below.
