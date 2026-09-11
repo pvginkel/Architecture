@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""The central architecture update: scans and stages the producer repos.
+"""The central architecture update: scans, stages and updates the producer repos.
 
     python3 tooling/fleet.py scan            each registered producer: stale, current,
                                              not fleet-managed, or failed with the reason
     python3 tooling/fleet.py stage <Repo>    clone or fetch one repo and stage the kit into
                                              it; starts no session
+    python3 tooling/fleet.py update [<id>…]  each stale producer, or the named ones, one at a
+                                             time: a triage session, then unless it says skip
+                                             an update session in the clone
 
 It runs with the dev container's python3, so it imports only the standard
 library and PyYAML.
@@ -14,21 +17,31 @@ fetched when present, checked out at `origin/HEAD`, with this repo's kit (the
 KIT_DIRS under `.claude/`) copied into the clone's `.claude/` and listed in its
 `.git/info/exclude`. What varies per repo comes from its `.architecturerc` at
 `origin/HEAD`; the commit each producer was last reviewed at comes from the
-specs repo's `architecture-updates/state.yaml`.
+specs repo's `architecture-updates/state.yaml`, which `update` rewrites as each
+producer finishes.
+
+The sessions are headless `kc` sessions driven as the dev plugin's
+`run_kc_session` drives them: `create-headless` in the clone with the staged
+agent, `send` under a timeout this tool enforces, `status` for the session
+id, and `end` always.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import shutil
+import signal
 import stat
 import subprocess
 import sys
+import tempfile
 import tomllib
 from collections.abc import Iterator
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 import yaml
@@ -52,6 +65,16 @@ STALE = "stale"
 CURRENT = "current"
 UNMANAGED = "not fleet-managed"
 FAILED = "failed"
+SKIPPED = "skipped"
+NOTHING = "nothing to apply"
+UPDATED = "updated"
+
+VERDICT = re.compile(r"VERDICT: (update|skip)")
+HANDOFF = re.compile(
+    r"(\d+) deltas? applied, (\d+) commits?, "
+    r"(validator clean|validation by the AaC build|stopped: (.+))\."
+)
+SKIPPED_LINE = re.compile(r"Skipped: (.+)")
 
 
 class ProducerError(Exception):
@@ -118,6 +141,84 @@ class Scan:
 
 
 @dataclass(frozen=True)
+class Agent:
+    """A headless session's staged agent, model, reasoning effort and timeout in seconds."""
+
+    name: str
+    model: str
+    effort: str | None
+    timeout: int
+
+
+TRIAGE = Agent("triage-architecture", "sonnet", None, 600)
+UPDATE = Agent("update-architecture", "opus", "xhigh", 3600)
+
+# Seconds a send has to wind down after SIGINT before it is killed.
+INTERRUPT_GRACE = 15
+
+
+@dataclass(frozen=True)
+class Session:
+    """A driven session: `failure` says why it did not finish (None when it did), `session_id`
+    is the claude session a later round resumes."""
+
+    failure: str | None
+    response: str
+    session_id: str | None
+
+
+@dataclass(frozen=True)
+class Verdict:
+    update: bool
+    reason: str
+
+
+@dataclass(frozen=True)
+class Handoff:
+    """The update agent's final two lines."""
+
+    deltas: int
+    commits: int
+    validation: str
+    stopped: str | None
+    skipped: str
+
+    @property
+    def text(self) -> str:
+        deltas = f"{self.deltas} delta{'' if self.deltas == 1 else 's'}"
+        commits = f"{self.commits} commit{'' if self.commits == 1 else 's'}"
+        return f"{deltas} applied, {commits}, {self.validation}. Skipped: {self.skipped}"
+
+
+@dataclass(frozen=True)
+class UpdateResult:
+    """What the update session left: `commits` are `<short sha> <subject>`, oldest first."""
+
+    clone: Clone
+    session_id: str | None
+    handoff: Handoff | None
+    commits: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class Outcome:
+    """One producer's result from `update`; `reviewed` is the commit its state advances to,
+    None to leave the recorded one."""
+
+    producer: Producer
+    status: str
+    detail: str = ""
+    reviewed: str | None = None
+    unresolved: bool = False
+    triage: Verdict | None = None
+    update: UpdateResult | None = None
+
+    @property
+    def state_outcome(self) -> str:
+        return f"{self.status}: {self.detail}" if self.detail else self.status
+
+
+@dataclass(frozen=True)
 class ScanRow:
     producer: str
     repo: str
@@ -142,14 +243,33 @@ def load_reviewed(spec_repo: Path) -> dict[str, str]:
 
         newsfilter:
           reviewed: <commit its architecture was last reviewed at>
-          date: <YYYY-MM-DD>
-          outcome: <the last run's outcome for it>
+          date: <YYYY-MM-DD of the last run that judged it>
+          outcome: <that run's outcome for it>
+
+    `reviewed` is absent until a run advances it.
     """
     path = spec_repo / STATE_FILE
     if not path.exists():
         return {}
     state = yaml.safe_load(path.read_text())
-    return {producer: entry["reviewed"] for producer, entry in state.items()}
+    return {producer: entry["reviewed"] for producer, entry in state.items() if "reviewed" in entry}
+
+
+def record_state(spec_repo: Path, outcome: Outcome, date: str) -> None:
+    """Rewrite one producer's state entry, keeping its `reviewed` unless the outcome advances it.
+
+    The file is replaced in one step, so a run killed mid-write leaves the
+    previous state whole.
+    """
+    path = spec_repo / STATE_FILE
+    state = yaml.safe_load(path.read_text()) if path.exists() else {}
+    reviewed = outcome.reviewed or state.get(outcome.producer.id, {}).get("reviewed")
+    entry = {"reviewed": reviewed} if reviewed else {}
+    state[outcome.producer.id] = {**entry, "date": date, "outcome": outcome.state_outcome}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    staging = path.with_name(f"{path.name}.tmp")
+    staging.write_text(yaml.safe_dump({k: state[k] for k in sorted(state)}, sort_keys=False))
+    os.replace(staging, path)
 
 
 def _git_env() -> dict[str, str]:
@@ -386,6 +506,222 @@ def scan(fleet: Fleet) -> Iterator[ScanRow]:
             yield ScanRow(producer.id, producer.repo, STALE, detail)
 
 
+def _kc(cwd: Path, *args: str, timeout: int | None = None) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["kc", *args], cwd=cwd, capture_output=True, text=True, check=False, timeout=timeout
+    )
+
+
+def _last_line(proc: subprocess.CompletedProcess[str]) -> str:
+    lines = (proc.stderr or proc.stdout).strip().splitlines()
+    return lines[-1] if lines else f"exit {proc.returncode}"
+
+
+def _send(name: str, prompt: str, cwd: Path, timeout: int) -> tuple[int | None, str]:
+    """Send one prompt and wait for the turn: its exit code (None when it timed out) and response.
+
+    `kc session send` interrupts the turn on SIGINT, so a send still running
+    when this returns, for any reason, is interrupted and then killed if it
+    outlives INTERRUPT_GRACE.
+    """
+    with tempfile.TemporaryDirectory(prefix="fleet-send-") as tmp:
+        prompt_file = Path(tmp) / "prompt"
+        response_file = Path(tmp) / "response"
+        prompt_file.write_text(prompt)
+        proc = subprocess.Popen(
+            [
+                "kc", "session", "send", name,
+                "--prompt-file", str(prompt_file),
+                "--response-file", str(response_file),
+                "-v",
+            ],
+            cwd=cwd,
+            stdout=subprocess.DEVNULL,
+        )
+        try:
+            code = proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            return None, ""
+        finally:
+            if proc.poll() is None:
+                proc.send_signal(signal.SIGINT)
+                try:
+                    proc.wait(timeout=INTERRUPT_GRACE)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait()
+        return code, response_file.read_text() if response_file.exists() else ""
+
+
+def _session_id(name: str, cwd: Path) -> str | None:
+    status = _kc(cwd, "session", "status", name, "--output=json", timeout=60)
+    if status.returncode != 0:
+        return None
+    session_id: str = json.loads(status.stdout).get("sessionId") or ""
+    return session_id or None
+
+
+def run_session(cwd: Path, agent: Agent, prompt: str) -> Session:
+    """Drive one headless session in `cwd` to the end of its turn, and end it."""
+    args = ["session", "create-headless", "--cwd", str(cwd), "--agent", agent.name]
+    args += ["--model", agent.model]
+    if agent.effort:
+        args += ["--reasoning-effort", agent.effort]
+    created = _kc(cwd, *args)
+    if created.returncode != 0 or not created.stdout.strip():
+        return Session(f"did not start: {_last_line(created)}", "", None)
+    name = created.stdout.strip().splitlines()[-1].strip()
+    try:
+        code, response = _send(name, prompt, cwd, agent.timeout)
+        if code is None:
+            return Session(f"timed out after {agent.timeout} s", "", None)
+        if code != 0:
+            return Session(f"exited {code}", response, None)
+        return Session(None, response, _session_id(name, cwd))
+    finally:
+        ended = _kc(cwd, "session", "end", name, timeout=60)
+        if ended.returncode != 0:
+            print(f"kc session end {name} failed: {_last_line(ended)}", file=sys.stderr)
+
+
+def _final_lines(response: str) -> list[str]:
+    return [line.strip() for line in response.splitlines() if line.strip()][-2:]
+
+
+def parse_verdict(response: str) -> Verdict:
+    """The triage agent's final two lines, `VERDICT: update|skip` and a line of reason.
+
+    Anything else counts as update.
+    """
+    lines = _final_lines(response)
+    if len(lines) == 2 and (verdict := VERDICT.fullmatch(lines[0])):
+        return Verdict(verdict[1] == "update", lines[1])
+    return Verdict(True, "no parseable verdict; counted as update")
+
+
+def parse_handoff(response: str) -> Handoff | None:
+    """The update agent's final two lines, or None when they are not its handoff."""
+    lines = _final_lines(response)
+    if len(lines) != 2:
+        return None
+    summary, skipped = HANDOFF.fullmatch(lines[0]), SKIPPED_LINE.fullmatch(lines[1])
+    if not (summary and skipped):
+        return None
+    return Handoff(int(summary[1]), int(summary[2]), summary[3], summary[4], skipped[1])
+
+
+def _brief(scan: Scan) -> str:
+    return (
+        f"- Producer id: {scan.producer.id}\n"
+        f"- Mode: {'generated' if scan.config.generated else 'hand-authored'}\n"
+        f"- Sources: {' '.join(f'`{s}`' for s in scan.config.sources)}\n"
+        f"- Base commit: {scan.base}\n"
+    )
+
+
+def _instructions(scan: Scan) -> str:
+    return (
+        f"\nThe repo's instructions, verbatim from its `{RC_FILE}`:\n\n"
+        f"{scan.config.instructions or '(none)'}\n"
+    )
+
+
+def triage_prompt(scan: Scan) -> str:
+    noun = "commit" if scan.commits == 1 else "commits"
+    return (
+        f"Does anything in {scan.base}..HEAD ({scan.commits} {noun}) change what producer "
+        f"`{scan.producer.id}`'s architecture must say? End with your two-line verdict.\n\n"
+        + _brief(scan)
+        + _instructions(scan)
+    )
+
+
+def update_prompt(scan: Scan) -> str:
+    return (
+        f"Bring producer `{scan.producer.id}`'s architecture sources up to date with the commits "
+        f"in {scan.base}..HEAD. Commit per the repo's cadence, do not push. End with your "
+        "two-line handoff.\n\n"
+        + _brief(scan)
+        + f"- Default branch: {scan.clone.branch}\n"
+        + _instructions(scan)
+    )
+
+
+def check_agents(clone: Path) -> None:
+    """Refuse a clone missing an agent: `create-headless --agent` with an unknown name
+    starts a plain session instead of failing."""
+    missing = [
+        f".claude/agents/{agent.name}.md"
+        for agent in (TRIAGE, UPDATE)
+        if not (clone / ".claude" / "agents" / f"{agent.name}.md").is_file()
+    ]
+    if missing:
+        raise ProducerError(f"agent definition(s) missing from the clone: {', '.join(missing)}")
+
+
+def _dispatch(scan: Scan, agent: Agent, prompt: str) -> Session:
+    print(
+        f"{scan.producer.id}: {agent.name} session in {scan.clone.path}",
+        file=sys.stderr,
+        flush=True,
+    )
+    return run_session(scan.clone.path, agent, prompt)
+
+
+def judge(scan: Scan) -> Outcome:
+    """Triage the stale producer and, unless triage says skip, run the update session."""
+    producer, clone = scan.producer, scan.clone
+    triage = _dispatch(scan, TRIAGE, triage_prompt(scan))
+    if triage.failure:
+        return Outcome(producer, FAILED, f"triage session {triage.failure}", unresolved=True)
+    verdict = parse_verdict(triage.response)
+    if not verdict.update:
+        return Outcome(producer, SKIPPED, verdict.reason, reviewed=clone.head, triage=verdict)
+    session = _dispatch(scan, UPDATE, update_prompt(scan))
+    if session.failure:
+        detail = f"update session {session.failure}"
+        return Outcome(producer, FAILED, detail, unresolved=True, triage=verdict)
+    handoff = parse_handoff(session.response)
+    log = git(clone.path, "log", "--reverse", "--format=%h %s", f"{clone.head}..HEAD")
+    result = UpdateResult(clone, session.session_id, handoff, tuple(log.splitlines()))
+    if _dirty(clone.path):
+        detail = f"the update session left uncommitted changes in {clone.path}"
+    elif handoff is None:
+        detail = "the update session's final two lines are not its handoff"
+    elif handoff.stopped:
+        detail = f"the update session stopped: {handoff.stopped}"
+    elif result.commits:
+        return Outcome(producer, UPDATED, handoff.text, triage=verdict, update=result)
+    else:
+        return Outcome(
+            producer, NOTHING, handoff.text, reviewed=clone.head, triage=verdict, update=result
+        )
+    return Outcome(producer, FAILED, detail, unresolved=True, triage=verdict, update=result)
+
+
+def update_producer(fleet: Fleet, producer: Producer, reviewed: str | None) -> Outcome:
+    if producer.repo is None:
+        return Outcome(producer, UNMANAGED)
+    try:
+        result = scan_producer(fleet, producer, producer.repo, reviewed)
+        if result.current:
+            return Outcome(producer, CURRENT, reviewed=result.clone.head)
+        check_agents(result.clone.path)
+        return judge(result)
+    except ProducerError as e:
+        return Outcome(producer, FAILED, str(e), unresolved=True)
+
+
+def update(fleet: Fleet, producers: list[Producer], now: datetime) -> Iterator[Outcome]:
+    """Each producer in turn; its state is recorded before its outcome is yielded."""
+    reviewed = load_reviewed(fleet.spec_repo)
+    for producer in producers:
+        outcome = update_producer(fleet, producer, reviewed.get(producer.id))
+        if producer.repo is not None:
+            record_state(fleet.spec_repo, outcome, now.date().isoformat())
+        yield outcome
+
+
 def resolve_repo(fleet: Fleet, name: str) -> str:
     """`owner/name` as given, or a bare name looked up in the registry."""
     if not REPO_ARG.fullmatch(name):
@@ -420,7 +756,19 @@ def cmd_stage(fleet: Fleet, name: str) -> int:
     return 0
 
 
-def run(argv: list[str], fleet: Fleet) -> int:
+def cmd_update(fleet: Fleet, producers: list[Producer], now: datetime) -> int:
+    id_width = max((len(p.id) for p in producers), default=0)
+    repo_width = max((len(p.repo or "-") for p in producers), default=0)
+    unresolved = False
+    for outcome in update(fleet, producers, now):
+        p = outcome.producer
+        line = f"{p.id:<{id_width}}  {p.repo or '-':<{repo_width}}  {outcome.status:<17}"
+        print(f"{line}  {outcome.detail}".rstrip(), flush=True)
+        unresolved |= outcome.unresolved
+    return 1 if unresolved else 0
+
+
+def run(argv: list[str], fleet: Fleet, now: datetime) -> int:
     parser = argparse.ArgumentParser(prog="fleet.py", description=__doc__.splitlines()[0])
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser(
@@ -430,11 +778,22 @@ def run(argv: list[str], fleet: Fleet) -> int:
         "stage", help="clone or fetch a repo and stage the kit into it; starts no session"
     )
     stage.add_argument("repo", metavar="<Repo>", help="a registered repo's name, or owner/name")
+    update_cmd = commands.add_parser(
+        "update", help="triage and update each stale producer, or the named ones, in turn"
+    )
+    update_cmd.add_argument("ids", nargs="*", metavar="<id>", help="a registered producer id")
     args = parser.parse_args(argv)
     if args.command == "scan":
         return cmd_scan(fleet)
-    return cmd_stage(fleet, args.repo)
+    if args.command == "stage":
+        return cmd_stage(fleet, args.repo)
+    producers = load_registry(fleet.registry)
+    unknown = sorted(set(args.ids) - {p.id for p in producers})
+    if unknown:
+        update_cmd.error(f"unknown producer id(s): {', '.join(unknown)}")
+    named = [p for p in producers if p.id in args.ids] if args.ids else producers
+    return cmd_update(fleet, named, now)
 
 
 if __name__ == "__main__":
-    sys.exit(run(sys.argv[1:], Fleet.default()))
+    sys.exit(run(sys.argv[1:], Fleet.default(), datetime.now()))

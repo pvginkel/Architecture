@@ -5,17 +5,22 @@ tmp_path: its startup check is what rejects a malformed `repo:`.
 
 The fleet cases build each producer repo as a bare git repo under tmp_path,
 served over file:// in place of GitHub; the clone area, the specs repo and the
-kit are under tmp_path too.
+kit are under tmp_path too. The sessions go to a fake `kc` on PATH that plays
+canned turns.
 """
 
 from __future__ import annotations
 
 import ast
+import dataclasses
+import json
 import os
 import stat
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -28,6 +33,7 @@ REGISTRY = TOOLING.parent / "pipeline-producers.yaml"
 
 ID = "newsfilter"
 REPO = "pvginkel/NewsFilter"
+NOW = datetime(2026, 9, 11, 14, 30)
 
 KIT = {
     "agents/triage-architecture.md": "triage agent\n",
@@ -445,7 +451,7 @@ def test_scan_reports_each_producer(tmp_path: Path, capsys: pytest.CaptureFixtur
         {"id": "home-automation-fleet"},
         {"id": "ginbov-nl", "repo": "pvginkel/Ginbov"},
     )
-    assert fleet.run(["scan"], f) == 1
+    assert fleet.run(["scan"], f, NOW) == 1
     assert capsys.readouterr().out.splitlines() == [
         f"newsfilter             pvginkel/NewsFilter  stale              "
         f"1 commit since {base[:12]}: 1 file changed, 1 insertion(+)",
@@ -458,14 +464,14 @@ def test_scan_reports_each_producer(tmp_path: Path, capsys: pytest.CaptureFixtur
 
 
 def test_scan_exits_zero_when_no_producer_fails(tmp_path: Path) -> None:
-    assert fleet.run(["scan"], _fleet(tmp_path, {"id": "home-automation-fleet"})) == 0
+    assert fleet.run(["scan"], _fleet(tmp_path, {"id": "home-automation-fleet"}), NOW) == 0
 
 
 def test_stage_takes_an_unregistered_repo_as_owner_name(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     head = Remote(tmp_path, "pvginkel/NewRepo").commit({"README.md": "readme\n"})
-    assert fleet.run(["stage", "pvginkel/NewRepo"], _fleet(tmp_path)) == 0
+    assert fleet.run(["stage", "pvginkel/NewRepo"], _fleet(tmp_path), NOW) == 0
     clone = tmp_path / "clones" / "NewRepo"
     assert (clone / ".claude" / "agents" / "triage-architecture.md").is_file()
     assert capsys.readouterr().out == f"staged {clone} at main {head[:12]}\n"
@@ -473,7 +479,8 @@ def test_stage_takes_an_unregistered_repo_as_owner_name(
 
 def test_stage_resolves_a_registered_repos_bare_name(tmp_path: Path) -> None:
     Remote(tmp_path, REPO).commit({"README.md": "readme\n"})
-    assert fleet.run(["stage", "NewsFilter"], _fleet(tmp_path, {"id": ID, "repo": REPO})) == 0
+    f = _fleet(tmp_path, {"id": ID, "repo": REPO})
+    assert fleet.run(["stage", "NewsFilter"], f, NOW) == 0
     assert (tmp_path / "clones" / "NewsFilter" / ".claude" / "architecture").is_dir()
 
 
@@ -487,7 +494,7 @@ def test_stage_resolves_a_registered_repos_bare_name(tmp_path: Path) -> None:
 def test_stage_rejects_a_name_it_cannot_resolve(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], name: str, reason: str
 ) -> None:
-    assert fleet.run(["stage", name], _fleet(tmp_path)) == 1
+    assert fleet.run(["stage", name], _fleet(tmp_path), NOW) == 1
     assert capsys.readouterr().err == f"stage {name}: {reason}\n"
 
 
@@ -519,3 +526,477 @@ def test_fleet_imports_only_the_standard_library_and_pyyaml() -> None:
         if isinstance(node, ast.ImportFrom) and node.module
     }
     assert modules - sys.stdlib_module_names == {"yaml"}
+
+
+# ---- fleet.py update: the sessions ----
+
+FAKE_KC = """\
+import json, os, signal, subprocess, sys, time
+from pathlib import Path
+
+log = Path(os.environ["FAKE_KC_LOG"])
+calls = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+args = sys.argv[1:]
+
+
+def record(**extra):
+    with log.open("a") as f:
+        f.write(json.dumps({"args": args, "cwd": os.getcwd(), **extra}) + "\\n")
+
+
+def count(verb):
+    return sum(c["args"][1] == verb for c in calls if not c.get("interrupted"))
+
+
+verb = args[1]
+if verb == "create-headless":
+    record()
+    if os.environ.get("FAKE_KC_REFUSE"):
+        print(os.environ["FAKE_KC_REFUSE"], file=sys.stderr)
+        sys.exit(1)
+    print(f"fake-{count('create-headless')}")
+elif verb == "send":
+    turn = json.loads(Path(os.environ["FAKE_KC_TURNS"]).read_text())[count("send")]
+    record(prompt=Path(args[args.index("--prompt-file") + 1]).read_text())
+    if turn.get("ignore_interrupt"):
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
+    for path, text in turn.get("write", {}).items():
+        Path(path).write_text(text)
+    for path, text in turn.get("commit", {}).items():
+        Path(path).write_text(text)
+        subprocess.run(["git", "add", path], check=True)
+        subprocess.run(["git", "commit", "--quiet", "-m", f"architecture: {path}"], check=True)
+    try:
+        time.sleep(turn.get("sleep", 0))
+    except KeyboardInterrupt:
+        record(interrupted=True)
+        sys.exit(130)
+    Path(args[args.index("--response-file") + 1]).write_text(turn.get("response", ""))
+    sys.exit(turn.get("exit", 0))
+elif verb == "status":
+    record()
+    print(json.dumps({"sessionId": "sid-" + args[2], "state": "idle"}))
+else:
+    record()
+"""
+
+
+class FakeKc:
+    """A `kc` on PATH that plays one canned turn per send and logs every call."""
+
+    def __init__(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        kc = bin_dir / "kc"
+        kc.write_text(f"#!{sys.executable}\n{FAKE_KC}")
+        kc.chmod(0o755)
+        self.log = tmp_path / "kc.jsonl"
+        self.turns = tmp_path / "kc-turns.json"
+        monkeypatch.setenv("PATH", f"{bin_dir}{os.pathsep}{os.environ['PATH']}")
+        monkeypatch.setenv("FAKE_KC_LOG", str(self.log))
+        monkeypatch.setenv("FAKE_KC_TURNS", str(self.turns))
+        self.play()
+
+    def play(self, *turns: dict[str, Any]) -> None:
+        self.turns.write_text(json.dumps(turns))
+
+    def calls(self) -> list[dict[str, Any]]:
+        if not self.log.exists():
+            return []
+        return [json.loads(line) for line in self.log.read_text().splitlines()]
+
+    def verbs(self) -> list[str]:
+        return [c["args"][1] for c in self.calls() if not c.get("interrupted")]
+
+    def creates(self) -> list[list[str]]:
+        return [c["args"][2:] for c in self.calls() if c["args"][1] == "create-headless"]
+
+    def prompts(self) -> list[str]:
+        return [c["prompt"] for c in self.calls() if "prompt" in c]
+
+
+@pytest.fixture
+def kc(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FakeKc:
+    return FakeKc(tmp_path, monkeypatch)
+
+
+SESSION = ["create-headless", "send", "status", "end"]
+SKIP = {"response": "Only CI changed.\n\nVERDICT: skip\nOnly CI housekeeping.\n"}
+UPDATE = {"response": "VERDICT: update\nThe app now consumes a queue.\n"}
+NOTHING = {"response": "0 deltas applied, 0 commits, validator clean.\nSkipped: none\n"}
+UNPARSEABLE = fleet.Verdict(True, "no parseable verdict; counted as update")
+PRODUCER = fleet.Producer(ID, REPO)
+
+
+def _stale(tmp_path: Path, rc: dict[str, Any] | None = None) -> tuple[fleet.Fleet, str, str]:
+    remote = Remote(tmp_path, REPO)
+    files = {"docs/architecture/a.yaml": _envelope(ID)}
+    if rc is not None:
+        files[".architecturerc"] = yaml.safe_dump(rc)
+    base = remote.commit(files)
+    head = remote.commit({"src/app.py": "app\n"})
+    return _fleet(tmp_path, {"id": ID, "repo": REPO}), base, head
+
+
+def _state(f: fleet.Fleet) -> dict[str, Any]:
+    state: dict[str, Any] = yaml.safe_load((f.spec_repo / fleet.STATE_FILE).read_text())
+    return state
+
+
+def _update(f: fleet.Fleet) -> fleet.Outcome:
+    [outcome] = fleet.update(f, [PRODUCER], NOW)
+    return outcome
+
+
+@pytest.mark.parametrize(
+    "response, verdict",
+    [
+        (SKIP["response"], fleet.Verdict(False, "Only CI housekeeping.")),
+        ("VERDICT: update\nroles/dns adds a zone.", fleet.Verdict(True, "roles/dns adds a zone.")),
+        ("VERDICT: skip\n\n  Only tests.  \n\n", fleet.Verdict(False, "Only tests.")),
+        ("VERDICT: skip\nOnly tests.\nAnything else?", UNPARSEABLE),
+        ("Only tests.\nVERDICT: skip", UNPARSEABLE),
+        ("VERDICT: maybe\nUnsure.", UNPARSEABLE),
+        ("**VERDICT: skip**\nOnly tests.", UNPARSEABLE),
+        ("", UNPARSEABLE),
+    ],
+)
+def test_the_triage_verdict_is_its_final_two_lines(response: str, verdict: fleet.Verdict) -> None:
+    assert fleet.parse_verdict(response) == verdict
+
+
+@pytest.mark.parametrize(
+    "response, handoff",
+    [
+        (
+            "Walked 3 commits.\n\n2 deltas applied, 2 commits, validator clean.\nSkipped: none\n",
+            fleet.Handoff(2, 2, "validator clean", None, "none"),
+        ),
+        (
+            "1 delta applied, 1 commit, validation by the AaC build.\nSkipped: ss:foo (no logo)",
+            fleet.Handoff(1, 1, "validation by the AaC build", None, "ss:foo (no logo)"),
+        ),
+        (
+            "0 deltas applied, 0 commits, stopped: the manual is missing.\nSkipped: none",
+            fleet.Handoff(0, 0, "stopped: the manual is missing", "the manual is missing", "none"),
+        ),
+    ],
+)
+def test_the_update_handoff_is_its_final_two_lines(response: str, handoff: fleet.Handoff) -> None:
+    assert fleet.parse_handoff(response) == handoff
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        "2 deltas applied, 2 commits, validator clean.",
+        "2 deltas applied, 2 commits, validator clean.\nSkipped: none\nAnything else?",
+        "2 deltas applied, 2 commits, validator failed.\nSkipped: none",
+        "2 deltas applied, 2 commits, validator clean\nSkipped: none",
+        "`2 deltas applied, 2 commits, validator clean.`\nSkipped: none",
+        "",
+    ],
+)
+def test_anything_else_is_no_handoff(response: str) -> None:
+    assert fleet.parse_handoff(response) is None
+
+
+def test_the_handoff_text_reads_back_as_the_agent_wrote_it() -> None:
+    assert fleet.Handoff(1, 2, "validator clean", None, "none").text == (
+        "1 delta applied, 2 commits, validator clean. Skipped: none"
+    )
+
+
+def test_a_session_is_created_sent_its_id_read_and_ended(tmp_path: Path, kc: FakeKc) -> None:
+    kc.play({"response": "the answer\n"})
+    session = fleet.run_session(tmp_path, fleet.UPDATE, "the prompt\n")
+    assert session == fleet.Session(None, "the answer\n", "sid-fake-0")
+    create, send, status, end = kc.calls()
+    assert create["args"] == [
+        "session", "create-headless", "--cwd", str(tmp_path),
+        "--agent", "update-architecture", "--model", "opus", "--reasoning-effort", "xhigh",
+    ]
+    assert send["args"][:3] == ["session", "send", "fake-0"]
+    assert send["args"][3::2] == ["--prompt-file", "--response-file", "-v"]
+    assert send["prompt"] == "the prompt\n"
+    assert status["args"] == ["session", "status", "fake-0", "--output=json"]
+    assert end["args"] == ["session", "end", "fake-0"]
+    assert {c["cwd"] for c in kc.calls()} == {str(tmp_path)}
+
+
+@pytest.mark.parametrize(
+    "turn, interrupted",
+    [({"sleep": 30}, True), ({"sleep": 30, "ignore_interrupt": True}, False)],
+    ids=["interrupted", "killed"],
+)
+def test_a_session_past_its_timeout_is_interrupted_then_killed_and_ended(
+    tmp_path: Path,
+    kc: FakeKc,
+    monkeypatch: pytest.MonkeyPatch,
+    turn: dict[str, Any],
+    interrupted: bool,
+) -> None:
+    monkeypatch.setattr(fleet, "INTERRUPT_GRACE", 1)
+    kc.play(turn)
+    agent = dataclasses.replace(fleet.TRIAGE, timeout=1)
+    assert fleet.run_session(tmp_path, agent, "p") == fleet.Session("timed out after 1 s", "", None)
+    assert kc.verbs() == ["create-headless", "send", "end"]
+    assert any(c.get("interrupted") for c in kc.calls()) is interrupted
+
+
+def test_a_session_exiting_non_zero_fails_and_is_ended(tmp_path: Path, kc: FakeKc) -> None:
+    kc.play({"response": "partial", "exit": 2})
+    session = fleet.run_session(tmp_path, fleet.TRIAGE, "p")
+    assert session == fleet.Session("exited 2", "partial", None)
+    assert kc.verbs() == ["create-headless", "send", "end"]
+
+
+def test_a_session_kc_will_not_create_fails(
+    tmp_path: Path, kc: FakeKc, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FAKE_KC_REFUSE", "no capacity")
+    session = fleet.run_session(tmp_path, fleet.TRIAGE, "p")
+    assert session == fleet.Session("did not start: no capacity", "", None)
+    assert kc.verbs() == ["create-headless"]
+
+
+def test_a_skip_verdict_advances_reviewed_without_an_update_session(
+    tmp_path: Path, kc: FakeKc, capsys: pytest.CaptureFixture[str]
+) -> None:
+    f, _, head = _stale(tmp_path)
+    kc.play(SKIP)
+    assert fleet.run(["update"], f, NOW) == 0
+    assert kc.verbs() == SESSION
+    clone = str(tmp_path / "clones" / "NewsFilter")
+    assert kc.creates() == [
+        ["--cwd", clone, "--agent", "triage-architecture", "--model", "sonnet"]
+    ]
+    assert {c["cwd"] for c in kc.calls()} == {clone}
+    assert _state(f) == {
+        ID: {"reviewed": head, "date": "2026-09-11", "outcome": "skipped: Only CI housekeeping."}
+    }
+    assert capsys.readouterr().out == (
+        "newsfilter  pvginkel/NewsFilter  skipped            Only CI housekeeping.\n"
+    )
+
+
+def test_the_triage_prompt_carries_the_brief_and_the_instructions_verbatim(
+    tmp_path: Path, kc: FakeKc
+) -> None:
+    instructions = "Annotations live in values.yaml.\n  Keep their indent.\n"
+    rc = {"generated": True, "sources": ["*/architecture.yaml"], "instructions": instructions}
+    remote = Remote(tmp_path, REPO)
+    base = remote.commit(
+        {".architecturerc": yaml.safe_dump(rc), "app/architecture.yaml": "images: {}\n"}
+    )
+    remote.commit({"src/app.py": "app\n"})
+    kc.play(SKIP)
+    _update(_fleet(tmp_path, {"id": ID, "repo": REPO}))
+    assert kc.prompts() == [
+        f"Does anything in {base}..HEAD (1 commit) change what producer `newsfilter`'s "
+        "architecture must say? End with your two-line verdict.\n\n"
+        "- Producer id: newsfilter\n"
+        "- Mode: generated\n"
+        "- Sources: `*/architecture.yaml`\n"
+        f"- Base commit: {base}\n"
+        "\nThe repo's instructions, verbatim from its `.architecturerc`:\n\n"
+        f"{instructions}\n"
+    ]
+
+
+def test_an_update_verdict_runs_the_update_session_with_its_brief(
+    tmp_path: Path, kc: FakeKc
+) -> None:
+    f, base, _ = _stale(tmp_path)
+    handoff = "1 delta applied, 1 commit, validator clean.\nSkipped: none\n"
+    edit = {"docs/architecture/a.yaml": _envelope(ID) + "# the queue\n"}
+    kc.play(UPDATE, {"commit": edit, "response": handoff})
+    outcome = _update(f)
+    clone = tmp_path / "clones" / "NewsFilter"
+    assert kc.verbs() == SESSION * 2
+    assert kc.creates()[1] == [
+        "--cwd", str(clone),
+        "--agent", "update-architecture", "--model", "opus", "--reasoning-effort", "xhigh",
+    ]
+    assert kc.prompts()[1] == (
+        "Bring producer `newsfilter`'s architecture sources up to date with the commits in "
+        f"{base}..HEAD. Commit per the repo's cadence, do not push. End with your two-line "
+        "handoff.\n\n"
+        "- Producer id: newsfilter\n"
+        "- Mode: hand-authored\n"
+        "- Sources: `:(glob)**/docs/architecture/**`\n"
+        f"- Base commit: {base}\n"
+        "- Default branch: main\n"
+        "\nThe repo's instructions, verbatim from its `.architecturerc`:\n\n(none)\n"
+    )
+    assert (outcome.status, outcome.reviewed, outcome.unresolved) == (fleet.UPDATED, None, False)
+    assert outcome.detail == "1 delta applied, 1 commit, validator clean. Skipped: none"
+    assert outcome.triage == fleet.Verdict(True, "The app now consumes a queue.")
+    assert outcome.update is not None
+    assert outcome.update.session_id == "sid-fake-1"
+    assert outcome.update.commits == (_git(clone, "log", "-1", "--format=%h %s"),)
+    assert outcome.update.commits[0].endswith(" architecture: docs/architecture/a.yaml")
+    assert _state(f) == {ID: {"date": "2026-09-11", "outcome": f"updated: {outcome.detail}"}}
+
+
+def test_an_update_with_nothing_to_apply_advances_reviewed(tmp_path: Path, kc: FakeKc) -> None:
+    f, _, head = _stale(tmp_path)
+    kc.play(UPDATE, NOTHING)
+    outcome = _update(f)
+    assert (outcome.status, outcome.reviewed, outcome.unresolved) == (fleet.NOTHING, head, False)
+    assert outcome.update is not None and outcome.update.commits == ()
+    assert _state(f)[ID]["reviewed"] == head
+
+
+def test_an_unparseable_verdict_runs_the_update_session(tmp_path: Path, kc: FakeKc) -> None:
+    f, _, _ = _stale(tmp_path)
+    kc.play({"response": "Looks harmless to me."}, NOTHING)
+    outcome = _update(f)
+    assert kc.verbs() == SESSION * 2
+    assert (outcome.status, outcome.triage) == (fleet.NOTHING, UNPARSEABLE)
+
+
+@pytest.mark.parametrize(
+    "turn, detail",
+    [
+        (
+            {"response": "0 deltas applied, 0 commits, stopped: no validator.\nSkipped: none\n"},
+            "the update session stopped: no validator",
+        ),
+        ({"response": "All done!"}, "the update session's final two lines are not its handoff"),
+        (
+            {"write": {"scratch.txt": "notes\n"}, **NOTHING},
+            "the update session left uncommitted changes in {clone}",
+        ),
+        ({"response": "partial", "exit": 1}, "update session exited 1"),
+    ],
+    ids=["stopped", "no-handoff", "dirty", "non-zero"],
+)
+def test_an_update_session_that_does_not_finish_cleanly_is_unresolved(
+    tmp_path: Path, kc: FakeKc, turn: dict[str, Any], detail: str
+) -> None:
+    f, _, _ = _stale(tmp_path)
+    kc.play(UPDATE, turn)
+    outcome = _update(f)
+    detail = detail.format(clone=tmp_path / "clones" / "NewsFilter")
+    assert (outcome.status, outcome.detail, outcome.reviewed) == (fleet.FAILED, detail, None)
+    assert outcome.unresolved
+    assert _state(f) == {ID: {"date": "2026-09-11", "outcome": f"failed: {detail}"}}
+
+
+def test_a_failed_triage_is_unresolved_keeps_reviewed_and_the_run_moves_on(
+    tmp_path: Path,
+    kc: FakeKc,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(fleet, "TRIAGE", dataclasses.replace(fleet.TRIAGE, timeout=1))
+    first = Remote(tmp_path, REPO)
+    base = first.commit({"docs/architecture/a.yaml": _envelope(ID)})
+    first.commit({"src/app.py": "app\n"})
+    second = Remote(tmp_path, "pvginkel/PaperClock")
+    second.commit({"docs/architecture/a.yaml": _envelope("paper-clock")})
+    head = second.commit({"src/app.py": "app\n"})
+    f = _fleet(
+        tmp_path,
+        {"id": ID, "repo": REPO},
+        {"id": "paper-clock", "repo": "pvginkel/PaperClock"},
+        {"id": "home-automation-fleet"},
+    )
+    state = f.spec_repo / fleet.STATE_FILE
+    state.parent.mkdir(parents=True)
+    state.write_text(yaml.safe_dump({ID: {"reviewed": base, "date": "2026-09-01", "outcome": "x"}}))
+    kc.play({"sleep": 30}, SKIP)
+    assert fleet.run(["update"], f, NOW) == 1
+    assert kc.verbs() == ["create-headless", "send", "end", *SESSION]
+    assert _state(f) == {
+        ID: {
+            "reviewed": base,
+            "date": "2026-09-11",
+            "outcome": "failed: triage session timed out after 1 s",
+        },
+        "paper-clock": {
+            "reviewed": head,
+            "date": "2026-09-11",
+            "outcome": "skipped: Only CI housekeeping.",
+        },
+    }
+    assert capsys.readouterr().out.splitlines() == [
+        "newsfilter             pvginkel/NewsFilter  failed             "
+        "triage session timed out after 1 s",
+        "paper-clock            pvginkel/PaperClock  skipped            Only CI housekeeping.",
+        "home-automation-fleet  -                    not fleet-managed",
+    ]
+
+
+def test_a_clone_missing_an_agent_stops_the_producer_before_any_session(
+    tmp_path: Path, kc: FakeKc
+) -> None:
+    f, _, _ = _stale(tmp_path)
+    (f.kit / "agents/update-architecture.md").unlink()
+    assert _update(f) == fleet.Outcome(
+        PRODUCER,
+        fleet.FAILED,
+        "agent definition(s) missing from the clone: .claude/agents/update-architecture.md",
+        unresolved=True,
+    )
+    assert kc.calls() == []
+
+
+def test_a_current_producer_runs_no_session(tmp_path: Path, kc: FakeKc) -> None:
+    remote = Remote(tmp_path, REPO)
+    remote.commit({"src/app.py": "app\n"})
+    head = remote.commit({"docs/architecture/a.yaml": _envelope(ID)})
+    f = _fleet(tmp_path, {"id": ID, "repo": REPO})
+    assert _update(f) == fleet.Outcome(PRODUCER, fleet.CURRENT, reviewed=head)
+    assert kc.calls() == []
+    assert _state(f) == {ID: {"reviewed": head, "date": "2026-09-11", "outcome": "current"}}
+
+
+def test_update_takes_only_the_named_producers(
+    tmp_path: Path, kc: FakeKc, capsys: pytest.CaptureFixture[str]
+) -> None:
+    Remote(tmp_path, REPO).commit({"docs/architecture/a.yaml": _envelope(ID)})
+    Remote(tmp_path, "pvginkel/PaperClock").commit(
+        {"docs/architecture/a.yaml": _envelope("paper-clock")}
+    )
+    f = _fleet(
+        tmp_path, {"id": ID, "repo": REPO}, {"id": "paper-clock", "repo": "pvginkel/PaperClock"}
+    )
+    assert fleet.run(["update", "paper-clock"], f, NOW) == 0
+    assert capsys.readouterr().out == "paper-clock  pvginkel/PaperClock  current\n"
+    assert list(_state(f)) == ["paper-clock"]
+
+
+def test_update_rejects_an_unknown_producer_id(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    f = _fleet(tmp_path, {"id": ID, "repo": REPO})
+    with pytest.raises(SystemExit) as exit_:
+        fleet.run(["update", "newsfilter", "nope", "design-assistant"], f, NOW)
+    assert exit_.value.code == 2
+    assert "unknown producer id(s): design-assistant, nope" in capsys.readouterr().err
+
+
+class Killed(Exception):
+    pass
+
+
+def test_the_state_is_recorded_as_each_producer_finishes(
+    tmp_path: Path, kc: FakeKc, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    Remote(tmp_path, REPO).commit({"docs/architecture/a.yaml": _envelope(ID)})
+    f = _fleet(tmp_path, {"id": ID, "repo": REPO}, {"id": "paper-clock", "repo": "x/PaperClock"})
+    update_producer = fleet.update_producer
+
+    def killed_at_the_second(
+        fl: fleet.Fleet, producer: fleet.Producer, reviewed: str | None
+    ) -> fleet.Outcome:
+        if producer.id == "paper-clock":
+            raise Killed
+        return update_producer(fl, producer, reviewed)
+
+    monkeypatch.setattr(fleet, "update_producer", killed_at_the_second)
+    with pytest.raises(Killed):
+        fleet.run(["update"], f, NOW)
+    assert list(_state(f)) == [ID]
