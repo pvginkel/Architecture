@@ -1,18 +1,11 @@
 # The Architecture environment.
 #
 # Primary repo: Architecture (Architecture-as-Code pipeline + viewer + service).
-# The environment is wider than this repo: it also carries the reference repos
-# whose architecture.yaml files this pipeline federates.
 
 repos:
   # The specs repo: slices, change-request bundles, the decision index.
   - url: https://github.com/pvginkel/ArchitectureSpecs
     shared: true
-
-  # Producer repos this pipeline federates, read (and occasionally edited) here.
-  - url: https://github.com/pvginkel/HelmCharts
-  - url: https://github.com/pvginkel/Ansible
-  - url: https://github.com/pvginkel/DockerImages
 
 capabilities:
   github: rw
@@ -40,10 +33,6 @@ packages: []
 
 preamble:
   instructions: |
-    This environment holds the Architecture-as-Code pipeline (Architecture)
-    alongside the producer repos it federates: HelmCharts, Ansible and
-    DockerImages.
-
     Everything builds through `kc project` — the toolchain lives in the
     `modern-app` sidecar, so ad-hoc poetry/npm commands need `cexec modern-app`.
 
