@@ -1163,7 +1163,7 @@ def jenkins(monkeypatch: pytest.MonkeyPatch) -> FakeJenkins:
 
 
 FAKE_TRACKER = """\
-import json, os, sys
+import json, os, sys, time
 from pathlib import Path
 
 job, commit = sys.argv[1], sys.argv[sys.argv.index("--hash") + 1]
@@ -1172,7 +1172,9 @@ calls = [json.loads(line) for line in log.read_text().splitlines()] if log.exist
 turns = json.loads(Path(os.environ["FAKE_TRACKER_PLAN"]).read_text())[job]
 turn = turns[sum(call["job"] == job for call in calls)]
 with log.open("a") as f:
-    f.write(json.dumps({"job": job, "hash": commit}) + "\\n")
+    f.write(json.dumps({"job": job, "hash": commit, "argv": sys.argv[1:]}) + "\\n")
+if "hang" in turn:
+    time.sleep(turn["hang"])
 print(f"[12:00:00] Resolving {job} build for commit {commit}", file=sys.stderr)
 if "error" in turn:
     print(f"error: {turn['error']}", file=sys.stderr)
@@ -1216,6 +1218,12 @@ class FakeTracker:
             return []
         calls = [json.loads(line) for line in self.log.read_text().splitlines()]
         return [(call["job"], call["hash"]) for call in calls]
+
+    def argv(self) -> list[list[str]]:
+        """Every call's full argument vector, in call order."""
+        if not self.log.exists():
+            return []
+        return [json.loads(line)["argv"] for line in self.log.read_text().splitlines()]
 
 
 @pytest.fixture(autouse=True)
@@ -1416,6 +1424,44 @@ def test_a_tracker_that_cannot_finish_is_operational_and_unresolved(
     assert outcome.unresolved and outcome.reviewed == _pushed(tmp_path)
     assert outcome.detail.endswith(
         "; AaC/NewsFilter tracking failed: error: authentication failed (401)"
+    )
+
+
+def test_the_tracker_is_given_an_appear_timeout_that_covers_a_queued_build(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, tracker: FakeTracker
+) -> None:
+    f = _updated(tmp_path, kc, jenkins)
+    jenkins.job(JOB)
+    tracker.play({JOB: [_built(42)]})
+    _deliver(f)
+    assert tracker.argv() == [
+        [JOB, "--hash", _pushed(tmp_path), "--appear-timeout", str(fleet.APPEAR_TIMEOUT)]
+    ]
+
+
+def test_a_tracker_that_never_finishes_is_capped_and_reported_operational(
+    tmp_path: Path,
+    kc: FakeKc,
+    jenkins: FakeJenkins,
+    tracker: FakeTracker,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(fleet, "TRACK_TIMEOUT", 0.5)
+    f = _updated(tmp_path, kc, jenkins)
+    jenkins.job(JOB)
+    tracker.play({JOB: [{"hang": 30, "builds": []}]})
+    outcome = _deliver(f)
+    assert outcome.push == fleet.Push(
+        _pushed(tmp_path),
+        (
+            fleet.Tracked(
+                JOB, "SUCCESS", fleet.TIMED_OUT, (), "the tracker did not finish within 0.5s"
+            ),
+        ),
+    )
+    assert outcome.unresolved and outcome.reviewed == _pushed(tmp_path)
+    assert outcome.detail.endswith(
+        "; AaC/NewsFilter tracking failed: the tracker did not finish within 0.5s"
     )
 
 

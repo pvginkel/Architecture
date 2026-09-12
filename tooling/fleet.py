@@ -62,7 +62,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import yaml
 
@@ -100,6 +100,9 @@ SKIPPED_LINE = re.compile(r"Skipped: (.+)")
 JENKINS_URL = "https://jenkins.webathome.org"
 JENKINS_USER = "admin"
 TRACKER = "track_build.py"
+APPEAR_TIMEOUT = 1800
+TRACK_TIMEOUT = 5400
+TIMED_OUT = 124
 FIX_ROUNDS = 2
 GREEN = "SUCCESS"
 GITHUB_REPO = re.compile(r"https://github\.com/([A-Za-z0-9._-]+/[A-Za-z0-9._-]+?)(?:\.git)?/?")
@@ -931,11 +934,23 @@ def _tracker_reason(proc: subprocess.CompletedProcess[str]) -> str:
 
 
 def track(producer: Producer, job: str, before: str | None, commit: str) -> Tracked:
-    """Follow the build of `commit` in `job`, and the builds it starts, to their end."""
+    """Follow the build of `commit` in `job`, and the builds it starts, to their end.
+
+    The tracker's own 30 s default for how long it waits for the build to appear is
+    far too short under a loaded queue, and it polls for completion without a
+    deadline, so a build that never finishes would park the whole sequential run:
+    `APPEAR_TIMEOUT` covers the queue and `TRACK_TIMEOUT` bounds the call.
+    """
     print(f"{producer.id}: tracking {job}", file=sys.stderr, flush=True)
-    proc = subprocess.run(
-        [TRACKER, job, "--hash", commit], capture_output=True, encoding="utf-8", check=False
-    )
+    argv = [TRACKER, job, "--hash", commit, "--appear-timeout", str(APPEAR_TIMEOUT)]
+    try:
+        proc = subprocess.run(
+            argv, capture_output=True, encoding="utf-8", check=False, timeout=TRACK_TIMEOUT
+        )
+    except subprocess.TimeoutExpired as e:
+        sys.stderr.write(cast(str, e.stderr or ""))
+        reason = f"the tracker did not finish within {TRACK_TIMEOUT}s"
+        return Tracked(job, before, TIMED_OUT, (), reason)
     sys.stderr.write(proc.stderr)
     reason = "" if proc.returncode in (0, 1) else _tracker_reason(proc)
     return Tracked(job, before, proc.returncode, parse_track_summary(proc.stdout), reason)
