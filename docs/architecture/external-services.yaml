@@ -3,9 +3,9 @@
 # Canonical entries for external / third-party SaaS that in-house producers reach
 # over a hardcoded host (never boundBy-resolved), declared once here and
 # referenced by UUID rather than re-minted per consumer. Multi-consumer services
-# are lifted here on sight (OpenAI — design-assistant, electronics-inventory,
-# newsfilter; Telegram Bot API — jenkins-telegram-bot, telegram-mcp-server,
-# newsfilter; GitHub — KubeCoder controller/worker + git-sync). Foundational
+# are lifted here on sight (OpenAI — electronics-inventory, newsfilter;
+# Telegram Bot API — jenkins-telegram-bot, telegram-mcp-server, newsfilter;
+# GitHub — KubeCoder controller/worker + git-sync). Foundational
 # third-party SaaS are kept here even with a single current consumer so the
 # catalogue stays in one place (Anthropic, VS Code Dev Tunnels — KubeCoder).
 # The provider->consumer Serving edge itself is authored in each consuming

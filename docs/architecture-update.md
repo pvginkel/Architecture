@@ -42,6 +42,10 @@ A hand-authored producer is cross-checked before any session: the first YAML amo
 carries a top-level `producer:` must name the registry id. A wrong `repo:` therefore surfaces as a
 failed producer, not as an update session editing another repo's artifact.
 
+The producer-facing statement of the same contract is the manual's *Staying current* section and
+[`USAGE.md`](../USAGE.md)'s *Keeping an artifact current*; a change to `.architecturerc`'s shape
+moves all three.
+
 ## What a run does, per producer
 
 `update` walks the registry in order — or just the ids named on the command line — one producer at

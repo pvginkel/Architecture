@@ -175,6 +175,37 @@ producer: my-repo
 
 The schema URL is stable; only the v0.1 immutability rule applies.
 
+## Keeping an artifact current
+
+The architecture in a producer repo is kept current centrally, from the
+Architecture repo, rather than by the producer repo itself. On demand, a tool
+there clones each registered repo, judges whether the commits since its
+architecture sources last changed — or since that repo was last reviewed,
+whichever is later — change what the architecture must say, and where they do
+runs a headless session in the clone that edits the artifact and commits. Those
+commits are pushed to the repo's default branch, and the builds the push starts
+are followed to their end.
+
+Nothing is installed in a producer repo: the agents that do the editing are
+copied into the throwaway clone for the run, and the repo is not asked to invoke
+anything itself.
+
+An optional `.architecturerc` at the producer repo's root steers that run:
+
+```yaml
+generated: false                              # true for a generated producer
+sources: [":(glob)**/docs/architecture/**"]   # git pathspecs the architecture is built from
+instructions: |                               # handed verbatim to the sessions
+  Model the worker pool as one component.
+```
+
+All three keys are optional: `generated` and `sources` default to the values
+shown, `instructions` to nothing. Any other key is an error. `instructions` wins
+over the agents' own guidance on anything specific to the repo. A **generated**
+producer does need the file: `generated: true` is what keeps the session in the
+sources the artifact is generated from, instead of the artifact it would
+otherwise edit.
+
 ## Schema-change requests
 
 To add a capability id, a relation kind, a stereotype, or any other vocabulary

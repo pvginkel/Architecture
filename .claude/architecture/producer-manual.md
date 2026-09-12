@@ -495,7 +495,8 @@ Two sanctioned authoring modes — pick by how structured the repo is:
   the YAML is a build artifact you **don't commit** (regenerate it — see
   Jenkins integration). Ids are uuid5-from-natural-key (see ID grammar);
   the `update-architecture` agent's generated mode maintains the
-  annotation layer and never runs the generator.
+  annotation layer and never runs the generator. That mode comes from
+  this repo's `.architecturerc` (`generated: true` — see Registration).
 
 **As-deployed granularity.** A generated producer may model running
 containers — an operational, more-than-textbook deployment view. This is
@@ -701,6 +702,34 @@ The next Architecture pipeline run picks the new entry up and wires
 the upstream-success trigger automatically. From then on, every
 successful build of this repo dispatches the Architecture pipeline
 downstream.
+
+### Staying current
+
+After registration this repo's architecture is kept current centrally:
+the Architecture repo's update tool clones this repo on demand, judges
+the commits since the architecture was last reviewed, and where they
+change what it must say runs the `update-architecture` agent in that
+clone. The agent edits and commits; the tool pushes to the default
+branch and follows the builds the push starts. Nothing is installed
+here, and nothing in this repo invokes it.
+
+An optional `.architecturerc` at this repo's root steers that run:
+
+```yaml
+generated: false                # true for a generated producer
+sources:                        # git pathspecs the architecture is built from
+  - ":(glob)**/docs/architecture/**"
+instructions: |                 # handed verbatim to both sessions
+  Model the worker pool as one component.
+```
+
+All three keys are optional: `generated` and `sources` default to the
+values shown, `instructions` to nothing. Any other key fails this
+producer, as does a `sources` that matches nothing at the remote head.
+`instructions` is authoritative on anything specific to this repo. A
+**generated** producer does need the file: `generated: true` is what
+keeps the update session in the annotation layer instead of the
+generated YAML.
 
 ## Ownership conventions
 

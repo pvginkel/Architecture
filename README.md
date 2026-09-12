@@ -65,8 +65,12 @@ views/         # curated view definitions (YAML) inlined into the dataset by the
 docs/
   architecture/        the `architecture` self-producer's own artifacts (this repo's elements)
   backfill/            one-off onboarding harness that seeded producer artifacts
-  todo.md              open deferred decisions
-pipeline-producers.yaml  # registry: which repos are producers, and their Jenkins jobs
+  *.md                 project docs, indexed by docs/index.md
+.claude/       # the producer-side kit, staged into a clone of each producer repo per run
+  agents/              triage-architecture · update-architecture — the headless update sessions
+  architecture/        producer manual · starter skeleton · arch-validate.py (the only copy)
+  skills/              seed-architecture (a repo's first artifact) · architecture-update (runs a fleet update)
+pipeline-producers.yaml  # registry: which repos are producers, their GitHub repos and Jenkins jobs
 Dockerfile     # check-schemas → build-viewer → build-service → run-collector → node runtime
 Jenkinsfile    # homelab Jenkins + Kaniko pipeline (collect → build → deploy)
 USAGE.md       # producer-facing integration docs; rendered at the container root
@@ -232,7 +236,7 @@ Self-hosted homelab: Kubernetes, Jenkins, Kaniko, Ansible. The Helm chart lives 
 The system is built and live end-to-end: schema, validation service, federation
 pipeline, 30 onboarded producers, and the data-driven viewer. Remaining items are
 deferred design decisions (logo single-sourcing, producer-supplied logos in the
-image, a canonical service↔interface idiom) tracked in [`docs/todo.md`](docs/todo.md).
+image, a canonical service↔interface idiom) tracked on the project's Trello board.
 
 The operator-side workflow (producer manual, seeding skill, triage and update
 agents) lives under `.claude/` in this repo, and `tooling/fleet.py` is the central

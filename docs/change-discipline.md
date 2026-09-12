@@ -39,7 +39,7 @@ the dataset the viewer loads. Checking those is not defensive coding — it is t
 distinction is where the input comes from: validate what crosses into the system, trust what the
 system already established.
 
-Prefer obvious-now failure over silent-corruption-later. A pipeline that merges 33 producers into
+Prefer obvious-now failure over silent-corruption-later. A pipeline that merges 30 producers into
 one published model corrupts quietly and visibly-much-later if it is allowed to.
 
 Per-component readings of the same rule: for `tooling/` it is the metaschema and producer input

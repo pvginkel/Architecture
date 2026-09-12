@@ -2,8 +2,9 @@ $schema: https://json-schema.org/draft/2020-12/schema
 $id: https://architecture.webathome.org/pipeline-producers.schema.yaml
 title: pipeline-producers
 description: |
-  Registry of architecture producers consumed by both the Jenkinsfile (for
-  copyArtifacts calls) and tooling/collect.py (for "must be present" checks).
+  Registry of architecture producers, read by the Jenkinsfile (for
+  copyArtifacts calls), tooling/collect.py (for "must be present" checks) and
+  tooling/fleet.py (the central architecture update, which clones each `repo`).
   Schema-validated at collector startup; entries that don't match fail the run.
 
 type: object
@@ -28,7 +29,8 @@ properties:
           description: |
             GitHub repository holding the producer's architecture sources, as
             `owner/name` (e.g., `pvginkel/Ansible`) — the repository the
-            producer's AaC job checks out. Not a URL and no `.git` suffix.
+            producer's AaC job checks out, and the one the central architecture
+            update clones. Not a URL and no `.git` suffix.
             Omit only for a producer whose artifact no repository's sources
             maintain (home-automation-fleet, generated from the live fleet).
           pattern: ^[A-Za-z0-9][A-Za-z0-9-]*/(?!.*\.git$)[A-Za-z0-9._-]+$

@@ -1,9 +1,8 @@
 # Registry of architecture producers. The Jenkinsfile reads this to know
 # which copyArtifacts calls to issue; the collector reads it to know which
-# producer-artifacts/<id>/ directories must exist. Adding a producer is a
-# PR against this file. Schema: pipeline-producers.schema.yaml.
-#
-# v3 ships empty — producers come online in v4 (Ansible first).
+# producer-artifacts/<id>/ directories must exist; the central architecture
+# update (tooling/fleet.py) reads each `repo` to know what to clone. Adding a
+# producer is a PR against this file. Schema: pipeline-producers.schema.yaml.
 
 producers:
   - id: ansible
