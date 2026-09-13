@@ -39,6 +39,7 @@ REGISTRY = TOOLING.parent / "pipeline-producers.yaml"
 
 ID = "newsfilter"
 REPO = "pvginkel/NewsFilter"
+JOB = "AaC/NewsFilter"
 NOW = datetime(2026, 9, 11, 14, 30)
 
 KIT = {
@@ -343,6 +344,32 @@ def test_a_reviewed_commit_outside_origin_heads_history_fails(tmp_path: Path) ->
 
 def test_a_missing_state_file_means_nothing_is_reviewed(tmp_path: Path) -> None:
     assert fleet.load_reviewed(tmp_path) == {}
+
+
+def test_a_state_entry_without_reviewed_is_read_past_and_kept_until_a_run_advances_it(
+    tmp_path: Path,
+) -> None:
+    """A failed first run leaves an entry with no `reviewed`; every later read must skip it."""
+    producer = fleet.Producer(ID, REPO, JOB)
+    detail = "triage session timed out after 600 s"
+    failed = fleet.Outcome(producer, fleet.FAILED, detail, issues=(detail,))
+    fleet.record_state(tmp_path, failed, "2026-09-11")
+    state = tmp_path / fleet.STATE_FILE
+    assert yaml.safe_load(state.read_text()) == {
+        ID: {"date": "2026-09-11", "outcome": f"failed: {detail}"}
+    }
+    assert fleet.load_reviewed(tmp_path) == {}
+    other = fleet.Outcome(
+        fleet.Producer("paper-clock", "x/PaperClock", "AaC/PaperClock"),
+        fleet.CURRENT,
+        reviewed="a" * 40,
+    )
+    fleet.record_state(tmp_path, other, "2026-09-12")
+    fleet.record_state(tmp_path, failed, "2026-09-12")
+    assert fleet.load_reviewed(tmp_path) == {"paper-clock": "a" * 40}
+    skipped = fleet.Outcome(producer, fleet.SKIPPED, "Only CI.", reviewed="b" * 40)
+    fleet.record_state(tmp_path, skipped, "2026-09-13")
+    assert fleet.load_reviewed(tmp_path) == {ID: "b" * 40, "paper-clock": "a" * 40}
 
 
 def test_the_specs_repo_is_aiworkflowrcs_spec_repo(tmp_path: Path) -> None:
@@ -1101,7 +1128,6 @@ def test_the_state_is_recorded_as_each_producer_finishes(
 
 JENKINS = "https://jenkins.example.invalid"
 TOKEN = "test-token"
-JOB = "AaC/NewsFilter"
 APP = "NewsFilter/NewsFilter"
 SCM = f"https://github.com/{REPO}.git"
 
@@ -1635,6 +1661,99 @@ def test_an_update_session_whose_id_is_unknown_is_not_resumed(
     assert outcome.detail.endswith(
         "; fix round 1: the update session has no id to resume; "
         "AaC/NewsFilter still red after 1 fix round"
+    )
+
+
+STOPPED = "0 deltas applied, 1 commit, stopped: the validator is unreachable.\nSkipped: none\n"
+
+
+@pytest.mark.parametrize(
+    "turn, failure, committed",
+    [
+        ({"sleep": 30}, "update session timed out after 3 s", False),
+        (
+            {"commit": _edit("fix 1"), "response": "partial", "exit": 2},
+            "update session exited 2",
+            True,
+        ),
+        (
+            {"write": {"scratch.txt": "notes\n"}, **_fix(1)},
+            "the update session left uncommitted changes in {clone}",
+            True,
+        ),
+        (
+            {"commit": _edit("fix 1"), "response": STOPPED},
+            "the update session stopped: the validator is unreachable",
+            True,
+        ),
+        (
+            {"commit": _edit("fix 1"), "response": "Fixed it!\n"},
+            "the update session's final two lines are not its handoff",
+            True,
+        ),
+    ],
+    ids=["timeout", "non-zero", "dirty", "stopped", "no-handoff"],
+)
+def test_a_fix_round_that_does_not_finish_cleanly_stops_short_of_a_push(
+    tmp_path: Path,
+    kc: FakeKc,
+    jenkins: FakeJenkins,
+    tracker: FakeTracker,
+    monkeypatch: pytest.MonkeyPatch,
+    turn: dict[str, Any],
+    failure: str,
+    committed: bool,
+) -> None:
+    monkeypatch.setattr(fleet, "UPDATE", dataclasses.replace(fleet.UPDATE, timeout=3))
+    monkeypatch.setattr(fleet, "INTERRUPT_GRACE", 1)
+    f = _updated(tmp_path, kc, jenkins, turn)
+    jenkins.job(JOB)
+    tracker.play({JOB: [_built(42, result="FAILURE")]})
+    outcome = _deliver(f)
+    clone = tmp_path / "clones" / "NewsFilter"
+    pushed = _pushed(tmp_path)
+    failure = failure.format(clone=clone)
+    if committed:
+        failure += f"; its commits stay unpushed in {clone}"
+    assert len(tracker.calls()) == 1
+    unfinished = "sleep" in turn or turn.get("exit", 0) != 0
+    resumed = ["create-headless", "send", "end"] if unfinished else SESSION
+    assert kc.verbs() == SESSION * 2 + resumed
+    [fix] = outcome.fixes
+    assert (fix.jobs, fix.failure, fix.push) == ((JOB,), failure, None)
+    assert bool(fix.commits) is committed
+    assert (_git(clone, "rev-parse", "HEAD") != pushed) is committed
+    assert outcome.reviewed == pushed
+    assert outcome.detail.endswith(
+        f"; fix round 1: {failure}; AaC/NewsFilter still red after 1 fix round"
+    )
+
+
+def test_a_fix_round_whose_push_is_rejected_keeps_its_commits_in_the_clone(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, tracker: FakeTracker
+) -> None:
+    f = _updated(tmp_path, kc, jenkins, _fix(1))
+    jenkins.job(JOB)
+    tracker.play({JOB: [_built(42, result="FAILURE")]})
+    once = tmp_path / "pushed-once"
+    hook = tmp_path / "remotes" / f"{REPO}.git" / "hooks" / "pre-receive"
+    hook.write_text(
+        f"#!/bin/sh\nif [ -e {once} ]; then echo 'protected branch' >&2; exit 1; fi\n"
+        f"touch {once}\n"
+    )
+    hook.chmod(0o755)
+    outcome = _deliver(f)
+    clone = tmp_path / "clones" / "NewsFilter"
+    pushed = _pushed(tmp_path)
+    assert once.exists() and len(tracker.calls()) == 1
+    assert kc.verbs() == SESSION * 3
+    [fix] = outcome.fixes
+    assert fix.failure is not None and fix.failure.startswith("git push failed: ")
+    assert fix.failure.endswith(f"; its commits stay unpushed in {clone}")
+    assert (fix.push, fix.session_id, len(fix.commits)) == (None, "sid-fake-2", 1)
+    assert _git(clone, "rev-parse", "HEAD") != pushed == outcome.reviewed
+    assert outcome.detail.endswith(
+        f"; fix round 1: {fix.failure}; AaC/NewsFilter still red after 1 fix round"
     )
 
 
