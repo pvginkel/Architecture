@@ -527,6 +527,14 @@ version, render timestamp per element. There's no schema home today
 (`additionalProperties: false`); stash it in `stats` if you need it. A
 dedicated `provenance` slot is a v0.2 question.
 
+**Gaps.** Whatever the generator cannot map (an image with no
+annotation, say), it prints on a console line of its own,
+`gap: <what>`, and the build stays green. The central architecture
+update reads those lines from the producer's last successful AaC build
+and hands each gap to an update session whatever commits are new, so a
+gap older than the last review is not left behind. Print every gap
+this way: a gap reported in any other form is never seen.
+
 ## Capability enum (read-only reference)
 
 You may **reference** any of these but cannot mint new ones without

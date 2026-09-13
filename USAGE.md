@@ -186,6 +186,11 @@ runs a headless session in the clone that edits the artifact and commits. Those
 commits are pushed to the repo's default branch, and the builds the push starts
 are followed to their end.
 
+A generated producer is also judged on the gaps its generator reports: the
+`gap: <what>` lines of its last successful AaC build. A gap no run has judged
+yet goes to the editing session even when no commit is new, and that session is
+handed every gap the build reports, whatever the commits.
+
 Nothing is installed in a producer repo: the agents that do the editing are
 copied into the throwaway clone for the run, and the repo is not asked to invoke
 anything itself.

@@ -21,6 +21,13 @@ KIT_DIRS under `.claude/`) copied into the clone's `.claude/` and listed in its
 specs repo's `architecture-updates/state.yaml`, which `update` rewrites as each
 producer finishes.
 
+A generated producer is stale too when its AaC job's last successful build
+reports a gap, a `gap: ` line of what its generator could not map, that the
+state does not record as judged. Such a producer skips triage: the update
+session is handed every gap the build reports, in scope whatever the range.
+The gaps are recorded with the reviewed commit, so a gap no session can close
+costs one session rather than one a run.
+
 The sessions are headless `kc` sessions driven as the dev plugin's
 `run_kc_session` drives them: `create-headless` in the clone with the staged
 agent, `send` under a timeout this tool enforces, `status` for the session
@@ -125,6 +132,8 @@ SUMMARY_LOG = re.compile(r"\s*↳ full log: (.+)")
 SCHEDULED = re.compile(
     r"^(?:Scheduling project: |Starting building: )(.+?)(?: #\d+)?$", re.MULTILINE
 )
+# A generated producer's console line naming what its generator could not map.
+GAP = re.compile(r"^gap: (.+)$", re.MULTILINE)
 # Builds read back per job to find the one completed before a tracked build.
 SCAN_RANGE = 50
 
@@ -192,7 +201,20 @@ class Clone:
 
 
 @dataclass(frozen=True)
+class Review:
+    """A producer's last review in the state file: the commit its architecture was judged at, and
+    the gaps its AaC build reported then."""
+
+    reviewed: str | None = None
+    gaps: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class Scan:
+    """What a run judges in a producer's clone: the commits past `base` and, for a generated
+    producer, the gaps its last successful AaC build reports, `new_gaps` those its review does
+    not list."""
+
     producer: Producer
     clone: Clone
     config: RepoConfig
@@ -200,10 +222,12 @@ class Scan:
     base: str
     commits: int
     shortstat: str
+    gaps: tuple[str, ...]
+    new_gaps: tuple[str, ...]
 
     @property
     def current(self) -> bool:
-        return self.base == self.clone.head
+        return self.base == self.clone.head and not self.new_gaps
 
 
 @dataclass(frozen=True)
@@ -359,15 +383,17 @@ class FixRound:
 @dataclass(frozen=True)
 class Outcome:
     """One producer's result from `update`; `reviewed` is the commit its state advances to,
-    None to leave the recorded one. An update's commits are delivered as `push`, then `fixes`.
-    `issues` is what went wrong for this producer, one item per string: the report's Unresolved
-    section lists them and the exit code counts them. What the sessions deliberately skipped is
-    `judgment_calls(outcome)`, reported apart from them."""
+    None to leave the recorded one, and `gaps` what its AaC build reported, recorded with it. An
+    update's commits are delivered as `push`, then `fixes`. `issues` is what went wrong for this
+    producer, one item per string: the report's Unresolved section lists them and the exit code
+    counts them. What the sessions deliberately skipped is `judgment_calls(outcome)`, reported
+    apart from them."""
 
     producer: Producer
     status: str
     detail: str = ""
     reviewed: str | None = None
+    gaps: tuple[str, ...] = ()
     issues: tuple[str, ...] = ()
     triage: Verdict | None = None
     update: UpdateResult | None = None
@@ -400,36 +426,50 @@ def load_registry(path: Path) -> list[Producer]:
     ]
 
 
-def load_reviewed(spec_repo: Path) -> dict[str, str]:
-    """Each producer's `reviewed` commit; a missing state file means none is reviewed.
+def load_state(spec_repo: Path) -> dict[str, Review]:
+    """Each producer's last review; a missing state file means none is reviewed.
 
     The state file maps producer id to the producer's last review:
 
-        newsfilter:
+        helm-charts:
           reviewed: <commit its architecture was last reviewed at>
+          gaps:
+            - <a gap its AaC build reported then>
           date: <YYYY-MM-DD of the last run that judged it>
           outcome: <that run's outcome for it>
 
-    `reviewed` is absent until a run advances it.
+    `reviewed` is absent until a run advances it, and `gaps` while there are none.
     """
     path = spec_repo / STATE_FILE
     if not path.exists():
         return {}
     state = yaml.safe_load(path.read_text())
-    return {producer: entry["reviewed"] for producer, entry in state.items() if "reviewed" in entry}
+    return {
+        producer: Review(entry.get("reviewed"), tuple(entry.get("gaps", ())))
+        for producer, entry in state.items()
+    }
 
 
 def record_state(spec_repo: Path, outcome: Outcome, date: str) -> None:
-    """Rewrite one producer's state entry, keeping its `reviewed` unless the outcome advances it.
+    """Rewrite one producer's state entry, keeping its review unless the outcome advances it.
+
+    `gaps` advance with `reviewed`: an outcome that leaves the commit where it
+    was has not judged the gaps either.
 
     The file is replaced in one step, so a run killed mid-write leaves the
     previous state whole.
     """
     path = spec_repo / STATE_FILE
     state = yaml.safe_load(path.read_text()) if path.exists() else {}
-    reviewed = outcome.reviewed or state.get(outcome.producer.id, {}).get("reviewed")
-    entry = {"reviewed": reviewed} if reviewed else {}
-    state[outcome.producer.id] = {**entry, "date": date, "outcome": outcome.state_outcome}
+    review: dict[str, Any]
+    if outcome.reviewed:
+        review = {"reviewed": outcome.reviewed}
+        if outcome.gaps:
+            review["gaps"] = list(outcome.gaps)
+    else:
+        previous = state.get(outcome.producer.id, {})
+        review = {key: previous[key] for key in ("reviewed", "gaps") if key in previous}
+    state[outcome.producer.id] = {**review, "date": date, "outcome": outcome.state_outcome}
     path.parent.mkdir(parents=True, exist_ok=True)
     staging = path.with_name(f"{path.name}.tmp")
     staging.write_text(yaml.safe_dump({k: state[k] for k in sorted(state)}, sort_keys=False))
@@ -651,7 +691,9 @@ def pick_base(clone: Clone, watermark: str, reviewed: str | None) -> str:
     return reviewed if is_ancestor(clone.path, watermark, reviewed) else watermark
 
 
-def scan_producer(fleet: Fleet, producer: Producer, repo: str, reviewed: str | None) -> Scan:
+def scan_producer(
+    fleet: Fleet, producer: Producer, repo: str, review: Review, jenkins: Jenkins
+) -> Scan:
     clone = prepare(fleet, repo)
     config = read_repo_config(clone.path, clone.head)
     files = source_files(clone, config.sources)
@@ -660,33 +702,48 @@ def scan_producer(fleet: Fleet, producer: Producer, repo: str, reviewed: str | N
     if not config.generated:
         check_envelope(clone, files, producer.id)
     watermark = git(clone.path, "log", "-1", "--format=%H", clone.head, "--", *config.sources)
-    base = pick_base(clone, watermark.strip(), reviewed)
+    base = pick_base(clone, watermark.strip(), review.reviewed)
+    gaps = jenkins.gaps(producer.job) if config.generated else ()
+    new_gaps = tuple(gap for gap in gaps if gap not in review.gaps)
     if base == clone.head:
-        return Scan(producer, clone, config, watermark.strip(), base, 0, "")
+        return Scan(producer, clone, config, watermark.strip(), base, 0, "", gaps, new_gaps)
     commits = git(clone.path, "rev-list", "--count", "--no-merges", f"{base}..{clone.head}")
     shortstat = git(clone.path, "diff", "--shortstat", base, clone.head)
     return Scan(
-        producer, clone, config, watermark.strip(), base, int(commits), shortstat.strip()
+        producer,
+        clone,
+        config,
+        watermark.strip(),
+        base,
+        int(commits),
+        shortstat.strip(),
+        gaps,
+        new_gaps,
     )
 
 
-def scan(fleet: Fleet) -> Iterator[ScanRow]:
-    reviewed = load_reviewed(fleet.spec_repo)
+def scan(fleet: Fleet, jenkins: Jenkins) -> Iterator[ScanRow]:
+    state = load_state(fleet.spec_repo)
     for producer in load_registry(fleet.registry):
         if producer.repo is None:
             yield ScanRow(producer.id, "-", UNMANAGED, "")
             continue
+        review = state.get(producer.id, Review())
         try:
-            result = scan_producer(fleet, producer, producer.repo, reviewed.get(producer.id))
+            result = scan_producer(fleet, producer, producer.repo, review, jenkins)
         except ProducerError as e:
             yield ScanRow(producer.id, producer.repo, FAILED, str(e))
             continue
         if result.current:
             yield ScanRow(producer.id, producer.repo, CURRENT, "")
-        else:
-            noun = "commit" if result.commits == 1 else "commits"
-            detail = f"{result.commits} {noun} since {result.base[:12]}: {result.shortstat}"
-            yield ScanRow(producer.id, producer.repo, STALE, detail)
+            continue
+        detail = []
+        if result.base != result.clone.head:
+            commits = counted(result.commits, "commit")
+            detail.append(f"{commits} since {result.base[:12]}: {result.shortstat}")
+        if result.new_gaps:
+            detail.append(counted(len(result.new_gaps), "new gap"))
+        yield ScanRow(producer.id, producer.repo, STALE, "; ".join(detail))
 
 
 def _kc(cwd: Path, *args: str, timeout: int | None = None) -> subprocess.CompletedProcess[str]:
@@ -840,13 +897,27 @@ def triage_prompt(scan: Scan) -> str:
     )
 
 
-def update_prompt(scan: Scan) -> str:
+def _gaps(scan: Scan) -> str:
+    if not scan.gaps:
+        return ""
     return (
-        f"Bring producer `{scan.producer.id}`'s architecture sources up to date with the commits "
-        f"in {scan.base}..HEAD. Commit per the repo's cadence, do not push. End with your "
-        "two-line handoff.\n\n"
+        f"- Gaps the last successful `{scan.producer.job}` build reports, in scope whatever the "
+        "range:\n" + "".join(f"  - {gap}\n" for gap in scan.gaps)
+    )
+
+
+def update_prompt(scan: Scan) -> str:
+    work = (
+        f"with the commits in {scan.base}..HEAD"
+        if scan.base != scan.clone.head
+        else "with the gaps its AaC build reports; no commit is past the base"
+    )
+    return (
+        f"Bring producer `{scan.producer.id}`'s architecture sources up to date {work}. "
+        "Commit per the repo's cadence, do not push. End with your two-line handoff.\n\n"
         + _brief(scan)
         + f"- Default branch: {scan.clone.branch}\n"
+        + _gaps(scan)
         + _instructions(scan)
     )
 
@@ -890,15 +961,26 @@ def _finished(clone: Path, response: str) -> Handoff | str:
 
 
 def judge(scan: Scan) -> Outcome:
-    """Triage the stale producer and, unless triage says skip, run the update session."""
+    """Triage the stale producer and, unless triage says skip, run the update session; a gap no
+    run has judged skips triage. Every outcome but a failure carries the scan's gaps, recorded
+    with `reviewed`."""
     producer, clone = scan.producer, scan.clone
-    triage = _dispatch(scan, TRIAGE, triage_prompt(scan))
-    if triage.failure:
-        detail = f"triage session {triage.failure}"
-        return Outcome(producer, FAILED, detail, issues=(detail,))
-    verdict = parse_verdict(triage.response)
-    if not verdict.update:
-        return Outcome(producer, SKIPPED, verdict.reason, reviewed=clone.head, triage=verdict)
+    verdict: Verdict | None = None
+    if not scan.new_gaps:
+        triage = _dispatch(scan, TRIAGE, triage_prompt(scan))
+        if triage.failure:
+            detail = f"triage session {triage.failure}"
+            return Outcome(producer, FAILED, detail, issues=(detail,))
+        verdict = parse_verdict(triage.response)
+        if not verdict.update:
+            return Outcome(
+                producer,
+                SKIPPED,
+                verdict.reason,
+                reviewed=clone.head,
+                gaps=scan.gaps,
+                triage=verdict,
+            )
     session = _dispatch(scan, UPDATE, update_prompt(scan))
     if session.failure:
         detail = f"update session {session.failure}"
@@ -911,9 +993,17 @@ def judge(scan: Scan) -> Outcome:
             producer, FAILED, finished, issues=(finished,), triage=verdict, update=result
         )
     if result.commits:
-        return Outcome(producer, UPDATED, finished.text, triage=verdict, update=result)
+        return Outcome(
+            producer, UPDATED, finished.text, gaps=scan.gaps, triage=verdict, update=result
+        )
     return Outcome(
-        producer, NOTHING, finished.text, reviewed=clone.head, triage=verdict, update=result
+        producer,
+        NOTHING,
+        finished.text,
+        reviewed=clone.head,
+        gaps=scan.gaps,
+        triage=verdict,
+        update=result,
     )
 
 
@@ -995,6 +1085,17 @@ class Jenkins:
         tree = "lastCompletedBuild[number,result]"
         build = self._api(f"{job_path(job)}/", tree)["lastCompletedBuild"]
         return None if build is None else (int(build["number"]), str(build["result"]))
+
+    def gaps(self, job: str) -> tuple[str, ...]:
+        """What the job's last successful build reported its generator could not map: the `gap: `
+        lines of its console, each once, in order; none when the job has no successful build."""
+        tree = "lastSuccessfulBuild[number]"
+        build = self._api(f"{job_path(job)}/", tree)["lastSuccessfulBuild"]
+        if build is None:
+            return ()
+        console = self.get(f"{job_path(job)}/{int(build['number'])}/consoleText")
+        text = console.decode("utf-8", "replace")
+        return tuple(dict.fromkeys(match[1] for match in GAP.finditer(text)))
 
     def started_by(self, job: str, number: int) -> list[str]:
         """The jobs build `number` of `job` started, read off its console log."""
@@ -1269,14 +1370,14 @@ def deliver(outcome: Outcome, update: UpdateResult, repo: str, jenkins: Jenkins)
 
 
 def update_producer(
-    fleet: Fleet, producer: Producer, reviewed: str | None, jenkins: Jenkins
+    fleet: Fleet, producer: Producer, review: Review, jenkins: Jenkins
 ) -> Outcome:
     if producer.repo is None:
         return Outcome(producer, UNMANAGED)
     try:
-        result = scan_producer(fleet, producer, producer.repo, reviewed)
+        result = scan_producer(fleet, producer, producer.repo, review, jenkins)
         if result.current:
-            return Outcome(producer, CURRENT, reviewed=result.clone.head)
+            return Outcome(producer, CURRENT, reviewed=result.clone.head, gaps=result.gaps)
         check_agents(result.clone.path)
         outcome = judge(result)
     except ProducerError as e:
@@ -1290,9 +1391,9 @@ def update(
     fleet: Fleet, producers: list[Producer], now: datetime, jenkins: Jenkins
 ) -> Iterator[Outcome]:
     """Each producer in turn; its state is recorded before its outcome is yielded."""
-    reviewed = load_reviewed(fleet.spec_repo)
+    state = load_state(fleet.spec_repo)
     for producer in producers:
-        outcome = update_producer(fleet, producer, reviewed.get(producer.id), jenkins)
+        outcome = update_producer(fleet, producer, state.get(producer.id, Review()), jenkins)
         if producer.repo is not None:
             record_state(fleet.spec_repo, outcome, now.date().isoformat())
         yield outcome
@@ -1362,6 +1463,11 @@ def _producer_lines(outcome: Outcome) -> list[str]:
         body.append(
             f"- Triage: {'update' if outcome.triage.update else 'skip'} — {outcome.triage.reason}"
         )
+    elif outcome.update is not None:
+        body.append("- Triage: not run — the build reports a gap no run has judged")
+    if outcome.gaps:
+        body.append(f"- Gaps the last successful `{outcome.producer.job}` build reports:")
+        body += [f"  - {gap}" for gap in outcome.gaps]
     if outcome.status == FAILED:
         body.append(f"- Failed: {outcome.detail}")
     if outcome.update is not None:
@@ -1447,7 +1553,7 @@ def cmd_scan(fleet: Fleet) -> int:
     id_width = max(len(p.id) for p in producers)
     repo_width = max(len(p.repo or "-") for p in producers)
     failed = False
-    for row in scan(fleet):
+    for row in scan(fleet, Jenkins.from_env()):
         line = f"{row.producer:<{id_width}}  {row.repo:<{repo_width}}  {row.status:<17}"
         print(f"{line}  {row.detail}".rstrip(), flush=True)
         failed |= row.status == FAILED

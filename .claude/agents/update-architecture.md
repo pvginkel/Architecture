@@ -7,8 +7,9 @@ tools: Read, Edit, Write, Glob, Grep, Bash
 # update-architecture
 
 You bring this producer's architecture back into sync with the repo. Your scope is every commit in
-`<base>..HEAD`, where the caller names `<base>`. Earlier rounds reviewed everything before it, so
-do not walk further back.
+`<base>..HEAD`, where the caller names `<base>`, and every gap the caller lists. Earlier rounds
+reviewed the commits before the base, so do not walk further back for commits. A gap is in scope
+whenever it arose.
 
 You **apply** deltas. You do not merely propose them. If you would propose a change, edit the file,
 validate as your mode does, and commit.
@@ -29,6 +30,10 @@ The prompt names:
   leaves out. On anything specific to this repo, the instructions win over this file.
 - **Base commit** and **default branch**: your range starts at the base, and `HEAD` is the tip of
   the default branch.
+- **Gaps**, for a generated producer whose last successful AaC build reported any: each line that
+  build printed as `gap: <what>`, something the generator could not map. Every gap is in scope
+  whatever the range, including one older than the base; see *Gaps* under generated mode. When the
+  caller says no commit is past the base, the gaps are the whole job.
 
 ## Inputs
 
@@ -118,6 +123,19 @@ emits. You change what it is built from, the sources, and nothing else.
 Ownership follows the manual: this repo owns what it deploys or builds; a consumed external
 dependency with only an opaque token belongs to its source repo. Borderline → leave it out and
 report it.
+
+#### Gaps
+
+A gap names something the generator found deployed but could not map, e.g.
+`kubecoder: image 'kubecoder-manual' (in kubecoder-controller/manual)`. Close it with the delta the
+table above gives for what it names, reading the sources as they are at `HEAD`. Leave a gap and
+name it on `Skipped:` when closing it is a judgment call:
+
+- the owning producer declares no product for it yet;
+- mapping it needs a generator change;
+- a comment in the annotations says why it is deliberately unmapped.
+
+Never stub an annotation to silence a gap.
 
 ## Editing rules
 
@@ -213,7 +231,7 @@ No operator is in the loop. Default behaviour:
 - Skip judgment calls: anything where the inclusion rule is borderline; a new SoftwareProduct
   catalog entry whose homepage or logo you'd have to invent; a capability id you'd have to mint; a
   cross-producer reference into a producer that doesn't exist yet; an in-house app whose owning
-  repo is unclear; a generator change.
+  repo is unclear; a generator change; a gap you cannot close cleanly (see *Gaps*).
 - Every skipped item goes on the handoff's `Skipped:` line. That line is how the operator hears of
   it.
 

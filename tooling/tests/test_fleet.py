@@ -191,7 +191,8 @@ def _fleet(tmp_path: Path, *producers: dict[str, str]) -> fleet.Fleet:
 
 
 def _scan(f: fleet.Fleet, reviewed: str | None = None) -> fleet.Scan:
-    return fleet.scan_producer(f, fleet.Producer(ID, REPO, JOB), REPO, reviewed)
+    producer = fleet.Producer(ID, REPO, JOB)
+    return fleet.scan_producer(f, producer, REPO, fleet.Review(reviewed), fleet.Jenkins.from_env())
 
 
 def test_default_sources_find_nested_artifacts(tmp_path: Path) -> None:
@@ -220,7 +221,9 @@ def test_a_producer_whose_sources_changed_last_is_current(tmp_path: Path) -> Non
     assert (result.base, result.clone.head, result.commits) == (head, head, 0)
 
 
-def test_architecturerc_sets_mode_sources_and_instructions(tmp_path: Path) -> None:
+def test_architecturerc_sets_mode_sources_and_instructions(
+    tmp_path: Path, jenkins: FakeJenkins
+) -> None:
     rc = {
         "generated": True,
         "sources": ["*/architecture.yaml"],
@@ -231,11 +234,12 @@ def test_architecturerc_sets_mode_sources_and_instructions(tmp_path: Path) -> No
         {".architecturerc": yaml.safe_dump(rc), "app-a/architecture.yaml": "images: {}\n"}
     )
     remote.commit({"docs/architecture/notes.md": "not a source here\n"})
+    jenkins.job(JOB)
     result = _scan(_fleet(tmp_path))
     assert result.config == fleet.RepoConfig(
         generated=True, sources=("*/architecture.yaml",), instructions="Edit the annotations.\n"
     )
-    assert (result.watermark, result.commits) == (watermark, 1)
+    assert (result.watermark, result.commits, result.gaps) == (watermark, 1, ())
 
 
 @pytest.mark.parametrize(
@@ -333,7 +337,7 @@ def test_the_base_is_the_later_of_watermark_and_reviewed(
         state.parent.mkdir(parents=True)
         entry = {"reviewed": shas[reviewed_at], "date": "2026-09-11", "outcome": "skipped"}
         state.write_text(yaml.safe_dump({ID: entry}))
-    [row] = fleet.scan(f)
+    [row] = fleet.scan(f, fleet.Jenkins.from_env())
     if commits == 0:
         assert (row.status, row.detail) == (fleet.CURRENT, "")
     else:
@@ -352,7 +356,29 @@ def test_a_reviewed_commit_outside_origin_heads_history_fails(tmp_path: Path) ->
 
 
 def test_a_missing_state_file_means_nothing_is_reviewed(tmp_path: Path) -> None:
-    assert fleet.load_reviewed(tmp_path) == {}
+    assert fleet.load_state(tmp_path) == {}
+
+
+def test_the_gaps_advance_with_reviewed_and_are_kept_while_it_is_not(tmp_path: Path) -> None:
+    """A delivery that fails keeps the gaps its session was handed but advances nothing."""
+    producer = fleet.Producer(ID, REPO, JOB)
+    gaps = ("app: image 'queue' (in app/queue)",)
+    fleet.record_state(
+        tmp_path, fleet.Outcome(producer, fleet.CURRENT, reviewed="a" * 40, gaps=gaps), "2026-09-11"
+    )
+    assert yaml.safe_load((tmp_path / fleet.STATE_FILE).read_text()) == {
+        ID: {"reviewed": "a" * 40, "gaps": list(gaps), "date": "2026-09-11", "outcome": "current"}
+    }
+    detail = "git push failed: protected branch"
+    failed = fleet.Outcome(producer, fleet.FAILED, detail, gaps=("another",), issues=(detail,))
+    fleet.record_state(tmp_path, failed, "2026-09-12")
+    assert fleet.load_state(tmp_path) == {ID: fleet.Review("a" * 40, gaps)}
+    fleet.record_state(
+        tmp_path, fleet.Outcome(producer, fleet.CURRENT, reviewed="b" * 40), "2026-09-13"
+    )
+    assert yaml.safe_load((tmp_path / fleet.STATE_FILE).read_text()) == {
+        ID: {"reviewed": "b" * 40, "date": "2026-09-13", "outcome": "current"}
+    }
 
 
 def test_a_state_entry_without_reviewed_is_read_past_and_kept_until_a_run_advances_it(
@@ -367,7 +393,7 @@ def test_a_state_entry_without_reviewed_is_read_past_and_kept_until_a_run_advanc
     assert yaml.safe_load(state.read_text()) == {
         ID: {"date": "2026-09-11", "outcome": f"failed: {detail}"}
     }
-    assert fleet.load_reviewed(tmp_path) == {}
+    assert fleet.load_state(tmp_path) == {ID: fleet.Review()}
     other = fleet.Outcome(
         fleet.Producer("paper-clock", "x/PaperClock", "AaC/PaperClock"),
         fleet.CURRENT,
@@ -375,10 +401,16 @@ def test_a_state_entry_without_reviewed_is_read_past_and_kept_until_a_run_advanc
     )
     fleet.record_state(tmp_path, other, "2026-09-12")
     fleet.record_state(tmp_path, failed, "2026-09-12")
-    assert fleet.load_reviewed(tmp_path) == {"paper-clock": "a" * 40}
+    assert fleet.load_state(tmp_path) == {
+        ID: fleet.Review(),
+        "paper-clock": fleet.Review("a" * 40),
+    }
     skipped = fleet.Outcome(producer, fleet.SKIPPED, "Only CI.", reviewed="b" * 40)
     fleet.record_state(tmp_path, skipped, "2026-09-13")
-    assert fleet.load_reviewed(tmp_path) == {ID: "b" * 40, "paper-clock": "a" * 40}
+    assert fleet.load_state(tmp_path) == {
+        ID: fleet.Review("b" * 40),
+        "paper-clock": fleet.Review("a" * 40),
+    }
 
 
 def test_the_specs_repo_is_aiworkflowrcs_spec_repo(tmp_path: Path) -> None:
@@ -899,7 +931,7 @@ def test_a_skip_verdict_advances_reviewed_without_an_update_session(
 
 
 def test_the_triage_prompt_carries_the_brief_and_the_instructions_verbatim(
-    tmp_path: Path, kc: FakeKc
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins
 ) -> None:
     instructions = "Annotations live in values.yaml.\n  Keep their indent.\n"
     rc = {"generated": True, "sources": ["*/architecture.yaml"], "instructions": instructions}
@@ -908,6 +940,7 @@ def test_the_triage_prompt_carries_the_brief_and_the_instructions_verbatim(
         {".architecturerc": yaml.safe_dump(rc), "app/architecture.yaml": "images: {}\n"}
     )
     remote.commit({"src/app.py": "app\n"})
+    jenkins.job(JOB)
     kc.play(SKIP)
     _update(_fleet(tmp_path, NEWSFILTER))
     assert kc.prompts() == [
@@ -1074,13 +1107,15 @@ def test_a_clone_missing_an_agent_stops_the_producer_before_any_session(
     assert kc.calls() == []
 
 
-def test_a_current_producer_runs_no_session(tmp_path: Path, kc: FakeKc) -> None:
+def test_a_current_producer_runs_no_session_and_a_hand_authored_one_reads_no_gaps(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins
+) -> None:
     remote = Remote(tmp_path, REPO)
     remote.commit({"src/app.py": "app\n"})
     head = remote.commit({"docs/architecture/a.yaml": _envelope(ID)})
     f = _fleet(tmp_path, NEWSFILTER)
     assert _update(f) == fleet.Outcome(PRODUCER, fleet.CURRENT, reviewed=head)
-    assert kc.calls() == []
+    assert kc.calls() == [] and jenkins.paths == []
     assert _state(f) == {ID: {"reviewed": head, "date": "2026-09-11", "outcome": "current"}}
 
 
@@ -1126,11 +1161,11 @@ def test_the_state_is_recorded_as_each_producer_finishes(
     update_producer = fleet.update_producer
 
     def killed_at_the_second(
-        fl: fleet.Fleet, producer: fleet.Producer, reviewed: str | None, jenkins: fleet.Jenkins
+        fl: fleet.Fleet, producer: fleet.Producer, review: fleet.Review, jenkins: fleet.Jenkins
     ) -> fleet.Outcome:
         if producer.id == "paper-clock":
             raise Killed
-        return update_producer(fl, producer, reviewed, jenkins)
+        return update_producer(fl, producer, review, jenkins)
 
     monkeypatch.setattr(fleet, "update_producer", killed_at_the_second)
     with pytest.raises(Killed):
@@ -1177,20 +1212,23 @@ JOB_CONFIG = """\
 """
 
 
+FakeJob = tuple[str, list[tuple[int, str | None]], str, bool, tuple[str, ...], tuple[str, ...]]
+
+
 class FakeJenkins:
     """Canned Jenkins REST responses under a placeholder host, in place of urlopen.
 
     A job carries its SCM URL, its builds newest first as `(number, result)`
     (`last` alone stands for one build #1 with that result, None for a job
-    never built), the trigger in its config, whether it is disabled, and the
-    jobs its last completed build's console says it started; the folders are
-    the job names' prefixes, at any depth. `no_history` refuses the build
-    listing the tool reads a failed build's prior result from.
+    never built), the trigger in its config, whether it is disabled, the jobs
+    its last completed build's console says it started, and the lines its last
+    successful build's console adds; the folders are the job names' prefixes,
+    at any depth. `no_history` refuses the build listing the tool reads a
+    failed build's prior result from.
     """
 
     def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        self.jobs: dict[str, tuple[str, list[tuple[int, str | None]], str, bool, tuple[str, ...]]]
-        self.jobs = {}
+        self.jobs: dict[str, FakeJob] = {}
         self.paths: list[str] = []
         self.down = False
         self.no_history = False
@@ -1208,14 +1246,19 @@ class FakeJenkins:
         disabled: bool = False,
         builds: list[tuple[int, str | None]] | None = None,
         starts: tuple[str, ...] = (),
+        console: tuple[str, ...] = (),
     ) -> None:
         if builds is None:
             builds = [(1, last)] if last is not None else []
-        self.jobs[name] = (scm, builds, trigger, disabled, starts)
+        self.jobs[name] = (scm, builds, trigger, disabled, starts, console)
 
     def _completed(self, name: str) -> tuple[int, str] | None:
         completed = [(n, r) for n, r in self.jobs[name][1] if r is not None]
         return max(completed) if completed else None
+
+    def _successful(self, name: str) -> int | None:
+        successful = [n for n, r in self.jobs[name][1] if r == "SUCCESS"]
+        return max(successful) if successful else None
 
     def _listing(self, folder: str) -> list[dict[str, Any]]:
         prefix = f"{folder}/" if folder else ""
@@ -1241,19 +1284,26 @@ class FakeJenkins:
         name = "/".join(parts[1:-2:2] if console else parts[1:-1:2])
         body: Any
         if path.endswith("/config.xml") and name in self.jobs:
-            scm, _, trigger, disabled, _ = self.jobs[name]
+            scm, _, trigger, disabled, _, _ = self.jobs[name]
             config = JOB_CONFIG.format(url=scm, trigger=trigger, disabled=str(disabled).lower())
             return io.BytesIO(config.encode())
         if console and name in self.jobs:
+            number = int(parts[-2])
             last = self._completed(name)
-            started = self.jobs[name][4] if last and last[0] == int(parts[-2]) else ()
+            started = self.jobs[name][4] if last and last[0] == number else ()
             lines = ["Started by an SCM change", *(f"Starting building: {j}" for j in started)]
+            if number == self._successful(name):
+                lines += self.jobs[name][5]
             return io.BytesIO("\n".join(lines).encode())
         if path.endswith("/api/json") and name in self.jobs:
             if tree == "lastCompletedBuild[number,result]":
                 last = self._completed(name)
                 built = None if last is None else {"number": last[0], "result": last[1]}
                 body = {"lastCompletedBuild": built}
+            elif tree == "lastSuccessfulBuild[number]":
+                successful = self._successful(name)
+                built = None if successful is None else {"number": successful}
+                body = {"lastSuccessfulBuild": built}
             else:
                 assert tree == f"builds[number,result]{{0,{fleet.SCAN_RANGE}}}"
                 if self.no_history:
@@ -1981,6 +2031,150 @@ def test_a_rejected_push_is_unresolved_and_tracks_nothing(
     assert outcome.detail.startswith("git push failed: ")
 
 
+# ---- fleet.py update: the gaps a generated producer's build reports ----
+
+GENERATED = {"generated": True, "sources": ["*/architecture.yaml"]}
+GAP_A = "app: image 'queue' (in app/queue)"
+GAP_B = "app: image 'cron' (in app/cron)"
+
+
+def _generated(tmp_path: Path, repo: str, *later: dict[str, str]) -> tuple[str, str]:
+    """A generated producer's repo whose sources changed first, then a commit per `later`: its
+    watermark and its head."""
+    remote = Remote(tmp_path, repo)
+    watermark = remote.commit(
+        {".architecturerc": yaml.safe_dump(GENERATED), "app/architecture.yaml": "images: {}\n"}
+    )
+    head = watermark
+    for files in later:
+        head = remote.commit(files)
+    return watermark, head
+
+
+def test_the_gaps_are_the_gap_lines_of_the_last_successful_build_each_once(
+    jenkins: FakeJenkins,
+) -> None:
+    console = (
+        f"gap: {GAP_A}",
+        "  gap: indented, not a gap line",
+        f"gap: {GAP_B}",
+        f"gap: {GAP_A}",
+        "no gap: here",
+    )
+    jenkins.job(JOB, builds=[(43, "FAILURE"), (42, "SUCCESS")], console=console)
+    jenkins.job(APP, builds=[(1, "FAILURE")], console=(f"gap: {GAP_A}",))
+    client = fleet.Jenkins.from_env()
+    assert client.gaps(JOB) == (GAP_A, GAP_B)
+    assert "/job/AaC/job/NewsFilter/42/consoleText" in jenkins.paths
+    assert client.gaps(APP) == ()
+
+
+def test_a_gap_no_run_has_judged_runs_the_update_session_without_triage(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, tracker: FakeTracker
+) -> None:
+    _, head = _generated(tmp_path, REPO)
+    f = _fleet(tmp_path, NEWSFILTER)
+    jenkins.job(JOB, console=(f"gap: {GAP_A}", f"gap: {GAP_B}"))
+    handoff = "1 delta applied, 1 commit, validation by the AaC build.\nSkipped: none\n"
+    mapped = {"app/architecture.yaml": "images:\n  queue: app:queue\n"}
+    kc.play({"commit": mapped, "response": handoff})
+    tracker.play({JOB: [_built(2)]})
+    assert fleet.run(["update"], f, NOW) == 0
+    assert [create[3] for create in kc.creates()] == ["update-architecture"]
+    assert kc.prompts() == [
+        "Bring producer `newsfilter`'s architecture sources up to date with the gaps its AaC "
+        "build reports; no commit is past the base. Commit per the repo's cadence, do not push. "
+        "End with your two-line handoff.\n\n"
+        "- Producer id: newsfilter\n"
+        "- Mode: generated\n"
+        "- Sources: `*/architecture.yaml`\n"
+        f"- Base commit: {head}\n"
+        "- Default branch: main\n"
+        f"- Gaps the last successful `{JOB}` build reports, in scope whatever the range:\n"
+        f"  - {GAP_A}\n"
+        f"  - {GAP_B}\n"
+        "\nThe repo's instructions, verbatim from its `.architecturerc`:\n\n(none)\n"
+    ]
+    pushed = _pushed(tmp_path)
+    assert pushed != head
+    assert _state(f) == {
+        ID: {
+            "reviewed": pushed,
+            "gaps": [GAP_A, GAP_B],
+            "date": "2026-09-11",
+            "outcome": "updated: 1 delta applied, 1 commit, validation by the AaC build. "
+            "Skipped: none",
+        }
+    }
+    report = (f.spec_repo / fleet.report_file(NOW)).read_text()
+    assert (
+        "## newsfilter — updated\n\n"
+        f"- Repo: `{REPO}`\n"
+        "- Triage: not run — the build reports a gap no run has judged\n"
+        f"- Gaps the last successful `{JOB}` build reports:\n"
+        f"  - {GAP_A}\n"
+        f"  - {GAP_B}\n"
+        "- Handoff: 1 delta applied, 1 commit, validation by the AaC build.\n"
+    ) in report
+
+
+@pytest.mark.parametrize("committed", [False, True], ids=["no-commit", "a-commit"])
+def test_gaps_a_run_has_judged_need_no_session_of_their_own_and_are_kept_while_reported(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, committed: bool
+) -> None:
+    later = [{"src/app.py": "app\n"}] if committed else []
+    watermark, head = _generated(tmp_path, REPO, *later)
+    f = _fleet(tmp_path, NEWSFILTER)
+    state = f.spec_repo / fleet.STATE_FILE
+    state.parent.mkdir(parents=True)
+    entry = {"reviewed": watermark, "gaps": [GAP_A, GAP_B], "date": "2026-09-01", "outcome": "x"}
+    state.write_text(yaml.safe_dump({ID: entry}))
+    jenkins.job(JOB, console=(f"gap: {GAP_A}",))
+    kc.play(SKIP)
+    outcome = _update(f)
+    assert (outcome.status, outcome.reviewed, outcome.gaps) == (
+        fleet.SKIPPED if committed else fleet.CURRENT,
+        head,
+        (GAP_A,),
+    )
+    assert [create[3] for create in kc.creates()] == (["triage-architecture"] if committed else [])
+    assert _state(f)[ID]["gaps"] == [GAP_A]
+
+
+def test_scan_counts_a_generated_producers_new_gaps(
+    tmp_path: Path, jenkins: FakeJenkins, capsys: pytest.CaptureFixture[str]
+) -> None:
+    base, _ = _generated(tmp_path, REPO, {"src/app.py": "app\n"})
+    _generated(tmp_path, "pvginkel/PaperClock")
+    f = _fleet(tmp_path, NEWSFILTER, PAPER_CLOCK)
+    jenkins.job(JOB, console=(f"gap: {GAP_A}",))
+    jenkins.job(
+        "AaC/PaperClock",
+        "https://github.com/pvginkel/PaperClock.git",
+        console=(f"gap: {GAP_A}", f"gap: {GAP_B}"),
+    )
+    assert fleet.run(["scan"], f, NOW) == 0
+    assert capsys.readouterr().out.splitlines() == [
+        "newsfilter   pvginkel/NewsFilter  stale              "
+        f"1 commit since {base[:12]}: 1 file changed, 1 insertion(+); 1 new gap",
+        "paper-clock  pvginkel/PaperClock  stale              2 new gaps",
+    ]
+
+
+def test_a_generated_producer_whose_gaps_jenkins_cannot_serve_fails(
+    tmp_path: Path, kc: FakeKc
+) -> None:
+    _generated(tmp_path, REPO)
+    reason = (
+        f"Jenkins: HTTP 404 for {JENKINS}/job/AaC/job/NewsFilter/api/json"
+        "?tree=lastSuccessfulBuild%5Bnumber%5D"
+    )
+    assert _update(_fleet(tmp_path, NEWSFILTER)) == fleet.Outcome(
+        PRODUCER, fleet.FAILED, reason, issues=(reason,)
+    )
+    assert kc.calls() == []
+
+
 # ---- fleet.py update: the report, the state and the specs repo ----
 
 GOLDEN = Path(__file__).resolve().parent / "golden"
@@ -2039,6 +2233,29 @@ def _canned() -> list[fleet.Outcome]:
             reviewed="e" * 40,
             triage=fleet.Verdict(True, "The backend gained a lease exporter."),
             update=fleet.UpdateResult(clone, "sid-2", nothing, ()),
+        ),
+        fleet.Outcome(
+            fleet.Producer("helm-charts", "pvginkel/HelmCharts", "AaC/HelmCharts"),
+            fleet.NOTHING,
+            "0 deltas applied, 0 commits, validation by the AaC build. "
+            "Skipped: kube-coder-tunnel-reclaim (a generator change)",
+            reviewed="9" * 40,
+            gaps=(
+                "kubecoder: image 'kube-coder-tunnel-reclaim' "
+                "(in kubecoder-controller/tunnel-reclaim)",
+            ),
+            update=fleet.UpdateResult(
+                clone,
+                "sid-3",
+                fleet.Handoff(
+                    0,
+                    0,
+                    "validation by the AaC build",
+                    None,
+                    "kube-coder-tunnel-reclaim (a generator change)",
+                ),
+                (),
+            ),
         ),
         fleet.Outcome(
             fleet.Producer("somfy-remote", "pvginkel/SomfyRemote", "AaC/SomfyRemote"),

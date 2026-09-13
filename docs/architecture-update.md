@@ -45,6 +45,11 @@ deliberately not part of it.
   The file is read from the remote head without a checkout; an unknown key, a wrong type or
   unparseable YAML fails that producer instead of being worked around.
 
+- **`gap:` lines, for a generated producer.** Its generator prints each thing it could not map on a
+  console line of its own, `gap: <what>`, in the `jenkinsJob` build, and the build stays green.
+  HelmCharts' `gen_architecture.py` does this, for an image no annotation maps, for instance. The
+  tool reads the lines from that job's last successful build.
+
 A hand-authored producer is cross-checked before any session: the first YAML among its sources that
 carries a top-level `producer:` must name the registry id. A wrong `repo:` therefore surfaces as a
 failed producer, not as an update session editing another repo's artifact.
@@ -67,16 +72,20 @@ a time:
    anything is copied — a producer's own agent is never overwritten. (This repo is a producer too,
    and what gets staged is this checkout's `.claude/` on disk, not what it has pushed: an
    uncommitted or unpushed kit edit refuses producer `architecture` until it is pushed.)
-3. **Pick the base.** The watermark is the last commit that touched the sources at `origin/HEAD`;
-   the base is the later of that and the producer's `reviewed` commit in the state file. A base
-   equal to the head means *current* — nothing to judge, no session.
+3. **Pick the base, read the gaps.** The watermark is the last commit that touched the sources at
+   `origin/HEAD`; the base is the later of that and the producer's `reviewed` commit in the state
+   file. A generated producer's gaps are the `gap:` lines of its `jenkinsJob`'s last successful
+   build. A gap is new when the state file does not list it. A base equal to the head with no new
+   gap means *current*: nothing to judge, no session.
 4. **Triage.** A `triage-architecture` session answers `VERDICT: update` or `VERDICT: skip` with one
    line of reason. `skip` ends the producer and advances `reviewed` to the head; an answer that
-   cannot be parsed counts as `update`, so a confused judge costs a session rather than a miss.
+   cannot be parsed counts as `update`, so a confused judge costs a session rather than a miss. A
+   new gap skips triage: there is something to model whatever the commits say.
 5. **Update.** An `update-architecture` session applies the deltas and commits per the repo's
-   cadence — it never pushes. It ends with a two-line handoff: what it applied, and what it
-   deliberately skipped. A session that leaves the clone dirty, ends without its handoff, or reports
-   that it stopped, fails that producer.
+   cadence — it never pushes. It is handed every gap the build reports, each in scope whatever the
+   range, so a gap that predates the base is not left behind. It ends with a two-line handoff: what
+   it applied, and what it deliberately skipped. A session that leaves the clone dirty, ends
+   without its handoff, or reports that it stopped, fails that producer.
 6. **Push and track**, below.
 
 Both sessions are headless `kc` sessions driven as the dev plugin's `run_kc_session` drives them:
@@ -133,11 +142,15 @@ without it the tool cannot read Jenkins, and the run stops at that check before 
 Both live in the specs repo (`spec_repo` in `.aiworkflowrc`), under `architecture-updates/`:
 
 - **`state.yaml`** — one entry per fleet-managed producer: `reviewed` (the commit its architecture
-  was last judged at), `date` and `outcome`. It is rewritten as each producer finishes, so a run
-  that is killed keeps every producer it got through and the next run resumes from there.
-- **`<YYYY-MM-DD>T<HHMM>.md`** — one per run: a section per producer (repo, triage verdict, handoff,
-  the commits and the commit they were pushed as, each tracked job's result with its builds and the
-  log of a failed one, a block per fix round), then **Judgment calls**, closing with **Unresolved**.
+  was last judged at), `gaps` (the gaps its build reported then, absent while there are none),
+  `date` and `outcome`. The gaps advance only with `reviewed`. That is what keeps a gap no session
+  can close from costing a session every run: it is looked at again only when triage sends new
+  commits to an update. The file is rewritten as each producer finishes, so a run that is killed
+  keeps every producer it got through and the next run resumes from there.
+- **`<YYYY-MM-DD>T<HHMM>.md`** — one per run: a section per producer (repo, triage verdict, the gaps
+  its build reports, handoff, the commits and the commit they were pushed as, each tracked job's
+  result with its builds and the log of a failed one, a block per fix round), then **Judgment
+  calls**, closing with **Unresolved**.
 
 Unresolved is the run's product and what decides the exit code — 0 when it is empty, 1 otherwise:
 a failed producer, a red build, a session that did not finish. Exit 1 means something actually
@@ -169,7 +182,8 @@ python3 tooling/fleet.py update newsfilter    # one producer, end to end
 
 `scan` starts no session and writes nothing outside the clones, so it is both the way to see what a
 full run would do and the way a misconfiguration — a wrong `repo:`, a malformed `.architecturerc`, a
-clone with local work — surfaces without spending a session on it.
+clone with local work — surfaces without spending a session on it. It reads a generated producer's
+gaps from Jenkins, so it needs `$JENKINS_TOKEN` just as `update` does.
 
 ## Changing the kit
 

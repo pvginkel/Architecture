@@ -3,6 +3,13 @@ dhcp-app:
   date: '2026-09-11'
   outcome: 'nothing to apply: 0 deltas applied, 0 commits, validation by the AaC build.
     Skipped: none'
+helm-charts:
+  reviewed: '9999999999999999999999999999999999999999'
+  gaps:
+  - 'kubecoder: image ''kube-coder-tunnel-reclaim'' (in kubecoder-controller/tunnel-reclaim)'
+  date: '2026-09-11'
+  outcome: 'nothing to apply: 0 deltas applied, 0 commits, validation by the AaC build.
+    Skipped: kube-coder-tunnel-reclaim (a generator change)'
 kitchen-display:
   reviewed: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   date: '2026-09-11'

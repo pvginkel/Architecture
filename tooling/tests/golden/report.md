@@ -1,6 +1,6 @@
 # Architecture update — 2026-09-11 14:30
 
-6 producers: 1 updated, 1 failed, 1 nothing to apply, 1 skipped, 1 current, 1 not fleet-managed. 2 unresolved items, 1 judgment call.
+7 producers: 1 updated, 1 failed, 2 nothing to apply, 1 skipped, 1 current, 1 not fleet-managed. 2 unresolved items, 2 judgment calls.
 
 ## newsfilter — updated
 
@@ -36,6 +36,15 @@
 - Handoff: 0 deltas applied, 0 commits, validation by the AaC build.
 - Skipped: none
 
+## helm-charts — nothing to apply
+
+- Repo: `pvginkel/HelmCharts`
+- Triage: not run — the build reports a gap no run has judged
+- Gaps the last successful `AaC/HelmCharts` build reports:
+  - kubecoder: image 'kube-coder-tunnel-reclaim' (in kubecoder-controller/tunnel-reclaim)
+- Handoff: 0 deltas applied, 0 commits, validation by the AaC build.
+- Skipped: kube-coder-tunnel-reclaim (a generator change)
+
 ## somfy-remote — skipped
 
 - Repo: `pvginkel/SomfyRemote`
@@ -50,6 +59,7 @@
 ## Judgment calls
 
 - `newsfilter`: the queue's retry topology
+- `helm-charts`: kube-coder-tunnel-reclaim (a generator change)
 
 ## Unresolved
 

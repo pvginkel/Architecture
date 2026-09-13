@@ -1,6 +1,6 @@
 ---
 name: architecture-update
-description: Run the central architecture update over the producer fleet from the Architecture repo. `tooling/fleet.py update` takes every registered producer that has commits past its watermark through a triage session and, unless triage says skip, an update session in a staged clone, pushes what the session commits, tracks the builds the push starts, and writes one report to the specs repo. Use when the operator asks to update the fleet's architecture, refresh the producers' architecture artifacts, run the central/fleet architecture update, or do the same for one named producer.
+description: Run the central architecture update over the producer fleet from the Architecture repo. `tooling/fleet.py update` takes every registered producer that has commits past its watermark through a triage session and, unless triage says skip, an update session in a staged clone (a generated producer whose AaC build reports a gap no run has judged goes straight to the update session), pushes what the session commits, tracks the builds the push starts, and writes one report to the specs repo. Use when the operator asks to update the fleet's architecture, refresh the producers' architecture artifacts, run the central/fleet architecture update, or do the same for one named producer.
 ---
 
 # architecture-update
