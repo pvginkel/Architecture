@@ -403,6 +403,25 @@ def test_a_tracked_file_conflicting_with_the_kit_is_refused_every_run_untouched(
         assert {name: (clone / name).read_text() for name in files} == files
 
 
+def test_a_gitignore_re_including_kit_paths_is_refused_every_run_with_the_copies_removed(
+    tmp_path: Path,
+) -> None:
+    Remote(tmp_path, REPO).commit(
+        {"docs/architecture/a.yaml": _envelope(ID), ".gitignore": "!/.claude/agents/*.md\n"}
+    )
+    f = _fleet(tmp_path)
+    clone = f.clones / "NewsFilter"
+    for _ in range(2):
+        with pytest.raises(fleet.ProducerError) as failure:
+            fleet.prepare(f, REPO)
+        assert str(failure.value) == (
+            "the repo's .gitignore re-includes kit paths, which .git/info/exclude cannot hide: "
+            "?? .claude/agents/triage-architecture.md; ?? .claude/agents/update-architecture.md"
+        )
+        assert not (clone / ".claude").exists()
+        assert _git(clone, "status", "--porcelain") == ""
+
+
 def test_a_repo_tracking_the_kit_identically_is_staged(tmp_path: Path) -> None:
     files = {f".claude/{rel}": text for rel, text in KIT.items()}
     Remote(tmp_path, "pvginkel/Architecture").commit(

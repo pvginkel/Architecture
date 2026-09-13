@@ -462,7 +462,8 @@ def kit_files(kit: Path) -> list[Path]:
 
 
 def _dirty(clone: Path) -> list[str]:
-    return git(clone, "status", "--porcelain").splitlines()
+    """The clone's status lines, every untracked file on its own so a refusal names them."""
+    return git(clone, "status", "--porcelain", "--untracked-files=all").splitlines()
 
 
 def _git_mode(path: Path) -> str:
@@ -486,11 +487,37 @@ def kit_conflicts(kit: Path, clone: Path, files: list[Path]) -> list[str]:
     ]
 
 
-def stage_kit(kit: Path, clone: Path) -> None:
-    """Copy the kit into `clone/.claude/` and exclude it; refuse a conflicting tracked file.
+def _exclude(clone: Path, paths: list[str]) -> None:
+    """List `paths` in the clone's `.git/info/exclude`, each once."""
+    exclude = clone / ".git" / "info" / "exclude"
+    text = exclude.read_text() if exclude.exists() else ""
+    listed = set(text.splitlines())
+    missing = [path for path in paths if path not in listed]
+    if missing:
+        if text and not text.endswith("\n"):
+            text += "\n"
+        exclude.parent.mkdir(parents=True, exist_ok=True)
+        exclude.write_text(text + "".join(f"{path}\n" for path in missing))
 
-    The refusal comes before any copy, so a refused clone keeps its tracked
-    files and every later run reports the same conflict.
+
+def _unstage(clone: Path, staged: list[Path]) -> None:
+    """Remove the kit copies, and the directories nothing but them filled."""
+    for path in staged:
+        path.unlink()
+    for path in sorted({p.parent for p in staged}, key=lambda p: len(p.parts), reverse=True):
+        while path != clone and path.exists() and not any(path.iterdir()):
+            path.rmdir()
+            path = path.parent
+
+
+def stage_kit(kit: Path, clone: Path) -> None:
+    """Copy the kit into `clone/.claude/` and exclude it; refuse a clone that cannot hide it.
+
+    A tracked file at a kit path with other content is refused before any
+    copy. A `.gitignore` that re-includes a kit path outranks
+    `.git/info/exclude`, so the copies would show as untracked: they are
+    removed again before that refusal. Either way a refused clone is left as
+    it was, and every later run reports the same reason.
     """
     files = kit_files(kit)
     conflicts = kit_conflicts(kit, clone, files)
@@ -498,25 +525,17 @@ def stage_kit(kit: Path, clone: Path) -> None:
         raise ProducerError(
             "the repo tracks kit files that differ from the kit: " + ", ".join(conflicts)
         )
-    staged = []
-    for rel in files:
-        dest = clone / ".claude" / rel
+    staged = [clone / ".claude" / rel for rel in files]
+    for rel, dest in zip(files, staged, strict=True):
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(kit / rel, dest)
-        staged.append(f"/.claude/{rel.as_posix()}")
-    exclude = clone / ".git" / "info" / "exclude"
-    text = exclude.read_text() if exclude.exists() else ""
-    listed = set(text.splitlines())
-    missing = [path for path in staged if path not in listed]
-    if missing:
-        if text and not text.endswith("\n"):
-            text += "\n"
-        exclude.parent.mkdir(parents=True, exist_ok=True)
-        exclude.write_text(text + "".join(f"{path}\n" for path in missing))
+    _exclude(clone, [f"/.claude/{rel.as_posix()}" for rel in files])
     dirty = _dirty(clone)
     if dirty:
+        _unstage(clone, staged)
         raise ProducerError(
-            "staging the kit left the clone dirty: " + "; ".join(line.strip() for line in dirty)
+            "the repo's .gitignore re-includes kit paths, which .git/info/exclude cannot hide: "
+            + "; ".join(line.strip() for line in dirty)
         )
 
 
