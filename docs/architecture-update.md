@@ -102,12 +102,25 @@ the pushed commit, and the tracker would wait for a build that never appears. Wh
 is the registry's own, the producer is unresolved: its commits are pushed all the same, but its
 artifact build went unverified and the report says so.
 
-Each job's last completed result is read *before* the push, which is what makes attribution
-possible. Green before and red after is the update's doing: the tool resumes the same update session
-(`--resume`) with the job, the failed build, its console log and the rule "assume your commits broke
-it; fix, commit, do not push", then pushes and tracks again — two rounds at most. Red before the
-push is recorded as pre-existing and left alone; a tracker that could not finish is operational.
-Both are unresolved, neither is fixed here.
+Attribution is per build, by that build's own job. The tracker follows a chain — the tracked job's
+build and every build it started downstream, `IaC/HelmCharts` for most of the fleet — and a failed
+build anywhere in it is compared with its own job's last completed result before this producer's
+first build of that job in the run, read from Jenkins' build history and remembered across the fix
+rounds. Green before and red now is the update's doing: the tool resumes the same update session
+(`--resume`) with those builds, their jobs and console logs, and the rule "assume your commits broke
+it; fix, commit, do not push", then pushes and tracks again — two rounds at most. Red before is
+recorded as pre-existing and left alone, a job with no completed build before is reported as such,
+and a tracker that could not finish — or a prior result the tool could not read — is operational.
+All are unresolved, none is fixed here.
+
+Before the first producer, the run reads the last completed result of every job it would track for
+the producers it is about to run, and of every job those builds started (off their console logs, as
+the tracker discovers downstream). Any red stops the run with exit 3 and the list — before anything
+is cloned or pushed — so the operator can run a fixup session first; `--force` runs anyway, and the
+report's header records what was red. The accepted trade-off is that one red build anywhere the
+fleet's pushes reach blocks the run until it is fixed or forced. Without the check a downstream job
+that was already red would exit the tracker 1 for a producer whose own job was green, and the update
+would be blamed, fix-rounded twice and its session's guesses pushed to the producer repo.
 
 Jenkins is `$JENKINS_URL` as `$JENKINS_USER`, defaulting in the tool's own constants exactly as
 `track_build.py` does. `$JENKINS_TOKEN` is the only credential and must be in the environment —
@@ -137,10 +150,11 @@ being shared with the dev pipeline, and pushes.
 
 The operator's entry point is the `architecture-update` skill: it starts `fleet.py update` in the
 background under `timeout --signal=INT --kill-after=2m 12h` and, when the run exits, sends one
-`notification` message with the report path and the unresolved and judgment-call counts — or, on
-exit 4, that the report is on disk but could not be committed and pushed to the specs repo, or, on
-exit 124, that the run was killed rather than finished. SIGINT rather than SIGTERM is what lets the
-tool end the headless session it is driving.
+`notification` message by exit code: 0 or 1, the report path and the unresolved and judgment-call
+counts; 3, that the run did not start because Jenkins was red before it (or could not be read) and
+which jobs; 4, that the report is on disk but could not be committed and pushed to the specs repo;
+124, that the run was killed rather than finished. SIGINT rather than SIGTERM is what lets the tool
+end the headless session it is driving.
 
 The tool itself is plain `python3`: the standard library and PyYAML only, so it runs in the dev
 container without the Poetry environment. (Its tests run under Poetry, with the rest of tooling's

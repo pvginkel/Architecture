@@ -735,7 +735,7 @@ def _state(f: fleet.Fleet) -> dict[str, Any]:
 
 
 def _update(f: fleet.Fleet) -> fleet.Outcome:
-    [outcome] = fleet.update(f, [PRODUCER], NOW)
+    [outcome] = fleet.update(f, [PRODUCER], NOW, fleet.Jenkins.from_env())
     return outcome
 
 
@@ -957,9 +957,7 @@ def test_an_update_verdict_runs_the_update_session_with_its_brief(
     assert outcome.update.session_id == "sid-fake-1"
     assert outcome.update.commits == (_git(clone, "log", "-1", "--format=%h %s"),)
     assert outcome.update.commits[0].endswith(" architecture: docs/architecture/a.yaml")
-    assert outcome.push == fleet.Push(
-        pushed, (fleet.Tracked(JOB, "SUCCESS", 0, (fleet.Build(JOB, 42, "SUCCESS"),), ""),)
-    )
+    assert outcome.push == fleet.Push(pushed, (_tracked(JOB, 0, fleet.Build(JOB, 42, "SUCCESS")),))
     assert _state(f) == {
         ID: {"reviewed": pushed, "date": "2026-09-11", "outcome": f"updated: {outcome.detail}"}
     }
@@ -1182,17 +1180,20 @@ JOB_CONFIG = """\
 class FakeJenkins:
     """Canned Jenkins REST responses under a placeholder host, in place of urlopen.
 
-    A job carries its SCM URL, its last completed result (None: never built),
-    the trigger in its config and whether it is disabled; the folders are the
-    job names' prefixes, at any depth.
+    A job carries its SCM URL, its builds newest first as `(number, result)`
+    (`last` alone stands for one build #1 with that result, None for a job
+    never built), the trigger in its config, whether it is disabled, and the
+    jobs its last completed build's console says it started; the folders are
+    the job names' prefixes, at any depth. `no_history` refuses the build
+    listing the tool reads a failed build's prior result from.
     """
 
     def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        self.jobs: dict[str, tuple[str, str | None, str, bool]] = {}
+        self.jobs: dict[str, tuple[str, list[tuple[int, str | None]], str, bool, tuple[str, ...]]]
+        self.jobs = {}
         self.paths: list[str] = []
-        self.remote: Path | None = None
-        self.remote_at_read: list[str] = []
         self.down = False
+        self.no_history = False
         monkeypatch.setenv("JENKINS_URL", JENKINS)
         monkeypatch.setenv("JENKINS_TOKEN", TOKEN)
         monkeypatch.delenv("JENKINS_USER", raising=False)
@@ -1205,8 +1206,16 @@ class FakeJenkins:
         last: str | None = "SUCCESS",
         trigger: str = PUSH_TRIGGER,
         disabled: bool = False,
+        builds: list[tuple[int, str | None]] | None = None,
+        starts: tuple[str, ...] = (),
     ) -> None:
-        self.jobs[name] = (scm, last, trigger, disabled)
+        if builds is None:
+            builds = [(1, last)] if last is not None else []
+        self.jobs[name] = (scm, builds, trigger, disabled, starts)
+
+    def _completed(self, name: str) -> tuple[int, str] | None:
+        completed = [(n, r) for n, r in self.jobs[name][1] if r is not None]
+        return max(completed) if completed else None
 
     def _listing(self, folder: str) -> list[dict[str, Any]]:
         prefix = f"{folder}/" if folder else ""
@@ -1228,18 +1237,31 @@ class FakeJenkins:
         tree = urllib.parse.parse_qs(url.query).get("tree", [""])[0]
         self.paths.append(path)
         parts = path.strip("/").split("/")
-        name = "/".join(parts[1:-1:2])
+        console = path.endswith("/consoleText")
+        name = "/".join(parts[1:-2:2] if console else parts[1:-1:2])
         body: Any
         if path.endswith("/config.xml") and name in self.jobs:
-            scm, _, trigger, disabled = self.jobs[name]
+            scm, _, trigger, disabled, _ = self.jobs[name]
             config = JOB_CONFIG.format(url=scm, trigger=trigger, disabled=str(disabled).lower())
             return io.BytesIO(config.encode())
+        if console and name in self.jobs:
+            last = self._completed(name)
+            started = self.jobs[name][4] if last and last[0] == int(parts[-2]) else ()
+            lines = ["Started by an SCM change", *(f"Starting building: {j}" for j in started)]
+            return io.BytesIO("\n".join(lines).encode())
         if path.endswith("/api/json") and name in self.jobs:
-            assert tree == "lastCompletedBuild[result]"
-            if self.remote is not None:
-                self.remote_at_read.append(_git(self.remote, "rev-parse", "main"))
-            last = self.jobs[name][1]
-            body = {"lastCompletedBuild": None if last is None else {"result": last}}
+            if tree == "lastCompletedBuild[number,result]":
+                last = self._completed(name)
+                built = None if last is None else {"number": last[0], "result": last[1]}
+                body = {"lastCompletedBuild": built}
+            else:
+                assert tree == f"builds[number,result]{{0,{fleet.SCAN_RANGE}}}"
+                if self.no_history:
+                    raise urllib.error.HTTPError(
+                        request.full_url, 500, "Server Error", email.message.Message(), None
+                    )
+                builds = [{"number": n, "result": r} for n, r in self.jobs[name][1]]
+                body = {"builds": builds}
         elif path.endswith("/api/json") and (not name or self._listing(name)):
             assert tree == "jobs[fullName,jobs[fullName]]"
             body = {"jobs": self._listing(name)}
@@ -1347,14 +1369,17 @@ def _updated(
     remote = Remote(tmp_path, REPO)
     remote.commit({"docs/architecture/a.yaml": _envelope(ID)})
     remote.commit({"src/app.py": "app\n"})
-    jenkins.remote = remote.bare
     kc.play(UPDATE, {"commit": _edit("the queue"), "response": HANDOFF}, *fixes)
     return _fleet(tmp_path, NEWSFILTER)
 
 
 def _deliver(f: fleet.Fleet) -> fleet.Outcome:
-    [outcome] = fleet.update(f, fleet.load_registry(f.registry), NOW)
+    [outcome] = fleet.update(f, fleet.load_registry(f.registry), NOW, fleet.Jenkins.from_env())
     return outcome
+
+
+def _tracked(job: str, code: int, *builds: fleet.Build) -> fleet.Tracked:
+    return fleet.Tracked(job, code, builds, "")
 
 
 def _pushed(tmp_path: Path) -> str:
@@ -1384,6 +1409,33 @@ def test_the_job_index_reads_every_folder_level_once_per_run(jenkins: FakeJenkin
     assert fleet.tracked_jobs(JOB, REPO, client) == [JOB, "Apps/Web/NewsFilter"]
     assert fleet.tracked_jobs("AaC/PaperClock", "pvginkel/PaperClock", client) == ["Standalone"]
     assert fleet.tracked_jobs("AaC/Home Assistant Fleet", "pvginkel/Architecture", client) == []
+
+
+def test_a_builds_prior_result_is_its_jobs_newest_completed_build_below_it(
+    jenkins: FakeJenkins,
+) -> None:
+    jenkins.job(JOB, builds=[(43, None), (42, "FAILURE"), (41, "SUCCESS"), (40, "ABORTED")])
+    client = fleet.Jenkins.from_env()
+    assert client.result_before(JOB, 44) == "FAILURE"
+    assert client.result_before(JOB, 43) == "FAILURE"
+    assert client.result_before(JOB, 42) == "SUCCESS"
+    assert client.result_before(JOB, 40) is None
+    assert client.last_completed(JOB) == (42, "FAILURE")
+    jenkins.job(APP, last=None)
+    assert client.last_completed(APP) is None
+
+
+def test_a_builds_downstream_is_read_off_its_console_as_the_tracker_reads_it() -> None:
+    console = (
+        "Started by an SCM change\n"
+        "[Pipeline] build\n"
+        "Scheduling project: IaC » HelmCharts\n"
+        "Starting building: IaC » HelmCharts #6386\n"
+        "Starting building: MyDownloads/MyDownloads #12\n"
+        "Finished: SUCCESS\n"
+    )
+    assert fleet.scheduled_jobs(console) == ["IaC/HelmCharts", "MyDownloads/MyDownloads"]
+    assert fleet.scheduled_jobs("Finished: FAILURE\n") == []
 
 
 def test_the_jenkins_address_defaults_in_the_tool_and_the_environment_overrides_it(
@@ -1435,15 +1487,15 @@ def test_an_update_is_pushed_and_each_tracked_job_followed_once_at_the_pushed_co
     outcome = _deliver(f)
     pushed = _pushed(tmp_path)
     assert pushed == _git(tmp_path / "clones" / "NewsFilter", "rev-parse", "HEAD") != before
-    assert jenkins.remote_at_read == [before, before]
     assert tracker.calls() == [(JOB, pushed), (APP, pushed)]
     assert outcome.push == fleet.Push(
         pushed,
         (
-            fleet.Tracked(JOB, "SUCCESS", 0, (fleet.Build(JOB, 42, "SUCCESS"),), ""),
-            fleet.Tracked(APP, "SUCCESS", 0, (fleet.Build(APP, 7, "SUCCESS"),), ""),
+            _tracked(JOB, 0, fleet.Build(JOB, 42, "SUCCESS")),
+            _tracked(APP, 0, fleet.Build(APP, 7, "SUCCESS")),
         ),
     )
+    assert not any(path.endswith("/api/json") and "builds[" in path for path in jenkins.paths)
     assert (outcome.status, outcome.reviewed, bool(outcome.issues), outcome.fixes) == (
         fleet.UPDATED,
         pushed,
@@ -1531,8 +1583,7 @@ def test_a_tracker_that_cannot_finish_is_operational_and_unresolved(
     outcome = _deliver(f)
     assert kc.verbs() == SESSION * 2
     assert outcome.push == fleet.Push(
-        _pushed(tmp_path),
-        (fleet.Tracked(JOB, "SUCCESS", 3, (), "error: authentication failed (401)"),),
+        _pushed(tmp_path), (fleet.Tracked(JOB, 3, (), "error: authentication failed (401)"),)
     )
     assert bool(outcome.issues) and outcome.reviewed == _pushed(tmp_path)
     assert outcome.detail.endswith(
@@ -1566,11 +1617,7 @@ def test_a_tracker_that_never_finishes_is_capped_and_reported_operational(
     outcome = _deliver(f)
     assert outcome.push == fleet.Push(
         _pushed(tmp_path),
-        (
-            fleet.Tracked(
-                JOB, "SUCCESS", fleet.TIMED_OUT, (), "the tracker did not finish within 0.5s"
-            ),
-        ),
+        (fleet.Tracked(JOB, fleet.TIMED_OUT, (), "the tracker did not finish within 0.5s"),),
     )
     assert bool(outcome.issues) and outcome.reviewed == _pushed(tmp_path)
     assert outcome.detail.endswith(
@@ -1583,6 +1630,8 @@ def test_a_build_the_change_broke_resumes_the_update_session_and_is_pushed_again
 ) -> None:
     f = _updated(tmp_path, kc, jenkins, _fix(1))
     jenkins.job(JOB)
+    architecture = "https://github.com/pvginkel/Architecture.git"
+    jenkins.job("AaC/Architecture", architecture, builds=[(89, "SUCCESS")])
     downstream = {"builds": [[JOB, 42, "SUCCESS"], ["AaC/Architecture", 90, "FAILURE"]]}
     tracker.play({JOB: [downstream, _built(43)]})
     outcome = _deliver(f)
@@ -1598,7 +1647,7 @@ def test_a_build_the_change_broke_resumes_the_update_session_and_is_pushed_again
     log = tracker.logs / "AaC_Architecture_90.log"
     assert kc.prompts()[2] == (
         f"Since the push of your commits (up to {first}), Jenkins is red where it was green "
-        "before them: `AaC/NewsFilter`. Assume your commits broke it; fix, commit, do not push. "
+        "before them: `AaC/Architecture`. Assume your commits broke it; fix, commit, do not push. "
         "End with your two-line handoff, covering this round.\n\n"
         "The failed builds, each with its console log:\n\n"
         f"- Job: AaC/Architecture\n  Build: #90 (FAILURE)\n  Log: {log}\n"
@@ -1606,35 +1655,26 @@ def test_a_build_the_change_broke_resumes_the_update_session_and_is_pushed_again
     assert outcome.push == fleet.Push(
         first,
         (
-            fleet.Tracked(
+            _tracked(
                 JOB,
-                "SUCCESS",
                 1,
-                (
-                    fleet.Build(JOB, 42, "SUCCESS"),
-                    fleet.Build("AaC/Architecture", 90, "FAILURE", str(log)),
-                ),
-                "",
+                fleet.Build(JOB, 42, "SUCCESS"),
+                fleet.Build("AaC/Architecture", 90, "FAILURE", str(log), "SUCCESS"),
             ),
         ),
     )
     assert outcome.fixes == (
         fleet.FixRound(
-            (JOB,),
+            ("AaC/Architecture",),
             HANDED_OFF,
             (_git(clone, "log", "-1", "--format=%h %s"),),
             None,
-            fleet.Push(
-                second, (fleet.Tracked(JOB, "SUCCESS", 0, (fleet.Build(JOB, 43, "SUCCESS"),), ""),)
-            ),
+            fleet.Push(second, (_tracked(JOB, 0, fleet.Build(JOB, 43, "SUCCESS")),)),
             "sid-fake-2",
         ),
     )
-    assert (outcome.status, outcome.reviewed, bool(outcome.issues)) == (
-        fleet.UPDATED,
-        second,
-        False,
-    )
+    assert (outcome.status, outcome.reviewed, outcome.issues) == (fleet.UPDATED, second, ())
+    assert jenkins.paths.count("/job/AaC/job/Architecture/api/json") == 1
 
 
 def test_the_fix_loop_stops_after_two_rounds_and_a_job_still_red_is_unresolved(
@@ -1793,6 +1833,108 @@ def test_a_fix_round_whose_push_is_rejected_keeps_its_commits_in_the_clone(
     )
 
 
+def test_a_downstream_build_red_before_the_run_is_pre_existing_and_the_run_needs_force(
+    tmp_path: Path,
+    kc: FakeKc,
+    jenkins: FakeJenkins,
+    tracker: FakeTracker,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    helm = "IaC/HelmCharts"
+    f = _updated(tmp_path, kc, jenkins)
+    jenkins.job(JOB, starts=(helm,))
+    jenkins.job(APP, last="UNSTABLE")
+    jenkins.job(helm, "https://github.com/pvginkel/HelmCharts.git", builds=[(99, "FAILURE")])
+    chain = {"builds": [[JOB, 42, "SUCCESS"], [helm, 100, "FAILURE"]]}
+    tracker.play({JOB: [chain], APP: [_built(7, APP)]})
+    head = _pushed(tmp_path)
+    assert fleet.run(["update"], f, NOW) == fleet.RED_EXIT == 3
+    assert capsys.readouterr().err == (
+        "Jenkins is red before the run:\n"
+        "  NewsFilter/NewsFilter UNSTABLE\n"
+        "  IaC/HelmCharts FAILURE, started by AaC/NewsFilter\n"
+        "nothing was done: fix them, or run again with --force\n"
+    )
+    assert kc.calls() == [] and tracker.calls() == [] and _pushed(tmp_path) == head
+    assert not (f.spec_repo / fleet.STATE_FILE).exists()
+    assert "/job/AaC/job/NewsFilter/1/consoleText" in jenkins.paths
+    jenkins.job(APP)
+    assert fleet.run(["update", "--force"], f, NOW) == 1
+    err = capsys.readouterr().err
+    assert err.startswith(
+        "Jenkins is red before the run:\n"
+        "  IaC/HelmCharts FAILURE, started by AaC/NewsFilter\n"
+        "running anyway (--force): a build red after a push counts against its producer only "
+        "where its own job was green before\n"
+    )
+    assert kc.verbs() == SESSION * 2
+    assert tracker.calls() == [(JOB, _pushed(tmp_path)), (APP, _pushed(tmp_path))]
+    report = (f.spec_repo / fleet.report_file(NOW)).read_text()
+    assert (
+        "\nRed before the run, run with `--force`: `IaC/HelmCharts` FAILURE "
+        "(started by `AaC/NewsFilter`).\n\n## newsfilter — updated\n"
+    ) in report
+    assert (
+        f"- Builds:\n  - `{JOB}`: red — `{JOB}` #42 SUCCESS, `IaC/HelmCharts` #100 FAILURE "
+        f"(FAILURE before the push; log: {tracker.logs / 'IaC_HelmCharts_100.log'})\n"
+        f"  - `{APP}`: green — `{APP}` #7 SUCCESS\n"
+    ) in report
+    assert report.endswith(
+        "## Unresolved\n\n"
+        "- `newsfilter`: IaC/HelmCharts via AaC/NewsFilter red, pre-existing: FAILURE before "
+        "the push\n"
+    )
+
+
+@pytest.mark.parametrize("cause", ["no token", "unreachable"])
+def test_jenkins_the_tool_cannot_read_before_the_run_stops_it(
+    tmp_path: Path,
+    kc: FakeKc,
+    jenkins: FakeJenkins,
+    tracker: FakeTracker,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    cause: str,
+) -> None:
+    f = _updated(tmp_path, kc, jenkins)
+    jenkins.job(JOB)
+    head = _pushed(tmp_path)
+    if cause == "no token":
+        monkeypatch.delenv("JENKINS_TOKEN")
+    else:
+        jenkins.down = True
+    assert fleet.run(["update"], f, NOW) == fleet.RED_EXIT
+    listing = f"{JENKINS}/api/json?tree=jobs%5BfullName%2Cjobs%5BfullName%5D%5D"
+    reason = (
+        "Jenkins: JENKINS_TOKEN is not set"
+        if cause == "no token"
+        else f"Jenkins: cannot reach {listing}: <urlopen error no route to host>"
+    )
+    assert capsys.readouterr().err == f"Jenkins could not be read before the run: {reason}\n"
+    assert kc.calls() == [] and tracker.calls() == [] and _pushed(tmp_path) == head
+
+
+def test_a_failed_builds_prior_result_the_tool_cannot_read_is_operational(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, tracker: FakeTracker
+) -> None:
+    f = _updated(tmp_path, kc, jenkins)
+    jenkins.job(JOB)
+    jenkins.no_history = True
+    tracker.play({JOB: [_built(42, result="FAILURE")]})
+    outcome = _deliver(f)
+    log = str(tracker.logs / "AaC_NewsFilter_42.log")
+    history = (
+        f"{JENKINS}/job/AaC/job/NewsFilter/api/json?tree=builds%5Bnumber%2Cresult%5D%7B0%2C50%7D"
+    )
+    reason = f"the results before the push could not be read: Jenkins: HTTP 500 for {history}"
+    assert kc.verbs() == SESSION * 2
+    assert outcome.push == fleet.Push(
+        _pushed(tmp_path),
+        (fleet.Tracked(JOB, 1, (fleet.Build(JOB, 42, "FAILURE", log),), reason),),
+    )
+    assert outcome.issues == (f"AaC/NewsFilter tracking failed: {reason}",)
+
+
 @pytest.mark.parametrize("cause", ["no token", "unreachable"])
 def test_jenkins_the_tool_cannot_read_leaves_the_commits_unpushed(
     tmp_path: Path,
@@ -1850,28 +1992,23 @@ def _canned() -> list[fleet.Outcome]:
     clone = fleet.Clone(Path("/tmp/architecture-update/repos/NewsFilter"), "main", "b" * 40)
     handoff = fleet.Handoff(2, 1, "validator clean", None, "the queue's retry topology")
     session = fleet.UpdateResult(clone, "sid-1", handoff, ("1111111 architecture: the queue",))
-    broke = fleet.Tracked(
+    broke = _tracked(
         JOB,
-        "SUCCESS",
         1,
-        (
-            fleet.Build(JOB, 42, "SUCCESS"),
-            fleet.Build("AaC/Architecture", 90, "FAILURE", "/tmp/jenkins/AaC_Architecture_90.log"),
+        fleet.Build(JOB, 42, "SUCCESS"),
+        fleet.Build(
+            "AaC/Architecture", 90, "FAILURE", "/tmp/jenkins/AaC_Architecture_90.log", "SUCCESS"
         ),
-        "",
     )
-    never_built = fleet.Tracked(
-        app, None, 1, (fleet.Build(app, 7, "FAILURE", "/tmp/jenkins/NewsFilter_7.log"),), ""
+    never_built = _tracked(
+        app, 1, fleet.Build(app, 7, "FAILURE", "/tmp/jenkins/NewsFilter_7.log")
     )
     fixed = fleet.FixRound(
-        (JOB,),
+        ("AaC/Architecture",),
         fleet.Handoff(1, 1, "validator clean", None, "none"),
         ("2222222 architecture: the queue's retry limit",),
         None,
-        fleet.Push(
-            "d" * 40,
-            (fleet.Tracked(JOB, "SUCCESS", 0, (fleet.Build(JOB, 43, "SUCCESS"),), ""), never_built),
-        ),
+        fleet.Push("d" * 40, (_tracked(JOB, 0, fleet.Build(JOB, 43, "SUCCESS")), never_built)),
         "sid-1",
     )
     issue = "NewsFilter/NewsFilter red; it had no completed build before the push"
@@ -1928,7 +2065,7 @@ def test_the_report_and_the_state_read_as_their_goldens(tmp_path: Path) -> None:
     for outcome in outcomes:
         if outcome.producer.repo is not None:
             fleet.record_state(f.spec_repo, outcome, NOW.date().isoformat())
-    report = fleet.write_report(f, outcomes, NOW)
+    report = fleet.write_report(f, outcomes, NOW, [])
     assert report == f.spec_repo / "architecture-updates" / "2026-09-11T1430.md"
     assert report.read_text() == (GOLDEN / "report.md").read_text()
     assert (f.spec_repo / fleet.STATE_FILE).read_text() == (GOLDEN / "state.yaml").read_text()

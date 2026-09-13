@@ -30,6 +30,10 @@ A whole-fleet run takes hours.
 - `12h` is the cap for the whole fleet — 30 producers, the tool's own timeouts
   being 600 s per triage session and 3600 s per update session.
 - Name producer ids to take only those: `python3 tooling/fleet.py update newsfilter`.
+- Before the first producer the tool checks that every job it would track,
+  and every job those jobs' last builds started, is green; any red stops it
+  with exit 3 and the list. `--force` runs anyway — pass it only when the
+  operator asks for it after seeing that list, never on your own.
 - The tool reports every producer as it finishes and records its state then, so
   a run that is killed keeps what it has done; the next run picks up from there.
 
@@ -52,6 +56,7 @@ affects the exit code. What the message says, by exit code:
 |---|---|
 | 0 | the run finished, the report path, nothing unresolved, `<m>` judgment calls to read |
 | 1 | the run finished, the report path, `<n>` unresolved items waiting for the operator, `<m>` judgment calls |
+| 3 | the run did **not start**: Jenkins was red before it (the log lists each red job, with the tracked job that started it) or could not be read; nothing was cloned or pushed. The operator fixes the builds first, or asks for a run with `--force` |
 | 4 | the run finished but its report is **not in the specs repo**: the report path on disk, both counts, and the log's last line, which says why the commit or push failed |
 | 124 | the run was **killed** at the timeout, not finished: the log path, and that every producer it finished kept its state |
 | other | the tool did not run: the log path and the last line of the log |

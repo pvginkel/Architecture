@@ -11,10 +11,10 @@
 - 1 commit, pushed as `cccccccccccc`:
   - `1111111 architecture: the queue`
 - Builds:
-  - `AaC/NewsFilter`: red, green before the push — `AaC/NewsFilter` #42 SUCCESS, `AaC/Architecture` #90 FAILURE (log: /tmp/jenkins/AaC_Architecture_90.log)
-  - `NewsFilter/NewsFilter`: red, with no completed build before the push — `NewsFilter/NewsFilter` #7 FAILURE (log: /tmp/jenkins/NewsFilter_7.log)
+  - `AaC/NewsFilter`: red — `AaC/NewsFilter` #42 SUCCESS, `AaC/Architecture` #90 FAILURE (green before the push; log: /tmp/jenkins/AaC_Architecture_90.log)
+  - `NewsFilter/NewsFilter`: red — `NewsFilter/NewsFilter` #7 FAILURE (no completed build before the push; log: /tmp/jenkins/NewsFilter_7.log)
 
-### Fix round 1 — `AaC/NewsFilter`
+### Fix round 1 — `AaC/Architecture`
 
 - Handoff: 1 delta applied, 1 commit, validator clean.
 - Skipped: none
@@ -22,7 +22,7 @@
   - `2222222 architecture: the queue's retry limit`
 - Builds:
   - `AaC/NewsFilter`: green — `AaC/NewsFilter` #43 SUCCESS
-  - `NewsFilter/NewsFilter`: red, with no completed build before the push — `NewsFilter/NewsFilter` #7 FAILURE (log: /tmp/jenkins/NewsFilter_7.log)
+  - `NewsFilter/NewsFilter`: red — `NewsFilter/NewsFilter` #7 FAILURE (no completed build before the push; log: /tmp/jenkins/NewsFilter_7.log)
 
 ## paper-clock — failed
 
