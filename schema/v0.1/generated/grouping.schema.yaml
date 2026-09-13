@@ -58,7 +58,6 @@ properties:
     - coredns
     - cpp
     - csharp
-    - design-assistant
     - dnsmasq
     - docker
     - elastic
