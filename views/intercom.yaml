@@ -2,7 +2,7 @@ id: intercom
 label: Intercom
 description: The Intercom — a voice intercom backed by OpenAI and a fleet of MCP servers (Home Assistant, Telegram, Gitblit, Trello), serving 12 units around the house.
 icon: Radio
-# Same shape as the Design Assistant view: the release is the grouping handle and
+# The release is the grouping handle and
 # the named definition is the anchor that carries the consumes-* edges, so depth 1
 # lands OpenAI and every MCP server it talks to. The release `intercom` is
 # single-environment (no @env suffix).

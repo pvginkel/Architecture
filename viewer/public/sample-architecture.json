@@ -254,17 +254,6 @@
   ],
   "applicationComponents": [
     {
-      "id": "app:design-assistant-prd",
-      "label": "Design Assistant (prd)",
-      "summary": "Multi-env Python and TypeScript RAG application stack.",
-      "introduced": "2026-03-12",
-      "lifecycle": "active",
-      "producer": "helm",
-      "stereotype": "SoftwareProduct",
-      "environment": "prd",
-      "sourceRepository": "git:pvginkel/DesignAssistant"
-    },
-    {
       "id": "app:iot-support-prd",
       "label": "IoT Support (prd)",
       "summary": "In-house IoT application and UI writing into Elasticsearch.",
@@ -320,28 +309,8 @@
       "logo": "guacamole"
     }
   ],
-  "applicationServices": [
-    {
-      "id": "svc:da-api-prd",
-      "label": "Design Assistant API (prd)",
-      "summary": "Internal HTTP API surface of the Design Assistant portal.",
-      "introduced": "2026-03-12",
-      "lifecycle": "active",
-      "producer": "helm",
-      "environment": "prd"
-    }
-  ],
-  "applicationInterfaces": [
-    {
-      "id": "if:da-http",
-      "label": "Design Assistant HTTPS",
-      "summary": "Addressable HTTPS endpoint for the Design Assistant API.",
-      "introduced": "2026-03-12",
-      "lifecycle": "active",
-      "producer": "helm",
-      "environment": "prd"
-    }
-  ],
+  "applicationServices": [],
+  "applicationInterfaces": [],
   "technologyServices": [
     {
       "id": "svc:postgres-5432",
@@ -507,7 +476,6 @@
     { "id": "rel:k8s-runs-prometheus", "source": "node:k8s-prd", "target": "ss:prometheus", "type": "Assignment" },
     { "id": "rel:k8s-runs-grafana", "source": "node:k8s-prd", "target": "ss:grafana", "type": "Assignment" },
     { "id": "rel:k8s-runs-external-secrets", "source": "node:k8s-prd", "target": "ss:external-secrets", "type": "Assignment" },
-    { "id": "rel:k8s-runs-design", "source": "node:k8s-prd", "target": "app:design-assistant-prd", "type": "Assignment" },
     { "id": "rel:k8s-runs-iot", "source": "node:k8s-prd", "target": "app:iot-support-prd", "type": "Assignment" },
     { "id": "rel:k8s-runs-zigbee", "source": "node:k8s-prd", "target": "app:zigbee-control-prd", "type": "Assignment" },
     { "id": "rel:udm-serves-proxmox", "source": "device:udm-pro", "target": "node:proxmox", "type": "Serving" },
@@ -539,15 +507,10 @@
     { "id": "rel:terraform-serves-proxmox", "source": "ss:terraform", "target": "node:proxmox", "type": "Serving" },
     { "id": "rel:postgres-assigned-svc", "source": "ss:postgresql-prd", "target": "svc:postgres-5432", "type": "Assignment" },
     { "id": "rel:postgres-svc-realises-rdb", "source": "svc:postgres-5432", "target": "cap:relational-database", "type": "Realization" },
-    { "id": "rel:postgres-svc-serves-design", "source": "svc:postgres-5432", "target": "app:design-assistant-prd", "type": "Serving" },
     { "id": "rel:keycloak-assigned-oidc", "source": "ss:keycloak-prd", "target": "svc:oidc-issuer", "type": "Assignment" },
     { "id": "rel:oidc-realises-iam", "source": "svc:oidc-issuer", "target": "cap:iam", "type": "Realization" },
-    { "id": "rel:oidc-serves-design", "source": "svc:oidc-issuer", "target": "app:design-assistant-prd", "type": "Serving" },
-    { "id": "rel:design-composes-api", "source": "app:design-assistant-prd", "target": "svc:da-api-prd", "type": "Composition" },
-    { "id": "rel:api-composes-http", "source": "svc:da-api-prd", "target": "if:da-http", "type": "Composition" },
     { "id": "rel:iot-accesses-elasticsearch", "source": "app:iot-support-prd", "target": "ss:elasticsearch", "type": "Access" },
     { "id": "rel:zigbee-accesses-mosquitto", "source": "app:zigbee-control-prd", "target": "ss:mosquitto", "type": "Access" },
-    { "id": "rel:design-accesses-postgres", "source": "app:design-assistant-prd", "target": "ss:postgresql-prd", "type": "Access" },
     { "id": "rel:guacamole-serves-vms", "source": "app:guacamole", "target": "node:ubuntu-vms", "type": "Serving" }
   ],
   "derived": {

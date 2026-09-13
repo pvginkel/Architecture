@@ -307,8 +307,8 @@ leaves room for other value sources later; only `env:` exists in v0.1.)
 ```yaml
 relations:
   # substitutable infra — target is a capability; boundBy REQUIRED
-  - id: rel:design-assistant-consumes-iam
-    source: app:design-assistant      # the consumer
+  - id: rel:electronics-inventory-consumes-iam
+    source: app:electronics-inventory # the consumer
     target: cap:iam                   # the capability it consumes
     type: Association
     boundBy: "env:OIDC_ISSUER_URL"
@@ -370,8 +370,8 @@ it had been read off the container — loopback hosts still resolve to the
 same-pod provider:
 
 ```yaml
-  - id: rel:design-assistant-consumes-sse-gateway
-    source: app:design-assistant
+  - id: rel:electronics-inventory-consumes-sse-gateway
+    source: app:electronics-inventory
     target: svc:ssegateway
     type: Association
     boundBy: "env:SSE_GATEWAY_URL"
