@@ -22,13 +22,19 @@ timeout --signal=INT --kill-after=2m 12h \
 
 Start it **in the background** and end your turn: it re-invokes you when it
 exits. Don't tail the log, don't poll it, don't re-run it to see how far it got.
-A whole-fleet run takes hours.
+A whole-fleet run takes from half an hour, when nearly every producer skips at
+triage, to hours when many of them update.
 
 - `--signal=INT` is what makes a killed run safe. On SIGINT the tool ends the
   headless session it is driving from a `finally`; SIGTERM would skip that and
   leave a session running.
-- `12h` is the cap for the whole fleet — 30 producers, the tool's own timeouts
-  being 600 s per triage session and 3600 s per update session.
+- `12h` is the cap for the whole fleet, and it is a backstop, not a budget. The
+  tool's own timeouts (600 s per triage session, 3600 s per update session)
+  would allow some 35 h over 30 producers; what a sweep actually costs, measured,
+  is about 50 s per producer that skips and about 10 min per producer that
+  updates, push and build tracking included, so a run reaches 12 h only when it
+  is stuck. A killed run leaves no report, but every producer it finished keeps
+  its state.
 - Name producer ids to take only those: `python3 tooling/fleet.py update newsfilter`.
 - Before the first producer the tool checks that every job it would track,
   and every job those jobs' last builds started, is green; any red stops it
