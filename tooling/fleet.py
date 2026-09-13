@@ -195,6 +195,10 @@ UPDATE = Agent("update-architecture", "opus", "xhigh", 3600)
 
 # Seconds a send has to wind down after SIGINT before it is killed.
 INTERRUPT_GRACE = 15
+# Seconds `kc session status` and `kc session end` get. Neither decides the
+# turn's outcome, so one that does not come back in time is let go, as the dev
+# plugin's run_kc_session lets it go, rather than ending the run.
+KC_TIMEOUT = 60
 
 
 @dataclass(frozen=True)
@@ -667,11 +671,31 @@ def _send(name: str, prompt: str, cwd: Path, timeout: int) -> tuple[int | None, 
 
 
 def _session_id(name: str, cwd: Path) -> str | None:
-    status = _kc(cwd, "session", "status", name, "--output=json", timeout=60)
-    if status.returncode != 0:
+    """The claude session id from `kc session status`, None when it cannot be read.
+
+    The id only serves a later fix round, which reports a session it cannot
+    resume, so a status that fails, hangs or is not JSON costs that resume
+    and nothing else.
+    """
+    try:
+        status = _kc(cwd, "session", "status", name, "--output=json", timeout=KC_TIMEOUT)
+        if status.returncode != 0:
+            return None
+        session_id: str = json.loads(status.stdout).get("sessionId") or ""
+    except (subprocess.TimeoutExpired, json.JSONDecodeError):
         return None
-    session_id: str = json.loads(status.stdout).get("sessionId") or ""
     return session_id or None
+
+
+def _end(name: str, cwd: Path) -> None:
+    """End the session; an end that fails or hangs is reported on stderr and let go."""
+    try:
+        ended = _kc(cwd, "session", "end", name, timeout=KC_TIMEOUT)
+    except subprocess.TimeoutExpired:
+        print(f"kc session end {name} did not finish within {KC_TIMEOUT} s", file=sys.stderr)
+        return
+    if ended.returncode != 0:
+        print(f"kc session end {name} failed: {_last_line(ended)}", file=sys.stderr)
 
 
 def run_session(cwd: Path, agent: Agent, prompt: str, resume: str | None = None) -> Session:
@@ -695,9 +719,7 @@ def run_session(cwd: Path, agent: Agent, prompt: str, resume: str | None = None)
             return Session(f"exited {code}", response, None)
         return Session(None, response, _session_id(name, cwd))
     finally:
-        ended = _kc(cwd, "session", "end", name, timeout=60)
-        if ended.returncode != 0:
-            print(f"kc session end {name} failed: {_last_line(ended)}", file=sys.stderr)
+        _end(name, cwd)
 
 
 def _final_lines(response: str) -> list[str]:

@@ -601,11 +601,19 @@ elif verb == "send":
     sys.exit(turn.get("exit", 0))
 elif verb == "status":
     record()
-    if os.environ.get("FAKE_KC_NO_STATUS"):
+    plays = os.environ.get("FAKE_KC_STATUS", "")
+    if plays == "refuse":
         sys.exit(1)
+    if plays == "hang":
+        time.sleep(30)
+    if plays == "garbage":
+        print("session fake-0: idle")
+        sys.exit(0)
     print(json.dumps({"sessionId": "sid-" + args[2], "state": "idle"}))
 else:
     record()
+    if verb == "end" and os.environ.get("FAKE_KC_END") == "hang":
+        time.sleep(30)
 """
 
 
@@ -770,6 +778,30 @@ def test_a_session_past_its_timeout_is_interrupted_then_killed_and_ended(
     assert fleet.run_session(tmp_path, agent, "p") == fleet.Session("timed out after 1 s", "", None)
     assert kc.verbs() == ["create-headless", "send", "end"]
     assert any(c.get("interrupted") for c in kc.calls()) is interrupted
+
+
+@pytest.mark.parametrize("plays", ["refuse", "hang", "garbage"])
+def test_a_status_that_cannot_be_read_costs_only_the_session_id(
+    tmp_path: Path, kc: FakeKc, monkeypatch: pytest.MonkeyPatch, plays: str
+) -> None:
+    monkeypatch.setattr(fleet, "KC_TIMEOUT", 1)
+    monkeypatch.setenv("FAKE_KC_STATUS", plays)
+    kc.play({"response": "the answer\n"})
+    session = fleet.run_session(tmp_path, fleet.TRIAGE, "p")
+    assert session == fleet.Session(None, "the answer\n", None)
+    assert kc.verbs() == SESSION
+
+
+def test_an_end_that_hangs_is_reported_and_let_go(
+    tmp_path: Path, kc: FakeKc, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(fleet, "KC_TIMEOUT", 1)
+    monkeypatch.setenv("FAKE_KC_END", "hang")
+    kc.play({"response": "the answer\n"})
+    session = fleet.run_session(tmp_path, fleet.TRIAGE, "p")
+    assert session == fleet.Session(None, "the answer\n", "sid-fake-0")
+    assert kc.verbs() == SESSION
+    assert capsys.readouterr().err == "kc session end fake-0 did not finish within 1 s\n"
 
 
 def test_a_session_exiting_non_zero_fails_and_is_ended(tmp_path: Path, kc: FakeKc) -> None:
@@ -1574,7 +1606,7 @@ def test_an_update_session_whose_id_is_unknown_is_not_resumed(
     tracker: FakeTracker,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("FAKE_KC_NO_STATUS", "1")
+    monkeypatch.setenv("FAKE_KC_STATUS", "refuse")
     f = _updated(tmp_path, kc, jenkins)
     jenkins.job(JOB)
     tracker.play({JOB: [_built(42, result="FAILURE")]})
