@@ -15,21 +15,21 @@
 //      home-automation-fleet/ on its next run — same contract as every other
 //      producer; no commit-back.
 //
-// To wire this up in Jenkins:
-//   - New Pipeline job (e.g. AaC/HomeAutomationFleet), "Pipeline script from SCM",
-//     repo = this one, Script Path = Jenkinsfile.ha-fleet.
-//   - HA_TOKEN comes from OpenBao via the withVault block below — store it at
+// The Jenkins job is AaC/Home Assistant Fleet:
+//   - "Pipeline script from SCM", repo = this one, Script Path = Jenkinsfile.ha-fleet.
+//   - HA_TOKEN comes from OpenBao via the withVault block below, stored at
 //     KV-v2 path `kv/jenkins/home-automation-fleet`, key `ha_token` (a HA
-//     long-lived access token; do NOT reuse a firmware MQTT user — those are
-//     ACL-scoped and don't see DSMR/Ecowitt/SLZB/WiFi). The controller-level
-//     Vault config supplies the address + auth (same as every other pipeline).
-//   - HA_URL is read from the ambient global Jenkins environment (already set),
-//     forwarded into the build container below.
-//   - Define the schedule in the Jenkins job config (Build Triggers → Build
-//     periodically), not here. This pipeline declares no trigger.
-//   - After this job has one successful build, register the producer in
-//     pipeline-producers.yaml and run the device migration (see
-//     tools/ha-fleet/README.md and the activation handoff).
+//     long-lived access token; not a firmware MQTT user — those are ACL-scoped
+//     and don't see DSMR/Ecowitt/SLZB/WiFi). The controller-level Vault config
+//     supplies the address + auth (same as every other pipeline).
+//   - HA_URL is read from the ambient global Jenkins environment, forwarded
+//     into the build container below.
+//   - The schedule lives in the job config (Build Triggers → Build
+//     periodically), not here: this pipeline declares no trigger.
+//   - The producer is registered in pipeline-producers.yaml as
+//     home-automation-fleet with this job and no `repo`, so the main pipeline
+//     copies this job's last successful artifact and the central architecture
+//     update leaves the producer alone (see tools/ha-fleet/README.md).
 
 library('JenkinsPipelineUtils') _
 

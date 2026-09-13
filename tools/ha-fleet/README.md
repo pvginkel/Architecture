@@ -79,10 +79,10 @@ fails without publishing on a non-zero exit), and archives
 the main pipeline's `copyArtifacts` filter `**/architecture/**/*.yaml` picks it
 up — same contract as every other producer; no commit-back).
 
-To wire it up: new Jenkins Pipeline job (e.g. `AaC/HomeAutomationFleet`),
-*Pipeline script from SCM*, repo = this one, **Script Path =
-`Jenkinsfile.ha-fleet`**. The pipeline declares **no trigger** — set the daily
-schedule in the job config (Build Triggers → Build periodically).
+The job is `AaC/Home Assistant Fleet`: *Pipeline script from SCM*, repo = this
+one, **Script Path = `Jenkinsfile.ha-fleet`**, with the daily schedule in the
+job config (Build Triggers → Build periodically) — the pipeline itself declares
+**no trigger**.
 
 Secrets:
 - **`HA_TOKEN`** comes from OpenBao via `withVault` (same pattern as the other
@@ -94,8 +94,9 @@ Secrets:
 - **`HA_URL`** is read from the ambient global Jenkins environment (already set),
   forwarded into the build container by the Jenkinsfile.
 
-Registering the producer in `pipeline-producers.yaml` and migrating the
-hand-authored HA devices out of `docs/architecture/home-automation.yaml` are
-**activation steps** that must land together with this job — doing either before
-the job produces an artifact breaks the main build / erases those devices from
-the model. See the activation handoff.
+The producer is registered in `pipeline-producers.yaml` as
+`home-automation-fleet` with that job and **no `repo:`** — its artifact comes
+from the live fleet, not from sources in a repository, so the central
+architecture update leaves it alone — and the HA-integrated devices were
+migrated out of the hand-authored `docs/architecture/home-automation.yaml` when
+it went live (`f135814`).
