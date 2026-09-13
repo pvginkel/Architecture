@@ -11,7 +11,7 @@ operator gets. The tool does the work; this skill is the wrapper around it.
 ## Run it
 
 From `/work/Architecture`, with `JENKINS_TOKEN` set in the environment — without
-it every producer with commits fails before its push:
+it the tool cannot read Jenkins and stops before the first producer (exit 3):
 
 ```bash
 mkdir -p /tmp/architecture-update
@@ -33,8 +33,7 @@ triage, to hours when many of them update.
   would allow some 35 h over 30 producers; what a sweep actually costs, measured,
   is about 50 s per producer that skips and about 10 min per producer that
   updates, push and build tracking included, so a run reaches 12 h only when it
-  is stuck. A killed run leaves no report, but every producer it finished keeps
-  its state.
+  is stuck.
 - Name producer ids to take only those: `python3 tooling/fleet.py update newsfilter`.
 - Before the first producer the tool checks that every job it would track,
   and every job those jobs' last builds started, is green; any red stops it

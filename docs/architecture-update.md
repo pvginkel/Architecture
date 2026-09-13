@@ -124,7 +124,7 @@ would be blamed, fix-rounded twice and its session's guesses pushed to the produ
 
 Jenkins is `$JENKINS_URL` as `$JENKINS_USER`, defaulting in the tool's own constants exactly as
 `track_build.py` does. `$JENKINS_TOKEN` is the only credential and must be in the environment —
-without it every producer with commits fails before its push.
+without it the tool cannot read Jenkins, and the run stops at that check before the first producer.
 
 `reviewed` advances to the pushed commit.
 
