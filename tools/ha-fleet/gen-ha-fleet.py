@@ -18,8 +18,9 @@ INCLUSION RULE (explicit allowlist; everything else is dropped and logged):
     `Zigbee2MQTT / Bridge` pseudo-device. The bridge pseudo-devices themselves
     are excluded (the Z2M *software* is modeled by helm-charts).
   - Integration devices in ALLOWED_INTEGRATIONS (dsmr / ecowitt / smlight /
-    matter / esphome) — the P1 energy meters, the Ecowitt weather gateway, the
-    SLZB coordinators, Matter and ESPHome/WiFi devices.
+    matter / esphome / overkiz) — the P1 energy meters, the Ecowitt weather
+    gateway, the SLZB coordinators, Matter and ESPHome/WiFi devices, and the
+    Somfy TaHoma gateway with the devices behind it.
 
 EXCLUSION (dropped, with a logged reason):
   - `manufacturer == "Pieter"`: in-house esp-mdm firmware, modeled by the
@@ -79,7 +80,7 @@ NAMESPACE = uuid.uuid5(
 DEFAULT_INTRODUCED = "2024-07-12"
 
 # Non-Zigbee integration domains we emit (home-automation device classes).
-ALLOWED_INTEGRATIONS = {"dsmr", "ecowitt", "smlight", "matter", "esphome"}
+ALLOWED_INTEGRATIONS = {"dsmr", "ecowitt", "smlight", "matter", "esphome", "overkiz"}
 
 # Cross-producer element ids, referenced by full composite id (resolved at merge).
 HA_PRD = "ss:home-assistant-prd,398e32ec-cbe7-40e4-8a66-094029653650"
@@ -353,6 +354,8 @@ def summarise(cls: str, dev: dict, area: str | None) -> str:
         return f"{man} {model}{where} — Matter device surfaced in Home Assistant."
     if cls == "esphome":
         return f"ESPHome device ({model}){where} surfaced in Home Assistant via the ESPHome (WiFi) integration."
+    if cls == "overkiz":
+        return f"{man} {model}{where} surfaced in Home Assistant via the Overkiz (Somfy TaHoma) integration."
     return f"{man} {model}{where} surfaced in Home Assistant via the {cls} integration."
 
 

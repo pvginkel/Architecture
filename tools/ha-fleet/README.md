@@ -22,6 +22,7 @@ each related into `cap:home-automation`:
 | Ecowitt weather gateway | `ecowitt` | → Home Assistant (prd) |
 | SLZB coordinators | `smlight` | → Home Assistant (prd) |
 | Matter / ESPHome (WiFi) | `matter` / `esphome` | → Home Assistant (prd) |
+| Somfy TaHoma gateway and the devices behind it | `overkiz` | → Home Assistant (prd) |
 
 **Excluded (logged):** `manufacturer == "Pieter"` (in-house firmware, modeled by
 the firmware producers + `cap:iot-device` — avoids double-modeling), the Z2M
