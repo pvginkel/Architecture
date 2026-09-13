@@ -1,6 +1,6 @@
 # Architecture update — 2026-09-11 14:30
 
-6 producers: 1 updated, 1 failed, 1 nothing to apply, 1 skipped, 1 current, 1 not fleet-managed. 3 unresolved items.
+6 producers: 1 updated, 1 failed, 1 nothing to apply, 1 skipped, 1 current, 1 not fleet-managed. 2 unresolved items, 1 judgment call.
 
 ## newsfilter — updated
 
@@ -47,8 +47,11 @@
 
 ## home-automation-fleet — not fleet-managed
 
+## Judgment calls
+
+- `newsfilter`: the queue's retry topology
+
 ## Unresolved
 
 - `newsfilter`: NewsFilter/NewsFilter red; it had no completed build before the push
-- `newsfilter`: the session skipped: the queue's retry topology
 - `paper-clock`: unpushed commits in /tmp/architecture-update/repos/PaperClock: push or discard

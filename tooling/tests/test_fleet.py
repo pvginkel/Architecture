@@ -885,6 +885,7 @@ def test_a_skip_verdict_advances_reviewed_without_an_update_session(
         "newsfilter  pvginkel/NewsFilter  skipped            Only CI housekeeping.",
         f"report: {f.spec_repo / fleet.report_file(NOW)}",
         "unresolved: 0",
+        "judgment calls: 0",
     ]
 
 
@@ -938,7 +939,7 @@ def test_an_update_verdict_runs_the_update_session_with_its_brief(
         "\nThe repo's instructions, verbatim from its `.architecturerc`:\n\n(none)\n"
     )
     pushed = _git(clone, "rev-parse", "HEAD")
-    assert (outcome.status, outcome.reviewed, outcome.unresolved) == (fleet.UPDATED, pushed, False)
+    assert (outcome.status, outcome.reviewed, outcome.issues) == (fleet.UPDATED, pushed, ())
     assert outcome.detail == "1 delta applied, 1 commit, validator clean. Skipped: none"
     assert outcome.triage == fleet.Verdict(True, "The app now consumes a queue.")
     assert outcome.update is not None
@@ -955,7 +956,7 @@ def test_an_update_with_nothing_to_apply_advances_reviewed(tmp_path: Path, kc: F
     f, _, head = _stale(tmp_path)
     kc.play(UPDATE, NOTHING)
     outcome = _update(f)
-    assert (outcome.status, outcome.reviewed, outcome.unresolved) == (fleet.NOTHING, head, False)
+    assert (outcome.status, outcome.reviewed, bool(outcome.issues)) == (fleet.NOTHING, head, False)
     assert outcome.update is not None and outcome.update.commits == ()
     assert _state(f)[ID]["reviewed"] == head
 
@@ -992,7 +993,7 @@ def test_an_update_session_that_does_not_finish_cleanly_is_unresolved(
     outcome = _update(f)
     detail = detail.format(clone=tmp_path / "clones" / "NewsFilter")
     assert (outcome.status, outcome.detail, outcome.reviewed) == (fleet.FAILED, detail, None)
-    assert outcome.unresolved
+    assert bool(outcome.issues)
     assert _git(tmp_path / "remotes" / f"{REPO}.git", "rev-parse", "main") == head
     assert _state(f) == {ID: {"date": "2026-09-11", "outcome": f"failed: {detail}"}}
 
@@ -1041,6 +1042,7 @@ def test_a_failed_triage_is_unresolved_keeps_reviewed_and_the_run_moves_on(
         "home-automation-fleet  -                    not fleet-managed",
         f"report: {f.spec_repo / fleet.report_file(NOW)}",
         "unresolved: 1",
+        "judgment calls: 0",
     ]
 
 
@@ -1086,6 +1088,7 @@ def test_update_takes_only_the_named_producers(
         "paper-clock  pvginkel/PaperClock  current",
         f"report: {f.spec_repo / fleet.report_file(NOW)}",
         "unresolved: 0",
+        "judgment calls: 0",
     ]
     assert list(_state(f)) == ["paper-clock"]
 
@@ -1428,7 +1431,7 @@ def test_an_update_is_pushed_and_each_tracked_job_followed_once_at_the_pushed_co
             fleet.Tracked(APP, "SUCCESS", 0, (fleet.Build(APP, 7, "SUCCESS"),), ""),
         ),
     )
-    assert (outcome.status, outcome.reviewed, outcome.unresolved, outcome.fixes) == (
+    assert (outcome.status, outcome.reviewed, bool(outcome.issues), outcome.fixes) == (
         fleet.UPDATED,
         pushed,
         False,
@@ -1459,7 +1462,7 @@ def test_a_job_the_push_does_not_start_is_not_tracked(
     assert "/job/AaC/job/Home Assistant Fleet/config.xml" in jenkins.paths
     assert "/job/AaC/job/Home Assistant Fleet/api/json" not in jenkins.paths
     assert "/job/Firmware/job/NewsFilter/api/json" not in jenkins.paths
-    assert (outcome.unresolved, outcome.detail) == (
+    assert (bool(outcome.issues), outcome.detail) == (
         False,
         "1 delta applied, 1 commit, validator clean. Skipped: none",
     )
@@ -1474,7 +1477,7 @@ def test_a_build_red_before_the_push_is_pre_existing_and_never_resumes_the_sessi
     tracker.play({JOB: [_built(42, result="FAILURE")], APP: [_built(7, APP, "FAILURE")]})
     outcome = _deliver(f)
     assert kc.verbs() == SESSION * 2
-    assert (outcome.reviewed, outcome.unresolved, outcome.fixes) == (
+    assert (outcome.reviewed, bool(outcome.issues), outcome.fixes) == (
         _pushed(tmp_path),
         True,
         (),
@@ -1498,7 +1501,7 @@ def test_a_tracker_that_cannot_finish_is_operational_and_unresolved(
         _pushed(tmp_path),
         (fleet.Tracked(JOB, "SUCCESS", 3, (), "error: authentication failed (401)"),),
     )
-    assert outcome.unresolved and outcome.reviewed == _pushed(tmp_path)
+    assert bool(outcome.issues) and outcome.reviewed == _pushed(tmp_path)
     assert outcome.detail.endswith(
         "; AaC/NewsFilter tracking failed: error: authentication failed (401)"
     )
@@ -1536,7 +1539,7 @@ def test_a_tracker_that_never_finishes_is_capped_and_reported_operational(
             ),
         ),
     )
-    assert outcome.unresolved and outcome.reviewed == _pushed(tmp_path)
+    assert bool(outcome.issues) and outcome.reviewed == _pushed(tmp_path)
     assert outcome.detail.endswith(
         "; AaC/NewsFilter tracking failed: the tracker did not finish within 0.5s"
     )
@@ -1594,7 +1597,7 @@ def test_a_build_the_change_broke_resumes_the_update_session_and_is_pushed_again
             "sid-fake-2",
         ),
     )
-    assert (outcome.status, outcome.reviewed, outcome.unresolved) == (
+    assert (outcome.status, outcome.reviewed, bool(outcome.issues)) == (
         fleet.UPDATED,
         second,
         False,
@@ -1617,7 +1620,7 @@ def test_the_fix_loop_stops_after_two_rounds_and_a_job_still_red_is_unresolved(
         "sid-fake-2",
     ]
     assert [fix.push.commit for fix in outcome.fixes if fix.push] == pushes[1:]
-    assert (outcome.reviewed, outcome.unresolved) == (pushes[-1], True)
+    assert (outcome.reviewed, bool(outcome.issues)) == (pushes[-1], True)
     assert outcome.detail.endswith("; AaC/NewsFilter still red after 2 fix rounds")
     assert _state(f)[ID]["reviewed"] == pushes[-1]
 
@@ -1657,7 +1660,7 @@ def test_an_update_session_whose_id_is_unknown_is_not_resumed(
     tracker.play({JOB: [_built(42, result="FAILURE")]})
     outcome = _deliver(f)
     assert kc.verbs() == SESSION * 2
-    assert outcome.unresolved
+    assert bool(outcome.issues)
     assert outcome.detail.endswith(
         "; fix round 1: the update session has no id to resume; "
         "AaC/NewsFilter still red after 1 fix round"
@@ -1777,7 +1780,7 @@ def test_jenkins_the_tool_cannot_read_leaves_the_commits_unpushed(
     clone = tmp_path / "clones" / "NewsFilter"
     assert _pushed(tmp_path) == head
     assert tracker.calls() == []
-    assert (outcome.status, outcome.reviewed, outcome.unresolved) == (fleet.FAILED, None, True)
+    assert (outcome.status, outcome.reviewed, bool(outcome.issues)) == (fleet.FAILED, None, True)
     assert outcome.detail.endswith(f"; the commits stay unpushed in {clone}")
     assert outcome.detail.startswith(
         "Jenkins: JENKINS_TOKEN is not set"
@@ -1799,7 +1802,7 @@ def test_a_rejected_push_is_unresolved_and_tracks_nothing(
     outcome = _deliver(f)
     assert _pushed(tmp_path) == head
     assert tracker.calls() == []
-    assert (outcome.status, outcome.reviewed, outcome.unresolved) == (fleet.FAILED, None, True)
+    assert (outcome.status, outcome.reviewed, bool(outcome.issues)) == (fleet.FAILED, None, True)
     assert outcome.detail.startswith("git push failed: ")
 
 
@@ -1922,21 +1925,35 @@ def test_a_run_commits_and_pushes_the_report_and_the_state_and_nothing_else(
     assert report.endswith("## Unresolved\n\nNothing.\n")
 
 
-def test_the_update_sessions_judgment_calls_close_the_report_unresolved(
-    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, tracker: FakeTracker
+def test_the_update_sessions_judgment_calls_are_reported_apart_and_do_not_fail_the_run(
+    tmp_path: Path,
+    kc: FakeKc,
+    jenkins: FakeJenkins,
+    tracker: FakeTracker,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    f = _updated(tmp_path, kc, jenkins)
+    f = _updated(tmp_path, kc, jenkins, _fix(1))
     judged = "2 deltas applied, 1 commit, validator clean.\nSkipped: the queue's retry topology\n"
-    kc.play(UPDATE, {"commit": _edit("the queue"), "response": judged})
+    kc.play(
+        UPDATE,
+        {"commit": _edit("the queue"), "response": judged},
+        {"commit": _edit("fix 1"), "response": judged.replace("retry topology", "dead letters")},
+    )
     jenkins.job(JOB)
-    tracker.play({JOB: [_built(42)]})
-    assert fleet.run(["update"], f, NOW) == 1
+    tracker.play({JOB: [_built(42, result="FAILURE"), _built(43)]})
+    assert fleet.run(["update"], f, NOW) == 0
+    assert capsys.readouterr().out.splitlines()[-2:] == ["unresolved: 0", "judgment calls: 2"]
     assert _state(f)[ID]["outcome"] == (
         "updated: 2 deltas applied, 1 commit, validator clean. "
         "Skipped: the queue's retry topology"
     )
-    assert (f.spec_repo / fleet.report_file(NOW)).read_text().endswith(
-        "## Unresolved\n\n- `newsfilter`: the session skipped: the queue's retry topology\n"
+    report = (f.spec_repo / fleet.report_file(NOW)).read_text()
+    assert "\n1 producer: 1 updated. Nothing unresolved, 2 judgment calls.\n" in report
+    assert report.endswith(
+        "## Judgment calls\n\n"
+        "- `newsfilter`: the queue's retry topology\n"
+        "- `newsfilter`: the queue's dead letters\n\n"
+        "## Unresolved\n\nNothing.\n"
     )
 
 

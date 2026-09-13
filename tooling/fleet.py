@@ -36,7 +36,9 @@ as `$JENKINS_USER`, by default JENKINS_URL and JENKINS_USER below;
 
 The run writes its report beside the state file, commits both by name because
 the specs repo's working tree is shared with the dev pipeline, and pushes. It
-exits 1 when the report's Unresolved section has anything in it.
+exits 1 when the report's Unresolved section has anything in it: something
+failed. The sessions' own `Skipped:` judgment calls are reported in a section
+of their own and do not count.
 """
 
 from __future__ import annotations
@@ -309,9 +311,9 @@ class FixRound:
 class Outcome:
     """One producer's result from `update`; `reviewed` is the commit its state advances to,
     None to leave the recorded one. An update's commits are delivered as `push`, then `fixes`.
-    `issues` is what went wrong for this producer, one item per string; the report's Unresolved
-    section and the exit code count `unresolved_items(outcome)`, which adds the sessions' own
-    `Skipped:` judgment calls to it."""
+    `issues` is what went wrong for this producer, one item per string: the report's Unresolved
+    section lists them and the exit code counts them. What the sessions deliberately skipped is
+    `judgment_calls(outcome)`, reported apart from them."""
 
     producer: Producer
     status: str
@@ -322,10 +324,6 @@ class Outcome:
     update: UpdateResult | None = None
     push: Push | None = None
     fixes: tuple[FixRound, ...] = ()
-
-    @property
-    def unresolved(self) -> bool:
-        return bool(self.issues)
 
     @property
     def state_outcome(self) -> str:
@@ -1136,12 +1134,12 @@ def report_file(now: datetime) -> Path:
     return UPDATES / f"{now:%Y-%m-%d}T{now:%H%M}.md"
 
 
-def unresolved_items(outcome: Outcome) -> list[str]:
-    """What the producer leaves for the operator: its issues and the sessions' judgment calls."""
+def judgment_calls(outcome: Outcome) -> list[str]:
+    """What the producer's update sessions deliberately skipped: each handoff's `Skipped:` line
+    other than `none`, the update session's first and then each fix round's."""
     handoffs = [outcome.update.handoff if outcome.update else None]
     handoffs += [fix.handoff for fix in outcome.fixes]
-    skipped = [h.skipped for h in handoffs if h is not None and h.skipped.strip().lower() != "none"]
-    return [*outcome.issues, *(f"the session skipped: {s}" for s in skipped)]
+    return [h.skipped for h in handoffs if h is not None and h.skipped.strip().lower() != "none"]
 
 
 def _build_line(build: Build) -> str:
@@ -1204,23 +1202,28 @@ def _producer_lines(outcome: Outcome) -> list[str]:
 
 
 def render_report(outcomes: list[Outcome], now: datetime) -> str:
-    """The run's report: a section per producer, closing with what needs the operator."""
-    items = [(o.producer.id, item) for o in outcomes for item in unresolved_items(o)]
+    """The run's report: a section per producer, then the sessions' judgment calls, closing with
+    what failed and needs the operator."""
+    issues = [(o.producer.id, issue) for o in outcomes for issue in o.issues]
+    calls = [(o.producer.id, call) for o in outcomes for call in judgment_calls(o)]
     tally = ", ".join(
         f"{sum(o.status == status for o in outcomes)} {status}"
         for status in dict.fromkeys(o.status for o in outcomes)
     )
-    closing = counted(len(items), "unresolved item") if items else "Nothing unresolved"
+    unresolved = counted(len(issues), "unresolved item") if issues else "Nothing unresolved"
+    judged = counted(len(calls), "judgment call") if calls else "no judgment calls"
     lines = [
         f"# Architecture update — {now:%Y-%m-%d %H:%M}",
         "",
-        f"{counted(len(outcomes), 'producer')}: {tally}. {closing}.",
+        f"{counted(len(outcomes), 'producer')}: {tally}. {unresolved}, {judged}.",
         "",
     ]
     for outcome in outcomes:
         lines += _producer_lines(outcome)
-    lines += ["## Unresolved", ""]
-    lines += [f"- `{producer}`: {item}" for producer, item in items] or ["Nothing."]
+    lines += ["## Judgment calls", ""]
+    lines += [f"- `{producer}`: {call}" for producer, call in calls] or ["None."]
+    lines += ["", "## Unresolved", ""]
+    lines += [f"- `{producer}`: {issue}" for producer, issue in issues] or ["Nothing."]
     return "\n".join([*lines, ""])
 
 
@@ -1288,15 +1291,17 @@ def cmd_update(fleet: Fleet, producers: list[Producer], now: datetime) -> int:
         print(f"{line}  {outcome.detail}".rstrip(), flush=True)
         outcomes.append(outcome)
     report = write_report(fleet, outcomes, now)
-    items = [item for outcome in outcomes for item in unresolved_items(outcome)]
+    issues = [issue for outcome in outcomes for issue in outcome.issues]
+    calls = [call for outcome in outcomes for call in judgment_calls(outcome)]
     print(f"report: {report}")
-    print(f"unresolved: {len(items)}")
+    print(f"unresolved: {len(issues)}")
+    print(f"judgment calls: {len(calls)}")
     try:
         publish(fleet, now)
     except ProducerError as e:
         print(f"publishing the report failed: {e}", file=sys.stderr)
         return 1
-    return 1 if items else 0
+    return 1 if issues else 0
 
 
 def run(argv: list[str], fleet: Fleet, now: datetime) -> int:

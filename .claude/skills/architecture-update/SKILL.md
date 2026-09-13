@@ -40,15 +40,18 @@ A run that got to the end closes its log with
 ```
 report: /work/ArchitectureSpecs/architecture-updates/<YYYY-MM-DD>T<HHMM>.md
 unresolved: <n>
+judgment calls: <m>
 ```
 
-Read those two lines, then send **one** message with the `notification` MCP tool
-and stop. What it says, by exit code:
+Read those three lines, then send **one** message with the `notification` MCP
+tool and stop. `<n>` counts what failed; `<m>` counts what the update sessions
+deliberately left for the operator (their `Skipped:` lines), which never
+affects the exit code. What the message says, by exit code:
 
 | Exit | Message |
 |---|---|
-| 0 | the run finished, the report path, nothing unresolved |
-| 1 | the run finished, the report path, `<n>` unresolved items waiting for the operator |
+| 0 | the run finished, the report path, nothing unresolved, `<m>` judgment calls to read |
+| 1 | the run finished, the report path, `<n>` unresolved items waiting for the operator, `<m>` judgment calls |
 | 124 | the run was **killed** at the timeout, not finished: the log path, and that every producer it finished kept its state |
 | other | the tool did not run: the log path and the last line of the log |
 

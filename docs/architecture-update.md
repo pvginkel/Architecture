@@ -115,13 +115,14 @@ Both live in the specs repo (`spec_repo` in `.aiworkflowrc`), under `architectur
   that is killed keeps every producer it got through and the next run resumes from there.
 - **`<YYYY-MM-DD>T<HHMM>.md`** — one per run: a section per producer (repo, triage verdict, handoff,
   the commits and the commit they were pushed as, each tracked job's result with its builds and the
-  log of a failed one, a block per fix round), closing with **Unresolved**.
+  log of a failed one, a block per fix round), then **Judgment calls**, closing with **Unresolved**.
 
-That closing section is the run's product and what decides the exit code — 0 when it is empty, 1
-otherwise. It carries the sessions' own `Skipped:` judgement calls alongside red builds and
-failures, so a run in which no producer failed can still exit 1 because an agent left something for
-a human. The tool stages and commits the two paths **by name**, the specs repo's working tree being
-shared with the dev pipeline, and pushes.
+Unresolved is the run's product and what decides the exit code — 0 when it is empty, 1 otherwise:
+a failed producer, a red build, a session that did not finish. Exit 1 means something actually
+failed. The sessions' own `Skipped:` judgement calls — what an agent deliberately left for a human —
+sit in their own section, counted on the run's closing `judgment calls:` line, and do not touch the
+exit code. The tool stages and commits the two paths **by name**, the specs repo's working tree
+being shared with the dev pipeline, and pushes.
 
 ## Running it
 
