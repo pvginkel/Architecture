@@ -5,8 +5,6 @@ producer's `architecture.yaml` from `producer-artifacts/<producer-id>/`,
 validates each artifact, merges them, runs cross-producer checks, and writes
 the consolidated dataset to `dist/data/v0.1/`.
 
-v3 ships with `pipeline-producers.yaml` empty; producers come online in v4.
-
 Usage:
 
     poetry run python collect.py \\
@@ -1246,8 +1244,8 @@ def main(
 
     click.echo(f"Loaded {len(producers)} registered producer(s) from {producers_path}.")
     for p in producers:
-        job = p.get("jenkinsJob", "<self>")
-        click.echo(f"  - {p['id']} (jenkinsJob={job})")
+        marker = ", self" if p.get("self") else ""
+        click.echo(f"  - {p['id']} (jenkinsJob={p['jenkinsJob']}{marker})")
 
     try:
         artifact_paths = discover_artifacts(producers, input_dir)

@@ -1,13 +1,16 @@
-// Architecture-rebuild pipeline (v3).
+// Architecture-rebuild pipeline.
 //
 // 1. Checkout the Architecture repo.
-// 2. Read pipeline-producers.yaml — the registered producer list.
+// 2. Read pipeline-producers.yaml — the registered producer list. Every
+//    producer names the `jenkinsJob` that archives its artifact; the one
+//    marked `self: true` is this repo, whose job is this very pipeline.
 // 3. For each registered producer:
-//    - if `jenkinsJob` is set: copyArtifacts from <jenkinsJob>
-//      lastSuccessful into producer-artifacts/<producer-id>/;
-//    - if `jenkinsJob` is absent: this is a self-producer whose
-//      source lives in docs/architecture/ of this very repo; copy
-//      those files into producer-artifacts/<producer-id>/.
+//    - copyArtifacts from <jenkinsJob> lastSuccessful into
+//      producer-artifacts/<producer-id>/;
+//    - for the self-producer, copy docs/architecture/ of this checkout
+//      into producer-artifacts/<producer-id>/ instead: its last
+//      successful build is the previous run of this pipeline, not the
+//      commit being built.
 // 4. Bundle producer-artifacts/ into producer-artifacts.tgz and
 //    archive it as a build artifact, before the collector runs, so
 //    the raw inputs are available for debugging even on failure.
@@ -23,10 +26,9 @@
 //
 // Triggers wired below:
 //   - SCM push to this repo (the default poll-or-webhook).
-//   - Upstream success of every registered producer's Jenkins job.
-//     In v3 pipeline-producers.yaml ships empty, so no upstream
-//     triggers are wired yet; v4 producer onboarding automatically
-//     wires them via the next Jenkinsfile execution.
+//   - Upstream success of every registered producer's Jenkins job
+//     except the self-producer's, which is this pipeline. Registering
+//     a producer wires its trigger on the next run of this Jenkinsfile.
 //   - Manual "Build Now" in the Jenkins UI is always available.
 
 library identifier: 'JenkinsPipelineUtils', changelog: false
@@ -42,7 +44,7 @@ podTemplate(inheritFrom: 'jenkins-agent kaniko', containers: [
         // Triggers wiring derived from pipeline-producers.yaml.
         def producersDoc = readYaml(file: 'pipeline-producers.yaml')
         def producers = producersDoc.producers ?: []
-        def upstreamJobs = producers.collect { it.jenkinsJob }.findAll { it != null }.join(', ')
+        def upstreamJobs = producers.findAll { !it.self }.collect { it.jenkinsJob }.join(', ')
 
         def triggers = [githubPush()]
         if (upstreamJobs) {
@@ -54,7 +56,19 @@ podTemplate(inheritFrom: 'jenkins-agent kaniko', containers: [
         stage('Copy producer artifacts') {
             sh 'mkdir -p producer-artifacts'
             producers.each { p ->
-                if (p.jenkinsJob) {
+                if (p.self) {
+                    // Self-producer: its artifact is this checkout's
+                    // docs/architecture/, not its jenkinsJob's archive
+                    // (that is this pipeline's previous run). Mirror the
+                    // directory into producer-artifacts/<id>/ so the
+                    // collector's rglob walk picks the files up the same
+                    // way it does for upstream producers.
+                    sh """
+                        set -eu
+                        mkdir -p producer-artifacts/${p.id}/docs/architecture
+                        cp docs/architecture/*.yaml producer-artifacts/${p.id}/docs/architecture/
+                    """
+                } else {
                     copyArtifacts(
                         projectName: p.jenkinsJob,
                         selector: lastSuccessful(),
@@ -62,17 +76,6 @@ podTemplate(inheritFrom: 'jenkins-agent kaniko', containers: [
                         target: "producer-artifacts/${p.id}",
                         fingerprintArtifacts: true
                     )
-                } else {
-                    // Self-producer: source lives in this repo under
-                    // docs/architecture/. Mirror the directory into
-                    // producer-artifacts/<id>/ so the collector's
-                    // rglob walk picks the files up the same way it
-                    // does for upstream producers.
-                    sh """
-                        set -eu
-                        mkdir -p producer-artifacts/${p.id}/docs/architecture
-                        cp docs/architecture/*.yaml producer-artifacts/${p.id}/docs/architecture/
-                    """
                 }
             }
         }

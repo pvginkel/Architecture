@@ -42,6 +42,11 @@ REPO = "pvginkel/NewsFilter"
 JOB = "AaC/NewsFilter"
 NOW = datetime(2026, 9, 11, 14, 30)
 
+# Registry entries, as pipeline-producers.yaml writes them.
+NEWSFILTER = {"id": ID, "repo": REPO, "jenkinsJob": JOB}
+PAPER_CLOCK = {"id": "paper-clock", "repo": "pvginkel/PaperClock", "jenkinsJob": "AaC/PaperClock"}
+HA_FLEET = {"id": "home-automation-fleet", "jenkinsJob": "AaC/Home Assistant Fleet"}
+
 KIT = {
     "agents/triage-architecture.md": "triage agent\n",
     "agents/update-architecture.md": "update agent\n",
@@ -97,7 +102,11 @@ def test_registry_rejects_malformed_repo(tmp_path: Path, repo: str) -> None:
 def test_committed_registry_names_a_repo_for_every_fleet_producer(tmp_path: Path) -> None:
     producers = yaml.safe_load(REGISTRY.read_text())["producers"]
     assert [p["id"] for p in producers if "repo" not in p] == ["home-automation-fleet"]
+    assert all("jenkinsJob" in p for p in producers)
+    assert [p["id"] for p in producers if p.get("self")] == ["architecture"]
     proc = _collect(REGISTRY, tmp_path)
+    assert "  - architecture (jenkinsJob=AaC/Architecture, self)\n" in proc.stdout
+    assert "  - ansible (jenkinsJob=AaC/Ansible)\n" in proc.stdout
     assert "FAIL [registry]" not in proc.stderr, proc.stderr
     assert f"Loaded {len(producers)} registered producer(s)" in proc.stdout
 
@@ -182,7 +191,7 @@ def _fleet(tmp_path: Path, *producers: dict[str, str]) -> fleet.Fleet:
 
 
 def _scan(f: fleet.Fleet, reviewed: str | None = None) -> fleet.Scan:
-    return fleet.scan_producer(f, fleet.Producer(ID, REPO), REPO, reviewed)
+    return fleet.scan_producer(f, fleet.Producer(ID, REPO, JOB), REPO, reviewed)
 
 
 def test_default_sources_find_nested_artifacts(tmp_path: Path) -> None:
@@ -318,7 +327,7 @@ def test_the_base_is_the_later_of_watermark_and_reviewed(
         "middle": remote.commit({"src/app.py": "one\n"}),
         "head": remote.commit({"src/app.py": "two\n"}),
     }
-    f = _fleet(tmp_path, {"id": ID, "repo": REPO})
+    f = _fleet(tmp_path, NEWSFILTER)
     if reviewed_at is not None:
         state = f.spec_repo / "architecture-updates" / "state.yaml"
         state.parent.mkdir(parents=True)
@@ -513,10 +522,10 @@ def test_scan_reports_each_producer(tmp_path: Path, capsys: pytest.CaptureFixtur
     Remote(tmp_path, "pvginkel/Ginbov").commit({"docs/architecture/a.yaml": _envelope(ID)})
     f = _fleet(
         tmp_path,
-        {"id": ID, "repo": REPO},
-        {"id": "paper-clock", "repo": "pvginkel/PaperClock"},
-        {"id": "home-automation-fleet"},
-        {"id": "ginbov-nl", "repo": "pvginkel/Ginbov"},
+        NEWSFILTER,
+        PAPER_CLOCK,
+        HA_FLEET,
+        {"id": "ginbov-nl", "repo": "pvginkel/Ginbov", "jenkinsJob": "AaC/Ginbov"},
     )
     assert fleet.run(["scan"], f, NOW) == 1
     assert capsys.readouterr().out.splitlines() == [
@@ -531,7 +540,7 @@ def test_scan_reports_each_producer(tmp_path: Path, capsys: pytest.CaptureFixtur
 
 
 def test_scan_exits_zero_when_no_producer_fails(tmp_path: Path) -> None:
-    assert fleet.run(["scan"], _fleet(tmp_path, {"id": "home-automation-fleet"}), NOW) == 0
+    assert fleet.run(["scan"], _fleet(tmp_path, HA_FLEET), NOW) == 0
 
 
 def test_stage_takes_an_unregistered_repo_as_owner_name(
@@ -546,7 +555,7 @@ def test_stage_takes_an_unregistered_repo_as_owner_name(
 
 def test_stage_resolves_a_registered_repos_bare_name(tmp_path: Path) -> None:
     Remote(tmp_path, REPO).commit({"README.md": "readme\n"})
-    f = _fleet(tmp_path, {"id": ID, "repo": REPO})
+    f = _fleet(tmp_path, NEWSFILTER)
     assert fleet.run(["stage", "NewsFilter"], f, NOW) == 0
     assert (tmp_path / "clones" / "NewsFilter" / ".claude" / "architecture").is_dir()
 
@@ -707,7 +716,7 @@ SKIP = {"response": "Only CI changed.\n\nVERDICT: skip\nOnly CI housekeeping.\n"
 UPDATE = {"response": "VERDICT: update\nThe app now consumes a queue.\n"}
 NOTHING = {"response": "0 deltas applied, 0 commits, validator clean.\nSkipped: none\n"}
 UNPARSEABLE = fleet.Verdict(True, "no parseable verdict; counted as update")
-PRODUCER = fleet.Producer(ID, REPO)
+PRODUCER = fleet.Producer(ID, REPO, JOB)
 
 
 def _stale(tmp_path: Path, rc: dict[str, Any] | None = None) -> tuple[fleet.Fleet, str, str]:
@@ -717,7 +726,7 @@ def _stale(tmp_path: Path, rc: dict[str, Any] | None = None) -> tuple[fleet.Flee
         files[".architecturerc"] = yaml.safe_dump(rc)
     base = remote.commit(files)
     head = remote.commit({"src/app.py": "app\n"})
-    return _fleet(tmp_path, {"id": ID, "repo": REPO}), base, head
+    return _fleet(tmp_path, NEWSFILTER), base, head
 
 
 def _state(f: fleet.Fleet) -> dict[str, Any]:
@@ -900,7 +909,7 @@ def test_the_triage_prompt_carries_the_brief_and_the_instructions_verbatim(
     )
     remote.commit({"src/app.py": "app\n"})
     kc.play(SKIP)
-    _update(_fleet(tmp_path, {"id": ID, "repo": REPO}))
+    _update(_fleet(tmp_path, NEWSFILTER))
     assert kc.prompts() == [
         f"Does anything in {base}..HEAD (1 commit) change what producer `newsfilter`'s "
         "architecture must say? End with your two-line verdict.\n\n"
@@ -914,12 +923,14 @@ def test_the_triage_prompt_carries_the_brief_and_the_instructions_verbatim(
 
 
 def test_an_update_verdict_runs_the_update_session_with_its_brief(
-    tmp_path: Path, kc: FakeKc
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, tracker: FakeTracker
 ) -> None:
     f, base, _ = _stale(tmp_path)
     handoff = "1 delta applied, 1 commit, validator clean.\nSkipped: none\n"
     edit = {"docs/architecture/a.yaml": _envelope(ID) + "# the queue\n"}
     kc.play(UPDATE, {"commit": edit, "response": handoff})
+    jenkins.job(JOB)
+    tracker.play({JOB: [_built(42)]})
     outcome = _update(f)
     clone = tmp_path / "clones" / "NewsFilter"
     assert kc.verbs() == SESSION * 2
@@ -946,7 +957,9 @@ def test_an_update_verdict_runs_the_update_session_with_its_brief(
     assert outcome.update.session_id == "sid-fake-1"
     assert outcome.update.commits == (_git(clone, "log", "-1", "--format=%h %s"),)
     assert outcome.update.commits[0].endswith(" architecture: docs/architecture/a.yaml")
-    assert outcome.push == fleet.Push(pushed, ())
+    assert outcome.push == fleet.Push(
+        pushed, (fleet.Tracked(JOB, "SUCCESS", 0, (fleet.Build(JOB, 42, "SUCCESS"),), ""),)
+    )
     assert _state(f) == {
         ID: {"reviewed": pushed, "date": "2026-09-11", "outcome": f"updated: {outcome.detail}"}
     }
@@ -1013,9 +1026,9 @@ def test_a_failed_triage_is_unresolved_keeps_reviewed_and_the_run_moves_on(
     head = second.commit({"src/app.py": "app\n"})
     f = _fleet(
         tmp_path,
-        {"id": ID, "repo": REPO},
-        {"id": "paper-clock", "repo": "pvginkel/PaperClock"},
-        {"id": "home-automation-fleet"},
+        NEWSFILTER,
+        PAPER_CLOCK,
+        HA_FLEET,
     )
     state = f.spec_repo / fleet.STATE_FILE
     state.parent.mkdir(parents=True)
@@ -1067,7 +1080,7 @@ def test_a_current_producer_runs_no_session(tmp_path: Path, kc: FakeKc) -> None:
     remote = Remote(tmp_path, REPO)
     remote.commit({"src/app.py": "app\n"})
     head = remote.commit({"docs/architecture/a.yaml": _envelope(ID)})
-    f = _fleet(tmp_path, {"id": ID, "repo": REPO})
+    f = _fleet(tmp_path, NEWSFILTER)
     assert _update(f) == fleet.Outcome(PRODUCER, fleet.CURRENT, reviewed=head)
     assert kc.calls() == []
     assert _state(f) == {ID: {"reviewed": head, "date": "2026-09-11", "outcome": "current"}}
@@ -1081,7 +1094,7 @@ def test_update_takes_only_the_named_producers(
         {"docs/architecture/a.yaml": _envelope("paper-clock")}
     )
     f = _fleet(
-        tmp_path, {"id": ID, "repo": REPO}, {"id": "paper-clock", "repo": "pvginkel/PaperClock"}
+        tmp_path, NEWSFILTER, PAPER_CLOCK
     )
     assert fleet.run(["update", "paper-clock"], f, NOW) == 0
     assert capsys.readouterr().out.splitlines() == [
@@ -1096,7 +1109,7 @@ def test_update_takes_only_the_named_producers(
 def test_update_rejects_an_unknown_producer_id(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    f = _fleet(tmp_path, {"id": ID, "repo": REPO})
+    f = _fleet(tmp_path, NEWSFILTER)
     with pytest.raises(SystemExit) as exit_:
         fleet.run(["update", "newsfilter", "nope", "design-assistant"], f, NOW)
     assert exit_.value.code == 2
@@ -1111,7 +1124,7 @@ def test_the_state_is_recorded_as_each_producer_finishes(
     tmp_path: Path, kc: FakeKc, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     Remote(tmp_path, REPO).commit({"docs/architecture/a.yaml": _envelope(ID)})
-    f = _fleet(tmp_path, {"id": ID, "repo": REPO}, {"id": "paper-clock", "repo": "x/PaperClock"})
+    f = _fleet(tmp_path, NEWSFILTER, PAPER_CLOCK)
     update_producer = fleet.update_producer
 
     def killed_at_the_second(
@@ -1336,7 +1349,7 @@ def _updated(
     remote.commit({"src/app.py": "app\n"})
     jenkins.remote = remote.bare
     kc.play(UPDATE, {"commit": _edit("the queue"), "response": HANDOFF}, *fixes)
-    return _fleet(tmp_path, {"id": ID, "repo": REPO, "jenkinsJob": JOB})
+    return _fleet(tmp_path, NEWSFILTER)
 
 
 def _deliver(f: fleet.Fleet) -> fleet.Outcome:
@@ -1369,7 +1382,7 @@ def test_the_job_index_reads_every_folder_level_once_per_run(jenkins: FakeJenkin
     assert "/job/Apps/job/Web/api/json" in jenkins.paths
     assert "/job/AaC/job/Home Assistant Fleet/config.xml" in jenkins.paths
     assert fleet.tracked_jobs(JOB, REPO, client) == [JOB, "Apps/Web/NewsFilter"]
-    assert fleet.tracked_jobs(None, "pvginkel/PaperClock", client) == ["Standalone"]
+    assert fleet.tracked_jobs("AaC/PaperClock", "pvginkel/PaperClock", client) == ["Standalone"]
     assert fleet.tracked_jobs("AaC/Home Assistant Fleet", "pvginkel/Architecture", client) == []
 
 
@@ -1465,6 +1478,26 @@ def test_a_job_the_push_does_not_start_is_not_tracked(
     assert (bool(outcome.issues), outcome.detail) == (
         False,
         "1 delta applied, 1 commit, validator clean. Skipped: none",
+    )
+
+
+def test_a_registry_job_the_push_does_not_start_is_unresolved_and_the_rest_tracked(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, tracker: FakeTracker
+) -> None:
+    f = _updated(tmp_path, kc, jenkins)
+    jenkins.job(JOB, trigger=TIMER_TRIGGER)
+    jenkins.job(APP)
+    tracker.play({APP: [_built(7, APP)]})
+    outcome = _deliver(f)
+    pushed = _pushed(tmp_path)
+    assert tracker.calls() == [(APP, pushed)]
+    assert (outcome.status, outcome.reviewed) == (fleet.UPDATED, pushed)
+    assert outcome.issues == (
+        f"{JOB} not tracked: a push to {REPO} does not start it "
+        "(no GitHub push trigger, or disabled)",
+    )
+    assert outcome.detail == (
+        f"1 delta applied, 1 commit, validator clean. Skipped: none; {outcome.issues[0]}"
     )
 
 
@@ -1857,13 +1890,13 @@ def _canned() -> list[fleet.Outcome]:
             fixes=(fixed,),
         ),
         fleet.Outcome(
-            fleet.Producer("paper-clock", "pvginkel/PaperClock"),
+            fleet.Producer("paper-clock", "pvginkel/PaperClock", "AaC/PaperClock"),
             fleet.FAILED,
             refused,
             issues=(refused,),
         ),
         fleet.Outcome(
-            fleet.Producer("dhcp-app", "pvginkel/DHCPApp"),
+            fleet.Producer("dhcp-app", "pvginkel/DHCPApp", "AaC/DHCPApp"),
             fleet.NOTHING,
             nothing.text,
             reviewed="e" * 40,
@@ -1871,18 +1904,21 @@ def _canned() -> list[fleet.Outcome]:
             update=fleet.UpdateResult(clone, "sid-2", nothing, ()),
         ),
         fleet.Outcome(
-            fleet.Producer("somfy-remote", "pvginkel/SomfyRemote"),
+            fleet.Producer("somfy-remote", "pvginkel/SomfyRemote", "AaC/SomfyRemote"),
             fleet.SKIPPED,
             "Only CI housekeeping.",
             reviewed="f" * 40,
             triage=fleet.Verdict(False, "Only CI housekeeping."),
         ),
         fleet.Outcome(
-            fleet.Producer("kitchen-display", "pvginkel/KitchenDisplay"),
+            fleet.Producer("kitchen-display", "pvginkel/KitchenDisplay", "AaC/KitchenDisplay"),
             fleet.CURRENT,
             reviewed="a" * 40,
         ),
-        fleet.Outcome(fleet.Producer("home-automation-fleet", None), fleet.UNMANAGED),
+        fleet.Outcome(
+            fleet.Producer("home-automation-fleet", None, "AaC/Home Assistant Fleet"),
+            fleet.UNMANAGED,
+        ),
     ]
 
 
@@ -1961,7 +1997,7 @@ def test_a_specs_repo_the_run_cannot_push_leaves_the_report_committed(
     tmp_path: Path, kc: FakeKc, capsys: pytest.CaptureFixture[str]
 ) -> None:
     Remote(tmp_path, REPO).commit({"docs/architecture/a.yaml": _envelope(ID)})
-    f = _fleet(tmp_path, {"id": ID, "repo": REPO})
+    f = _fleet(tmp_path, NEWSFILTER)
     hook = tmp_path / "specs.git" / "hooks" / "pre-receive"
     hook.write_text("#!/bin/sh\necho 'protected branch' >&2\nexit 1\n")
     hook.chmod(0o755)
@@ -1976,7 +2012,7 @@ def test_a_specs_repo_the_run_cannot_push_leaves_the_report_committed(
 def test_a_run_over_a_producer_without_a_repo_commits_the_report_alone(
     tmp_path: Path, kc: FakeKc
 ) -> None:
-    f = _fleet(tmp_path, {"id": "home-automation-fleet"})
+    f = _fleet(tmp_path, HA_FLEET)
     assert fleet.run(["update"], f, NOW) == 0
     assert not (f.spec_repo / fleet.STATE_FILE).exists()
     assert _git(f.spec_repo, "show", "--name-only", "--format=%s", "HEAD").splitlines() == [

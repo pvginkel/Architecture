@@ -104,11 +104,11 @@ USAGE.md § *Schema-change requests*.
 
 ## The pipeline
 
-`pipeline-producers.yaml` is the registry. For each entry the Jenkinsfile either
-`copyArtifacts` the producer's last-successful `architecture.yaml` from its Jenkins
-job, or — for the `architecture` **self-producer**, which has no `jenkinsJob` —
-copies this repo's own artifacts from `docs/architecture/`. The collector
-(`tooling/collect.py`) then:
+`pipeline-producers.yaml` is the registry. For each entry the Jenkinsfile
+`copyArtifacts` the producer's last-successful `architecture.yaml` from its
+`jenkinsJob` — except for the `architecture` **self-producer** (`self: true`, its
+job being this very pipeline), whose artifacts it copies from this repo's own
+`docs/architecture/`. The collector (`tooling/collect.py`) then:
 
 1. validates each artifact against the schema + triple matrix,
 2. merges them, cross-checking every cross-producer reference resolves,

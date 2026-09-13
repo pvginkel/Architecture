@@ -29,8 +29,10 @@ id, and `end` always.
 An update's commits are pushed to the default branch, and each job the push
 starts (every enabled Jenkins job whose SCM checks out the repo and which a
 GitHub push trigger starts, the registry's AaC job first) is followed with
-`track_build.py`. A job green before the push and red after it resumes the
-update session to fix it, FIX_ROUNDS times at most. Jenkins is `$JENKINS_URL`
+`track_build.py`; a registry job the push does not start is unresolved, since
+the producer's artifact build then went unverified. A job green before the
+push and red after it resumes the update session to fix it, FIX_ROUNDS times
+at most. Jenkins is `$JENKINS_URL`
 as `$JENKINS_USER`, by default JENKINS_URL and JENKINS_USER below;
 `$JENKINS_TOKEN` is the only credential.
 
@@ -155,9 +157,12 @@ class Fleet:
 
 @dataclass(frozen=True)
 class Producer:
+    """A registry entry: `repo` is None for a producer no repo's sources maintain, `job` the
+    Jenkins job that builds and archives its artifact."""
+
     id: str
     repo: str | None
-    job: str | None = None
+    job: str
 
 
 @dataclass(frozen=True)
@@ -353,7 +358,7 @@ def spec_repo_from(aiworkflowrc: Path) -> Path:
 
 def load_registry(path: Path) -> list[Producer]:
     return [
-        Producer(p["id"], p.get("repo"), p.get("jenkinsJob"))
+        Producer(p["id"], p.get("repo"), p["jenkinsJob"])
         for p in yaml.safe_load(path.read_text())["producers"]
     ]
 
@@ -954,10 +959,21 @@ class Jenkins:
         return None if build is None else str(build["result"])
 
 
-def tracked_jobs(job: str | None, repo: str, jenkins: Jenkins) -> list[str]:
-    """The jobs a push to `repo` starts, the registry's AaC job first."""
+def tracked_jobs(job: str, repo: str, jenkins: Jenkins) -> list[str]:
+    """The jobs a push to `repo` starts, the registry's job `job` first when it is one."""
     started = jenkins.jobs_by_repo().get(repo.lower(), ())
     return ([job] if job in started else []) + [j for j in started if j != job]
+
+
+def untracked_job(job: str, repo: str, jobs: list[str]) -> list[str]:
+    """The issue a registry job the push does not start leaves: the producer's artifact build
+    went unverified, which a run could not otherwise tell from a verified-green one."""
+    if job in jobs:
+        return []
+    return [
+        f"{job} not tracked: a push to {repo} does not start it "
+        "(no GitHub push trigger, or disabled)"
+    ]
 
 
 def parse_track_summary(stdout: str) -> tuple[Build, ...]:
@@ -1097,6 +1113,7 @@ def deliver(outcome: Outcome, update: UpdateResult, repo: str, jenkins: Jenkins)
         push, session_id = fix.push, fix.session_id
     issues = [f"fix round {n}: {fix.failure}" for n, fix in enumerate(fixes, 1) if fix.failure]
     issues += [issue for t in push.tracked if (issue := build_issue(t, len(fixes)))]
+    issues += untracked_job(producer.job, repo, jobs)
     return replace(
         outcome,
         detail="; ".join([outcome.detail, *issues]),

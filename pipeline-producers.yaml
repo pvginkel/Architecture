@@ -10,6 +10,12 @@ producers:
     jenkinsJob: AaC/Ansible
   - id: architecture
     repo: pvginkel/Architecture
+    # The self-producer: docs/architecture/ in this repo. AaC/Architecture is
+    # this pipeline, so `self` has the Jenkinsfile copy the files locally and
+    # leave the job out of its own upstream triggers; the central update tracks
+    # it after a push like any other.
+    jenkinsJob: AaC/Architecture
+    self: true
   - id: home-automation-fleet
     # Daily HA-fleet snapshot — its own scheduled job (Jenkinsfile.ha-fleet),
     # not build-triggered. Job name has spaces; rename the job + this value to

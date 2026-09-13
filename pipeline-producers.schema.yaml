@@ -16,7 +16,7 @@ properties:
     items:
       type: object
       additionalProperties: false
-      required: [id]
+      required: [id, jenkinsJob]
       properties:
         id:
           type: string
@@ -37,11 +37,22 @@ properties:
         jenkinsJob:
           type: string
           description: |
-            Jenkins job path, typically `<folder>/<branch>` (e.g.,
-            `ansible/master`). Used by the Jenkinsfile's copyArtifacts step.
-            Omit for self-producers whose source lives in this repo (the
-            Jenkinsfile copies docs/architecture/ locally instead).
+            The Jenkins job that builds and archives the producer's artifact,
+            as a job path (e.g., `AaC/Ansible`). The Jenkinsfile copies the
+            artifact from its last successful build and wires it as an
+            upstream trigger; the central architecture update tracks it after
+            a push and reports the producer unresolved when a push does not
+            start it. For the self-producer it is this repo's own pipeline.
           minLength: 1
+        self:
+          type: boolean
+          const: true
+          description: |
+            Marks the self-producer, whose artifact is docs/architecture/ in
+            this repo: the Jenkinsfile copies those files locally instead of
+            from `jenkinsJob`'s archive, and leaves `jenkinsJob` — this very
+            pipeline — out of its upstream triggers. Omit for every other
+            producer.
         defaultLogo:
           type: string
           description: |

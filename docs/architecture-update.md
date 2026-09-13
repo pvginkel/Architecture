@@ -20,7 +20,7 @@ producer-side kit lives under this repo's `.claude/` and is copied into each clo
 | `.claude/skills/seed-architecture/SKILL.md` | first-version authoring, for a repo that has no artifact yet |
 | `.claude/architecture/` | `producer-manual.md` (the vocabulary the agents read on startup), `architecture.yaml` (the starter skeleton), `arch-validate.py` (the only copy) |
 | `.claude/skills/architecture-update/SKILL.md` | the operator's entry point here: runs the tool and sends the one notification |
-| `pipeline-producers.yaml` | the registry — which producers exist, and which GitHub repo each one is |
+| `pipeline-producers.yaml` | the registry — which producers exist, which GitHub repo each one is, and which Jenkins job builds its artifact |
 
 The **kit** is `.claude/agents/`, `.claude/skills/seed-architecture/` and `.claude/architecture/`
 (`KIT_DIRS` in `fleet.py`). The `architecture-update` skill drives the fleet from here and is
@@ -32,6 +32,13 @@ deliberately not part of it.
   `collect.py` at startup. A producer without one is *not fleet-managed* and the tool never touches
   it; today that is only `home-automation-fleet`, whose artifact a scheduled job generates from the
   live Home Assistant state rather than from sources in a repo.
+- **`jenkinsJob:`** — the job that builds and archives the artifact, which every producer has. After
+  a push the tool tracks it first; a push that does not start it (no push trigger, or disabled)
+  leaves the producer unresolved with that said, because a run cannot otherwise tell a
+  verified-green producer from one whose artifact build was never followed. This repo is a producer
+  too — `architecture`, marked `self: true` — and its job is the `AaC/Architecture` pipeline itself,
+  which the Jenkinsfile therefore copies locally rather than from an archive and leaves out of its
+  own upstream triggers; the tool tracks it after a push like any other.
 - **`.architecturerc` at the repo root** — optional. `generated` (default `false`), `sources` (git
   pathspecs, default `:(glob)**/docs/architecture/**`) and `instructions` (free text handed verbatim
   to both sessions, and authoritative over the agents' own files on anything specific to that repo).
@@ -91,7 +98,9 @@ Without that bound one build that never completes parks the whole sequential run
 Which jobs those are is decided once per run from Jenkins' REST API: every enabled job whose SCM
 checks out the repo and which carries a GitHub push trigger, the registry's `jenkinsJob` first. A
 timer-driven, hand-run or disabled job on the same repo is left out on purpose — it will never build
-the pushed commit, and the tracker would wait for a build that never appears.
+the pushed commit, and the tracker would wait for a build that never appears. When the job left out
+is the registry's own, the producer is unresolved: its commits are pushed all the same, but its
+artifact build went unverified and the report says so.
 
 Each job's last completed result is read *before* the push, which is what makes attribution
 possible. Green before and red after is the update's doing: the tool resumes the same update session
