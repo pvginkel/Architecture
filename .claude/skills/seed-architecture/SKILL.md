@@ -73,10 +73,12 @@ conventions** below, and tell it to return a tagged candidate table with
   base-URL constants in code and so hide from an env-var scan.
 
 Skip vendor dirs, lockfiles, `.venv/`, `__pycache__/`, `tmp/`. Aggregate the
-agents' findings into one inventory file:
+agents' findings into one inventory file **outside the clone** — the central
+update refuses a clone whose working tree is dirty, and nothing here would
+remove it:
 
 ```
-tmp/architecture-inventory/<producer-id>-inventory.md
+/tmp/architecture-update/inventory/<producer-id>-inventory.md
 ```
 
 `<producer-id>` is the bare kebab this repo will use as its `producer:`
