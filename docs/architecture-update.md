@@ -128,9 +128,10 @@ being shared with the dev pipeline, and pushes.
 
 The operator's entry point is the `architecture-update` skill: it starts `fleet.py update` in the
 background under `timeout --signal=INT --kill-after=2m 12h` and, when the run exits, sends one
-`notification` message with the report path and the unresolved count — or, on exit 124, that the run
-was killed rather than finished. SIGINT rather than SIGTERM is what lets the tool end the headless
-session it is driving.
+`notification` message with the report path and the unresolved and judgment-call counts — or, on
+exit 4, that the report is on disk but could not be committed and pushed to the specs repo, or, on
+exit 124, that the run was killed rather than finished. SIGINT rather than SIGTERM is what lets the
+tool end the headless session it is driving.
 
 The tool itself is plain `python3`: the standard library and PyYAML only, so it runs in the dev
 container without the Poetry environment. (Its tests run under Poetry, with the rest of tooling's

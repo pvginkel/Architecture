@@ -1965,8 +1965,10 @@ def test_a_specs_repo_the_run_cannot_push_leaves_the_report_committed(
     hook = tmp_path / "specs.git" / "hooks" / "pre-receive"
     hook.write_text("#!/bin/sh\necho 'protected branch' >&2\nexit 1\n")
     hook.chmod(0o755)
-    assert fleet.run(["update"], f, NOW) == 1
-    assert "publishing the report failed: git push failed: " in capsys.readouterr().err
+    assert fleet.run(["update"], f, NOW) == fleet.UNPUBLISHED_EXIT == 4
+    out, err = capsys.readouterr()
+    assert out.splitlines()[-2:] == ["unresolved: 0", "judgment calls: 0"]
+    assert "publishing the report failed: git push failed: " in err
     assert _git(f.spec_repo, "log", "-1", "--format=%s") == "Architecture update 2026-09-11T1430"
     assert (f.spec_repo / fleet.report_file(NOW)).exists()
 

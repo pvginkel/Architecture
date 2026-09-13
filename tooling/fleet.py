@@ -38,7 +38,9 @@ The run writes its report beside the state file, commits both by name because
 the specs repo's working tree is shared with the dev pipeline, and pushes. It
 exits 1 when the report's Unresolved section has anything in it: something
 failed. The sessions' own `Skipped:` judgment calls are reported in a section
-of their own and do not count.
+of their own and do not count. It exits 4 when the report could not be
+published: the run finished and the report is on disk, but not in the specs
+repo.
 """
 
 from __future__ import annotations
@@ -112,6 +114,11 @@ PUSH_TRIGGER = "com.cloudbees.jenkins.GitHubPushTrigger"
 SUMMARY = "=== Build tracking summary ==="
 SUMMARY_ROW = re.compile(r"(.+?)\s+#(\d+)\s+(\S+)\s.*")
 SUMMARY_LOG = re.compile(r"\s*↳ full log: (.+)")
+
+
+# `update`'s exit codes; argparse's usage error is 2, and the skill's `timeout` 124.
+UNRESOLVED_EXIT = 1
+UNPUBLISHED_EXIT = 4
 
 
 class ProducerError(Exception):
@@ -1300,8 +1307,8 @@ def cmd_update(fleet: Fleet, producers: list[Producer], now: datetime) -> int:
         publish(fleet, now)
     except ProducerError as e:
         print(f"publishing the report failed: {e}", file=sys.stderr)
-        return 1
-    return 1 if issues else 0
+        return UNPUBLISHED_EXIT
+    return UNRESOLVED_EXIT if issues else 0
 
 
 def run(argv: list[str], fleet: Fleet, now: datetime) -> int:

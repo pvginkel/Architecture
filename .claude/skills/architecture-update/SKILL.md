@@ -52,10 +52,8 @@ affects the exit code. What the message says, by exit code:
 |---|---|
 | 0 | the run finished, the report path, nothing unresolved, `<m>` judgment calls to read |
 | 1 | the run finished, the report path, `<n>` unresolved items waiting for the operator, `<m>` judgment calls |
+| 4 | the run finished but its report is **not in the specs repo**: the report path on disk, both counts, and the log's last line, which says why the commit or push failed |
 | 124 | the run was **killed** at the timeout, not finished: the log path, and that every producer it finished kept its state |
 | other | the tool did not run: the log path and the last line of the log |
-
-Exit 1 also covers a report the tool could not commit and push to the specs
-repo; its last stderr line says so, and the report is on disk either way.
 
 Don't summarise the report in the message — the operator reads it himself.
