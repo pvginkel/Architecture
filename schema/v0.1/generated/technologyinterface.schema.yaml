@@ -144,3 +144,12 @@ properties:
     description: Cluster identifier when the interface is cluster-scoped.
     type: string
     minLength: 1
+  webUi:
+    description: 'true marks an interface a human opens in a browser, which is the homeapps launcher''s tile opt-in. Absent
+      means not a web UI. A positive opt-in: mark only human UIs. An HTTP server is not a web UI, so machine endpoints never
+      carry it (REST/gRPC APIs, /metrics, MQTT/pub-sub, S3/object storage, MCP servers, image registries, ACME/CA). When one
+      service backs both a UI and a non-UI surface (e.g. OpenBao''s 443 console vs its 8200 admin API), mark only the UI''s
+      interface.
+
+      '
+    type: boolean
