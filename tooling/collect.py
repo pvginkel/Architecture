@@ -978,8 +978,8 @@ def check_views(
       (layers/kinds from subset.yaml, capabilities/lifecycle/environments from
       the enums, producers from the registry, releases from the merged data);
     - `defaultEnvironment` is a known environment;
-    - every `include`/`exclude` id resolves to an element in the merged set
-      (same fail-loud stance as a dangling relation ref).
+    - every `include`/`includeUnexpanded`/`exclude` id resolves to an element
+      in the merged set (same fail-loud stance as a dangling relation ref).
 
     Schema-shape was already enforced by load_views; this is the semantic pass.
     """
@@ -1038,35 +1038,37 @@ def check_views(
                 f"not in enums/environments.yaml"
             )
 
-        # An include entry may be a literal id or a /regex/ over element ids (see
-        # the schema). A literal must resolve; a regex must compile and match at
-        # least one element — a dead pattern is as much a bug as a dangling id.
-        for ref in view.get("include") or []:
-            pattern = _view_include_regex(ref)
-            if pattern is not None:
-                try:
-                    rx = re.compile(pattern)
-                except re.error as exc:
-                    messages.append(
-                        f"view {vid!r}: include pattern {ref!r} is not a valid "
-                        f"regex: {exc}"
-                    )
+        # An include/includeUnexpanded entry may be a literal id or a /regex/
+        # over element ids (see the schema). A literal must resolve; a regex must
+        # compile and match at least one element — a dead pattern is as much a
+        # bug as a dangling id.
+        for field in ("include", "includeUnexpanded"):
+            for ref in view.get(field) or []:
+                pattern = _view_include_regex(ref)
+                if pattern is not None:
+                    try:
+                        rx = re.compile(pattern)
+                    except re.error as exc:
+                        messages.append(
+                            f"view {vid!r}: {field} pattern {ref!r} is not a "
+                            f"valid regex: {exc}"
+                        )
+                        continue
+                    if not any(rx.search(eid) for eid in index.by_full_id):
+                        messages.append(
+                            f"view {vid!r}: {field} pattern {ref!r} matches no "
+                            f"element in the merged dataset"
+                        )
                     continue
-                if not any(rx.search(eid) for eid in index.by_full_id):
+                # Views are repo-level, not a producer; hint-only references
+                # would need an owning producer to resolve, so pass "" and
+                # require full/uuid ids (matches cross-producer ref rules).
+                entry, _ = index.resolve(ref, "")
+                if entry is None:
                     messages.append(
-                        f"view {vid!r}: include pattern {ref!r} matches no "
+                        f"view {vid!r}: {field} id {ref!r} resolves to no "
                         f"element in the merged dataset"
                     )
-                continue
-            # Views are repo-level, not a producer; hint-only references would
-            # need an owning producer to resolve, so pass "" and require
-            # full/uuid ids (matches cross-producer ref rules).
-            entry, _ = index.resolve(ref, "")
-            if entry is None:
-                messages.append(
-                    f"view {vid!r}: include id {ref!r} resolves to no "
-                    f"element in the merged dataset"
-                )
 
         for ref in view.get("exclude") or []:
             entry, _ = index.resolve(ref, "")

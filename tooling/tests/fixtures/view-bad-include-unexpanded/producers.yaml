@@ -1,0 +1,5 @@
+producers:
+- id: ansible
+  jenkinsJob: ansible/master
+- id: helm
+  jenkinsJob: HelmCharts/master

@@ -140,7 +140,8 @@ elements and relations.
   Select-All; collapse state persists in `localStorage` keyed by the `?src` hash.
 - **Views:** a tab strip across the canvas. Each view is a declarative predicate
   (`{layers, kinds, producers, capabilities, lifecycle, environments, releases}`)
-  plus optional include/exclude id lists and a neighbour-expansion depth. Landscape
+  plus optional include/exclude id lists, a neighbour-expansion depth, and an
+  `includeUnexpanded` list that joins after the expansion. Landscape
   opens by default; Everything (full filter machinery, no predicate) is last.
 - **DTAP:** the model carries separate elements per environment; the viewer defaults
   to **prd** (and elements with no environment), and the Environment filter reveals

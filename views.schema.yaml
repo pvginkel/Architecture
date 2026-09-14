@@ -12,6 +12,7 @@ description: |
       base   = elements matching predicate (AND across fields, OR within a field)
       base   = (base ∪ include) − exclude
       scoped = base ∪ { elements within neighbourDepth relation-hops of base }
+      scoped = scoped ∪ includeUnexpanded
 
   `excludeInstances: true` first removes runtime instances (elements carrying an
   `environment` and/or `stats.release`) from the universe, so they appear in
@@ -105,6 +106,18 @@ properties:
       gates still filter their expansion neighbours — so you can anchor a hub
       (e.g. the IoT Support app) without pulling in the noisy fan-out its
       producer emits.
+  includeUnexpanded:
+    $ref: "#/$defs/valueList"
+    description: |
+      Element ids added to the scope after the neighbour expansion, so they show
+      without pulling in their own neighbours. Use for a system just past the
+      view's edge whose other relations are not the view's business, e.g. the
+      Jenkins behind the Intercom's Jenkins MCP filter, which `include` would
+      bring in together with everything else Jenkins touches. Entries take the
+      same literal-id and `/pattern/` forms as `include` and must resolve the same
+      way. Matched elements always join the scope: `exclude` and the exclude*
+      gates act before them. They play no part in the include-only rule, which
+      keys on `include`.
   exclude:
     $ref: "#/$defs/valueList"
     description: |

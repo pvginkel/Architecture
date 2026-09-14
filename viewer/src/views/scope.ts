@@ -6,6 +6,7 @@
 //   base   = elements matching predicate (AND across fields, OR within a field)
 //   base   = (base ∪ include) − exclude
 //   scoped = base ∪ { elements within neighbourDepth relation-hops of base }
+//   scoped = scoped ∪ includeUnexpanded
 //
 // An empty predicate normally matches the whole model (the Everything view). The
 // one exception: an empty predicate paired with an `include` list is an
@@ -167,8 +168,19 @@ function asRegExp(entry: string): RegExp | null {
   return match ? new RegExp(match[1], match[2]) : null;
 }
 
+/** The element ids an `include`/`includeUnexpanded` entry names: every id a
+ *  `/pattern/` matches, or the literal id itself when the model has it. */
+function matchInclude(entry: string, model: ArchModel): string[] {
+  const pattern = asRegExp(entry);
+  if (pattern) {
+    return model.elements.filter((el) => pattern.test(el.id)).map((el) => el.id);
+  }
+  return model.elementById.has(entry) ? [entry] : [];
+}
+
 /** The set of element ids a view scopes (predicate ∪ include − exclude, then
- *  neighbour-expanded). Environment is applied later by the filter layer. */
+ *  neighbour-expanded, then ∪ includeUnexpanded). Environment is applied later
+ *  by the filter layer. */
 export function resolveViewScope(
   view: ViewDefinition,
   model: ArchModel,
@@ -226,21 +238,23 @@ export function resolveViewScope(
     // IoT Support app while excludeProducers strips that producer's noisy
     // deployment software from the *expansion*). The gates still apply to every
     // other element, so a named hub appears without its fan-out.
-    const pattern = asRegExp(entry);
-    if (pattern) {
-      for (const el of model.elements) {
-        if (pattern.test(el.id)) {
-          base.add(el.id);
-        }
-      }
-    } else if (model.elementById.has(entry)) {
-      base.add(entry);
+    for (const id of matchInclude(entry, model)) {
+      base.add(id);
     }
   }
   for (const id of view.exclude ?? []) {
     base.delete(id);
   }
-  return expandNeighbours(base, view.neighbourDepth ?? 0, model, admits);
+  const scoped = expandNeighbours(base, view.neighbourDepth ?? 0, model, admits);
+  // includeUnexpanded joins after the expansion: its elements show, past
+  // exclude and the gates, but their own neighbours stay out — a system just
+  // past the view's edge without everything else it touches.
+  for (const entry of view.includeUnexpanded ?? []) {
+    for (const id of matchInclude(entry, model)) {
+      scoped.add(id);
+    }
+  }
+  return scoped;
 }
 
 /** The filter state a view seeds on open: the Environment group set to the

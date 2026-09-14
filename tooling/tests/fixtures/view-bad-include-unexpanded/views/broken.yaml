@@ -1,0 +1,6 @@
+id: broken
+label: Broken
+description: Adds an unexpanded element that does not exist in the merged set.
+icon: Map
+includeUnexpanded:
+  - ss:does-not-exist

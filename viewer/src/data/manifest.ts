@@ -91,6 +91,7 @@ export interface ViewDefinition {
   icon: string;
   predicate?: ViewPredicate;
   include?: string[];
+  includeUnexpanded?: string[];
   exclude?: string[];
   excludeInstances?: boolean;
   excludeKinds?: string[];

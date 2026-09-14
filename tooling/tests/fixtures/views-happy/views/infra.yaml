@@ -1,7 +1,9 @@
 id: infra
 label: Infrastructure
-description: Compute nodes only.
+description: Compute nodes, plus the Keycloak instance without its neighbours.
 icon: Network
 predicate:
   kinds: [Node]
+includeUnexpanded:
+  - "/^ss:keycloak-prd,/"
 neighbourDepth: 0
