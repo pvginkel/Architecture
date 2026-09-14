@@ -14,6 +14,13 @@ icon: Radio
 # is left in — without it the units float unconnected. iotsupport-app is not
 # excluded here: the intercom subgraph is self-contained, so depth 1 pulls in
 # only the intercom firmware, none of that producer's other gadgets.
+#
+# The systems behind the MCP servers (Jenkins, the Trello MCP server, Gitblit,
+# Home Assistant) sit two hops out too (system -> MCP server or filter ->
+# server). They are includeUnexpanded, not include: an include is expanded as
+# well, and depth 1 from these systems would pull in everything else they touch
+# (Home Assistant's device fleet and the other gadgets' firmware, the Jenkins
+# telegram bot, their product definitions).
 predicate:
   releases: [intercom]
 include:
@@ -21,4 +28,10 @@ include:
   # All intercom units, matched by id prefix so the volatile per-deployment hash
   # in each id (device:intercom-vN-<hash>) doesn't need pinning.
   - "/^device:intercom-v/"
+includeUnexpanded:
+  # The helm-charts instances are matched by id prefix, like the units.
+  - "/^ss:jenkins-prd-jenkins-jenkins,/"
+  - "/^ss:trello-mcp-prd-trello-mcp-server,/"
+  - "/^ss:git-sync-prd-gitblit-gitblit-app,/"
+  - ss:home-assistant-prd,398e32ec-cbe7-40e4-8a66-094029653650 # Home Assistant
 neighbourDepth: 1
