@@ -16,8 +16,7 @@ on the element kind that carries it. A browser UI a human opens is marked by `we
 interface, not by a `Realization`. That boolean exists only on `ApplicationInterface` and
 `TechnologyInterface`. The protocol an interface speaks (MCP, say) is not a capability either.
 
-`cap:web-ui` and `cap:mcp` are tags of that kind, and producers still reference them. An entry can
-leave the enum only once no producer references it: `reconcile_capability_enum` in
+An entry can leave the enum only once no producer references it: `reconcile_capability_enum` in
 `tooling/collect.py` fails the whole collector run on any `cap:` id the enum does not hold.
 
 ## The three places a new entry touches
