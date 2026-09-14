@@ -14,7 +14,7 @@ be assembled without opening them all.
 - [slice-test-plan.md](slice-test-plan.md) — how a merged slice is proven: the tree-wide suites, the viewer and service live checks, the push and the CI follow-up.
 - [slice-doc-plan.md](slice-doc-plan.md) — which doc surfaces a shipped slice must bring up to date, and in what order.
 - [deployment.md](deployment.md) — the self-hosted stack the container artifact ships into (K8s/Jenkins/Kaniko/Ansible); what's in scope here vs the operator's.
-- [capability-enum.md](capability-enum.md) — the three places a `cap:` enum entry must touch (enum → generated vocab → hand-added viewer icon).
+- [capability-enum.md](capability-enum.md) — what belongs in the capability enum: a strategy-layer role, never a flag on an access point, which is an attribute such as the interface kinds' `webUi`. Why an entry leaves only once no producer references it. The three places a `cap:` enum entry must touch (enum → generated vocab → hand-added viewer icon).
 - [architecture-update.md](architecture-update.md) — the central architecture update: `tooling/fleet.py`, the producer-side kit under `.claude/` it stages into each clone, the triage and update sessions, the tracked builds, and the run's report.
 
 ## Not topic docs

@@ -94,7 +94,8 @@ property of an element's **kind**, not the element:
 
 Every element carries `id`, `label`, `summary`, `introduced`, `lifecycle`
 (`active`/`deprecated`/`removed`), and the collector-stamped `producer`. Per-kind
-attributes add `environment` (DTAP), `cluster`, `stereotype`, `logo`, `homepage`,
+attributes add `environment` (DTAP), `cluster`, `webUi` (the browser-UI opt-in,
+on the two interface kinds only), `stereotype`, `logo`, `homepage`,
 `sourceRepository`, and free-form `stats`. The full envelope and the producer
 contract are in [`USAGE.md`](./USAGE.md).
 
