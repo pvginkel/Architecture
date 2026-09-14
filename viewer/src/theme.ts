@@ -115,8 +115,6 @@ export const CAPABILITY_ICON: Record<CapabilityId, LucideIcon> = {
   "cap:media-streaming": Clapperboard,
   "cap:home-automation": House,
   "cap:iot-device": Cpu,
-  "cap:mcp": Plug,
-  "cap:web-ui": AppWindow,
 };
 
 // ---------- ArchiMate relationship notation ----------

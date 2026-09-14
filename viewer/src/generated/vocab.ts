@@ -102,8 +102,6 @@ export const CAPABILITY_IDS = [
   "cap:media-streaming",
   "cap:home-automation",
   "cap:iot-device",
-  "cap:mcp",
-  "cap:web-ui",
 ] as const;
 export type CapabilityId = (typeof CAPABILITY_IDS)[number];
 
@@ -193,8 +191,6 @@ export const CAPABILITY_LABELS = {
   "cap:media-streaming": "Media streaming",
   "cap:home-automation": "Home automation",
   "cap:iot-device": "IoT device",
-  "cap:mcp": "Model Context Protocol server",
-  "cap:web-ui": "Web UI",
 } as const satisfies Record<CapabilityId, string>;
 
 export const CAPABILITY_SUMMARIES = {
@@ -230,8 +226,6 @@ export const CAPABILITY_SUMMARIES = {
   "cap:media-streaming": "Audio/video catalogue, transcoding, client delivery.",
   "cap:home-automation": "Sensor and actuator orchestration over Zigbee/MQTT.",
   "cap:iot-device": "In-house ESP32 hardware/firmware device managed by IoTSupport and integrated via MQTT discovery.",
-  "cap:mcp": "Exposes tools and resources to LLM agents over the Model Context Protocol (MCP).",
-  "cap:web-ui": "Offers a browser-facing web UI a human points a browser at. Positive opt-in \u2014 machine endpoints (APIs, /metrics, MQTT, S3) do not realize it.",
 } as const satisfies Record<CapabilityId, string>;
 
 export const LIFECYCLE_LABELS = {
