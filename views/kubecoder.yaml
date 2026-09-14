@@ -9,10 +9,10 @@ icon: Container
 #
 # All four products are include-anchored: every edge — the wire surface each
 # realizes, the internal consumes-* edges (①/②/③), cap:container-orchestration,
-# and the external GitHub / Anthropic / Telegram /
-# VS Code Dev Tunnels Serving edges — is authored on a product, so naming them
-# lands those one hop out. The worker also has no chart instance (it is injected
-# into env pods as an ImageVolume), so anchoring it is the only way it and its
+# and the external GitHub / Anthropic / Telegram / VS Code Dev Tunnels Serving
+# edges — is authored on a product, so naming them lands those one hop out. The
+# worker also has no chart instance (it is injected into env pods as an
+# ImageVolume), so anchoring it is the only way it and its
 # GitHub/Anthropic/tunnel dependencies appear at all.
 predicate:
   releases: [kubecoder]
