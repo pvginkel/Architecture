@@ -14,14 +14,10 @@ icon: Radio
 # is left in — without it the units float unconnected. iotsupport-app is not
 # excluded here: the intercom subgraph is self-contained, so depth 1 pulls in
 # only the intercom firmware, none of that producer's other gadgets.
-#
-# cap:mcp is included so the Model Context Protocol capability the MCP servers
-# realise shows as their shared anchor (it sits at depth 2 otherwise).
 predicate:
   releases: [intercom]
 include:
   - app:intercom-server,c313fb20-b8df-4f6c-be1b-23af65e26705 # Intercom Server (anchor)
-  - cap:mcp # Model Context Protocol server capability
   # All intercom units, matched by id prefix so the volatile per-deployment hash
   # in each id (device:intercom-vN-<hash>) doesn't need pinning.
   - "/^device:intercom-v/"

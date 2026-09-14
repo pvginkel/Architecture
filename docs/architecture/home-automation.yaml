@@ -99,6 +99,7 @@ technologyInterfaces:
     introduced: 2026-05-28
     lifecycle: active
     environment: prd
+    webUi: true
     logo: home-assistant
     stats:
       url: https://homeassistant.webathome.org
@@ -176,10 +177,6 @@ relations:
   - id: rel:home-assistant-prd-realizes-api
     source: ss:home-assistant-prd,398e32ec-cbe7-40e4-8a66-094029653650
     target: svc:home-assistant-api,001f7df8-de45-471c-9307-13466784ea1d
-    type: Realization
-  - id: rel:home-assistant-api-if-realizes-web-ui
-    source: if:home-assistant-api,e1606bc9-faf0-4723-b616-63d7c8f9ec6d
-    target: cap:web-ui
     type: Realization
   - id: rel:home-assistant-prd-composes-api-if
     source: ss:home-assistant-prd,398e32ec-cbe7-40e4-8a66-094029653650

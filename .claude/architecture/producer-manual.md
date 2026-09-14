@@ -196,8 +196,21 @@ Per-kind additions:
 
 - `environment` (optional, on Node, ApplicationComponent, SystemSoftware, ApplicationService, ApplicationInterface, TechnologyService, TechnologyInterface): `dev` \| `tst` \| `uat` \| `prd`
 - `cluster` (optional, on Node, SystemSoftware, ApplicationComponent, ApplicationService, ApplicationInterface, TechnologyService, TechnologyInterface): cluster identifier
+- `webUi` (optional, on ApplicationInterface, TechnologyInterface): boolean — `true` marks a browser UI a human opens
 
 Set `environment` (and `cluster`, where applicable) on every element where the answer isn't "all of them" — externally-shared elements like `svc:github-api` legitimately span environments and stay unset.
+
+**Browser UIs carry `webUi: true` on their interface.** If an interface offers
+a browser-facing UI a human opens, set `webUi: true` on it — the homeapps
+launcher surfaces every `webUi: true` interface (prd) as a tile. It is a
+positive opt-in: mark only human UIs, and leave it absent everywhere else. An
+HTTP server is not a web UI — machine endpoints never get it (REST/gRPC APIs,
+`/metrics`, MQTT/pub-sub, S3/object storage, MCP servers, image registries,
+ACME/CA). The attribute exists only on the two interface kinds: a browser UI
+with no modelled interface gets one, and the attribute never goes on its
+service or component. When one service backs both a UI and a non-UI surface
+(e.g. OpenBao's 443 console vs its 8200 admin API), mark only the UI's
+interface so only the UI becomes a tile.
 
 **Do not emit a `producer:` attribute on elements.** The collector
 stamps it onto every merged element from the envelope `producer:` key.
@@ -556,15 +569,6 @@ discovery), add a `Realization` from your firmware `ss:` element to
 `cap:iot-device`. That single edge is the selection axis for the IoT view —
 it is how your device shows up in it.
 
-**Browser UIs Realize `cap:web-ui`.** If a service or interface offers a
-browser-facing UI a human opens, add a `Realization` to `cap:web-ui` — the
-homeapps launcher surfaces every `cap:web-ui` interface (prd) as a tile. It is a
-positive opt-in: mark only human UIs. An HTTP server is not a web UI — machine
-endpoints never get it (REST/gRPC APIs, `/metrics`, MQTT/pub-sub, S3/object
-storage, MCP servers, image registries, ACME/CA). Prefer marking the
-**interface** when one service backs both a UI and a non-UI surface (e.g.
-OpenBao's 443 console vs its 8200 admin API) so only the UI becomes a tile.
-
 ```
 cap:iam                       Identity & Access Management
 cap:secrets-management        Secrets storage / rotation / lease management
@@ -598,8 +602,6 @@ cap:vpn                       Encrypted network tunnel
 cap:media-streaming           Audio/video catalogue, transcoding, client delivery
 cap:home-automation           Sensor/actuator orchestration over Zigbee/MQTT
 cap:iot-device                IoT device (in-house ESP32 firmware; MQTT-discovery, managed by IoTSupport)
-cap:mcp                       Model Context Protocol server (tools/resources for LLM agents)
-cap:web-ui                    Browser-facing web UI a human opens (homeapps launcher tiles; opt-in, never for APIs)
 ```
 
 If a needed capability isn't listed, raise it with Pieter — adding
