@@ -131,6 +131,7 @@ properties:
     - xaml
     - xml
     - yaml
+    - youtrack
     - zigbee2mqtt
   environment:
     description: DTAP stage. Omit for surfaces that span environments (e.g. external APIs).

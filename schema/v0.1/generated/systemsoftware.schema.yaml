@@ -131,6 +131,7 @@ properties:
     - xaml
     - xml
     - yaml
+    - youtrack
     - zigbee2mqtt
   environment:
     description: DTAP stage. Custom attribute, not ArchiMate's Plateau.

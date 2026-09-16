@@ -131,4 +131,5 @@ properties:
     - xaml
     - xml
     - yaml
+    - youtrack
     - zigbee2mqtt

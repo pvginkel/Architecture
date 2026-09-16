@@ -323,6 +323,7 @@ export const LOGO_FILES = {
   "xaml": "xaml.png",
   "xml": "xml.svg",
   "yaml": "yaml.svg",
+  "youtrack": "youtrack.svg",
   "zigbee2mqtt": "zigbee2mqtt.png",
 } as const;
 export type LogoName = keyof typeof LOGO_FILES;
