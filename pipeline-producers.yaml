@@ -121,3 +121,7 @@ producers:
     repo: pvginkel/KubeCoder
     jenkinsJob: AaC/KubeCoder
     defaultLogo: kubecoder
+  - id: youtrack-mcp-server
+    repo: pvginkel/YouTrackMCPServer
+    jenkinsJob: AaC/YouTrackMCPServer
+    defaultLogo: youtrack
