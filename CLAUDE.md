@@ -53,8 +53,6 @@ the contract is `.aiworkflowrc` and `.kubecoder/project.yaml`. The specs repo at
 `../ArchitectureSpecs` holds slices and the decision index; it is a separate git repo, so commit
 there separately.
 
-Issue tracking follows the host convention; this project's owner tag is **`Architecture`**.
-
 ## Documentation
 
 Design and conventions live in `docs/` — one per scope (root for cross-cutting, plus one per
