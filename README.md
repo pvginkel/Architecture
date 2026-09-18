@@ -238,7 +238,7 @@ Self-hosted homelab: Kubernetes, Jenkins, Kaniko, Ansible. The Helm chart lives 
 The system is built and live end-to-end: schema, validation service, federation
 pipeline, 30 onboarded producers, and the data-driven viewer. Remaining items are
 deferred design decisions (logo single-sourcing, producer-supplied logos in the
-image, a canonical service↔interface idiom) tracked on the project's Trello board.
+image, a canonical service↔interface idiom).
 
 The operator-side workflow (producer manual, seeding skill, triage and update
 agents) lives under `.claude/` in this repo, and `tooling/fleet.py` is the central

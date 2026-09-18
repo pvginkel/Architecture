@@ -187,10 +187,8 @@ are new (self-producer / `intercom-server`); they resolve once those producers n
   now superseded by this doc.)
 - Per-firmware modeling notes are committed inside each firmware repo at
   `docs/architecture/SEED-NOTES.md` (durable, not part of any backfill scratch folder).
-- Trello card #25 ("Model the IoT device fleet that depends on iotsupport-app") is the
-  umbrella this generator closes.
 - The image→product mapping file is a stopgap for a v0.1 gap: build artifacts (container
   images, firmware binaries) have no element kind, so name→product is a side-channel in both
-  HelmCharts and IoT Support. Proper fix tracked as a Trello backlog card: a v0.2 ArchiMate
+  HelmCharts and IoT Support. The proper fix is a v0.2 ArchiMate
   «Artifact» element (build-name identity + `Artifact —Realization→ «SoftwareProduct»`),
   after which both side-channels resolve through the model.
