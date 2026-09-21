@@ -90,9 +90,6 @@ producers:
   - id: underfloor-heating-controller
     repo: pvginkel/UnderfloorHeatingController
     jenkinsJob: AaC/UnderfloorHeatingController
-  - id: somfy-remote
-    repo: pvginkel/SomfyRemote
-    jenkinsJob: AaC/SomfyRemote
   - id: paper-clock
     repo: pvginkel/PaperClock
     jenkinsJob: AaC/PaperClock
