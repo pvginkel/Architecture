@@ -122,3 +122,6 @@ producers:
     repo: pvginkel/YouTrackMCPServer
     jenkinsJob: AaC/YouTrackMCPServer
     defaultLogo: youtrack
+  - id: argocd-deploy
+    repo: pvginkel/ArgoCDDeploy
+    jenkinsJob: AaC/ArgoCDDeploy
