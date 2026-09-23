@@ -26,10 +26,6 @@ tools:
 # it a useful smoke test.
 imageBuilder: true
 
-secrets:
-  # track_build.py, for following a pushed AaC/Architecture build.
-  JENKINS_TOKEN: jenkins-token
-
 packages: []
 
 preamble:
