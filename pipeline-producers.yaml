@@ -146,3 +146,6 @@ producers:
   - id: iac-provisioner-deploy
     repo: pvginkel/IacProvisionerDeploy
     jenkinsJob: AaC/IacProvisionerDeploy
+  - id: newsfilter-deploy
+    repo: pvginkel/NewsfilterDeploy
+    jenkinsJob: AaC/NewsfilterDeploy
