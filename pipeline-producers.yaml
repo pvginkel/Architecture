@@ -170,3 +170,6 @@ producers:
   - id: calendar-support-deploy
     repo: pvginkel/CalendarSupportDeploy
     jenkinsJob: AaC/CalendarSupportDeploy
+  - id: git-sync-deploy
+    repo: pvginkel/GitSyncDeploy
+    jenkinsJob: AaC/GitSyncDeploy
