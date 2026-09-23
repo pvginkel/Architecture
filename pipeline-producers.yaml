@@ -179,3 +179,6 @@ producers:
   - id: intercom-deploy
     repo: pvginkel/IntercomDeploy
     jenkinsJob: AaC/IntercomDeploy
+  - id: telegram-mcp-deploy
+    repo: pvginkel/TelegramMcpDeploy
+    jenkinsJob: AaC/TelegramMcpDeploy
