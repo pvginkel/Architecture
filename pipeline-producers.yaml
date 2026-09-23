@@ -176,3 +176,6 @@ producers:
   - id: infra-statistics-deploy
     repo: pvginkel/InfraStatisticsDeploy
     jenkinsJob: AaC/InfraStatisticsDeploy
+  - id: intercom-deploy
+    repo: pvginkel/IntercomDeploy
+    jenkinsJob: AaC/IntercomDeploy
