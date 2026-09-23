@@ -197,3 +197,6 @@ producers:
   - id: youtrack-deploy
     repo: pvginkel/YoutrackDeploy
     jenkinsJob: AaC/YoutrackDeploy
+  - id: postgres-pas-deploy
+    repo: pvginkel/PostgresPasDeploy
+    jenkinsJob: AaC/PostgresPasDeploy
