@@ -185,3 +185,6 @@ producers:
   - id: trello-mcp-deploy
     repo: pvginkel/TrelloMcpDeploy
     jenkinsJob: AaC/TrelloMcpDeploy
+  - id: youtrack-mcp-deploy
+    repo: pvginkel/YoutrackMcpDeploy
+    jenkinsJob: AaC/YoutrackMcpDeploy
