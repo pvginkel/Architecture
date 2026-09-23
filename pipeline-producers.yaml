@@ -131,3 +131,6 @@ producers:
   - id: filebeat-deploy
     repo: pvginkel/FilebeatDeploy
     jenkinsJob: AaC/FilebeatDeploy
+  - id: models-deploy
+    repo: pvginkel/ModelsDeploy
+    jenkinsJob: AaC/ModelsDeploy
