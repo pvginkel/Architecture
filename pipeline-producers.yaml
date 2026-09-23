@@ -128,3 +128,6 @@ producers:
   - id: kubecoder-deploy
     repo: pvginkel/KubeCoderDeploy
     jenkinsJob: AaC/KubeCoderDeploy
+  - id: filebeat-deploy
+    repo: pvginkel/FilebeatDeploy
+    jenkinsJob: AaC/FilebeatDeploy
