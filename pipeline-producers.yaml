@@ -137,3 +137,6 @@ producers:
   - id: pgadmin-deploy
     repo: pvginkel/PgadminDeploy
     jenkinsJob: AaC/PgadminDeploy
+  - id: fieldnotes-deploy
+    repo: pvginkel/FieldnotesDeploy
+    jenkinsJob: AaC/FieldnotesDeploy
