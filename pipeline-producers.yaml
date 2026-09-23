@@ -125,3 +125,6 @@ producers:
   - id: argocd-deploy
     repo: pvginkel/ArgoCDDeploy
     jenkinsJob: AaC/ArgoCDDeploy
+  - id: kubecoder-deploy
+    repo: pvginkel/KubeCoderDeploy
+    jenkinsJob: AaC/KubeCoderDeploy
