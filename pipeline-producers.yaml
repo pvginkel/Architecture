@@ -152,3 +152,6 @@ producers:
   - id: source-deploy
     repo: pvginkel/SourceDeploy
     jenkinsJob: AaC/SourceDeploy
+  - id: scantopdf-deploy
+    repo: pvginkel/ScantopdfDeploy
+    jenkinsJob: AaC/ScantopdfDeploy
