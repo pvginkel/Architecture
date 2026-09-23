@@ -140,3 +140,6 @@ producers:
   - id: fieldnotes-deploy
     repo: pvginkel/FieldnotesDeploy
     jenkinsJob: AaC/FieldnotesDeploy
+  - id: homeapps-deploy
+    repo: pvginkel/HomeappsDeploy
+    jenkinsJob: AaC/HomeappsDeploy
