@@ -203,3 +203,6 @@ producers:
   - id: electronics-inventory-deploy
     repo: pvginkel/ElectronicsInventoryDeploy
     jenkinsJob: AaC/ElectronicsInventoryDeploy
+  - id: version-poller-deploy
+    repo: pvginkel/VersionPollerDeploy
+    jenkinsJob: AaC/VersionPollerDeploy
