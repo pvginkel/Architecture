@@ -34,6 +34,7 @@
 library identifier: 'JenkinsPipelineUtils', changelog: false
 
 podTemplate(inheritFrom: 'jenkins-agent kaniko', containers: [
+    containerTemplates.k8s('k8s'),
     containerTemplates.python('python')
 ]) {
     node(POD_LABEL) {
@@ -142,8 +143,14 @@ podTemplate(inheritFrom: 'jenkins-agent kaniko', containers: [
             }
         }
 
-        stage('Redeploy home') {
-            cicd.helmDeploy()
+        // The build hands its image to Argo CD by pinning it in the deploy repo (argo-cd D53);
+        // Argo syncs the commit. HelmCharts no longer deploys this app.
+        stage('Write image pins') {
+            container('k8s') {
+                cicd.writeVersionPins(repo: 'pvginkel/WebathomeOrgDeploy', pins: [
+                    'config/prd/values.yaml': ['images.architecture_viewer': ":${currentBuild.number}"]
+                ])
+            }
         }
     }
 }
