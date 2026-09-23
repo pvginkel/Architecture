@@ -200,3 +200,6 @@ producers:
   - id: postgres-pas-deploy
     repo: pvginkel/PostgresPasDeploy
     jenkinsJob: AaC/PostgresPasDeploy
+  - id: electronics-inventory-deploy
+    repo: pvginkel/ElectronicsInventoryDeploy
+    jenkinsJob: AaC/ElectronicsInventoryDeploy
