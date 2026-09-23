@@ -158,3 +158,6 @@ producers:
   - id: ginbov-nl-deploy
     repo: pvginkel/GinbovNlDeploy
     jenkinsJob: AaC/GinbovNlDeploy
+  - id: webathome-org-deploy
+    repo: pvginkel/WebathomeOrgDeploy
+    jenkinsJob: AaC/WebathomeOrgDeploy
