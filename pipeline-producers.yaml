@@ -182,3 +182,6 @@ producers:
   - id: telegram-mcp-deploy
     repo: pvginkel/TelegramMcpDeploy
     jenkinsJob: AaC/TelegramMcpDeploy
+  - id: trello-mcp-deploy
+    repo: pvginkel/TrelloMcpDeploy
+    jenkinsJob: AaC/TrelloMcpDeploy
