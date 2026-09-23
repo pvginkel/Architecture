@@ -191,3 +191,6 @@ producers:
   - id: zigbee2mqtt-deploy
     repo: pvginkel/Zigbee2mqttDeploy
     jenkinsJob: AaC/Zigbee2mqttDeploy
+  - id: guacamole-deploy
+    repo: pvginkel/GuacamoleDeploy
+    jenkinsJob: AaC/GuacamoleDeploy
