@@ -149,3 +149,6 @@ producers:
   - id: newsfilter-deploy
     repo: pvginkel/NewsfilterDeploy
     jenkinsJob: AaC/NewsfilterDeploy
+  - id: source-deploy
+    repo: pvginkel/SourceDeploy
+    jenkinsJob: AaC/SourceDeploy
