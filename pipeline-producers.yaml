@@ -143,3 +143,6 @@ producers:
   - id: homeapps-deploy
     repo: pvginkel/HomeappsDeploy
     jenkinsJob: AaC/HomeappsDeploy
+  - id: iac-provisioner-deploy
+    repo: pvginkel/IacProvisionerDeploy
+    jenkinsJob: AaC/IacProvisionerDeploy
