@@ -188,3 +188,6 @@ producers:
   - id: youtrack-mcp-deploy
     repo: pvginkel/YoutrackMcpDeploy
     jenkinsJob: AaC/YoutrackMcpDeploy
+  - id: zigbee2mqtt-deploy
+    repo: pvginkel/Zigbee2mqttDeploy
+    jenkinsJob: AaC/Zigbee2mqttDeploy
