@@ -155,3 +155,6 @@ producers:
   - id: scantopdf-deploy
     repo: pvginkel/ScantopdfDeploy
     jenkinsJob: AaC/ScantopdfDeploy
+  - id: ginbov-nl-deploy
+    repo: pvginkel/GinbovNlDeploy
+    jenkinsJob: AaC/GinbovNlDeploy
