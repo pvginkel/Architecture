@@ -167,3 +167,6 @@ producers:
   - id: homeassistant-mcp-deploy
     repo: pvginkel/HomeassistantMcpDeploy
     jenkinsJob: AaC/HomeassistantMcpDeploy
+  - id: calendar-support-deploy
+    repo: pvginkel/CalendarSupportDeploy
+    jenkinsJob: AaC/CalendarSupportDeploy
