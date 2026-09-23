@@ -134,3 +134,6 @@ producers:
   - id: models-deploy
     repo: pvginkel/ModelsDeploy
     jenkinsJob: AaC/ModelsDeploy
+  - id: pgadmin-deploy
+    repo: pvginkel/PgadminDeploy
+    jenkinsJob: AaC/PgadminDeploy
