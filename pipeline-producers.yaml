@@ -161,3 +161,6 @@ producers:
   - id: webathome-org-deploy
     repo: pvginkel/WebathomeOrgDeploy
     jenkinsJob: AaC/WebathomeOrgDeploy
+  - id: media-deploy
+    repo: pvginkel/MediaDeploy
+    jenkinsJob: AaC/MediaDeploy
