@@ -194,3 +194,6 @@ producers:
   - id: guacamole-deploy
     repo: pvginkel/GuacamoleDeploy
     jenkinsJob: AaC/GuacamoleDeploy
+  - id: youtrack-deploy
+    repo: pvginkel/YoutrackDeploy
+    jenkinsJob: AaC/YoutrackDeploy
