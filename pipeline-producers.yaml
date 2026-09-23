@@ -173,3 +173,6 @@ producers:
   - id: git-sync-deploy
     repo: pvginkel/GitSyncDeploy
     jenkinsJob: AaC/GitSyncDeploy
+  - id: infra-statistics-deploy
+    repo: pvginkel/InfraStatisticsDeploy
+    jenkinsJob: AaC/InfraStatisticsDeploy
