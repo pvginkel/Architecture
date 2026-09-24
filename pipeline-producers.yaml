@@ -254,3 +254,6 @@ producers:
   - id: csi-driver-smb-deploy
     repo: pvginkel/CsiDriverSmbDeploy
     jenkinsJob: AaC/CsiDriverSmbDeploy
+  - id: external-secrets-deploy
+    repo: pvginkel/ExternalSecretsDeploy
+    jenkinsJob: AaC/ExternalSecretsDeploy
