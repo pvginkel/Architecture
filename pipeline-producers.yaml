@@ -236,3 +236,6 @@ producers:
   - id: jenkins-deploy
     repo: pvginkel/JenkinsDeploy
     jenkinsJob: AaC/JenkinsDeploy
+  - id: elasticsearch-deploy
+    repo: pvginkel/ElasticsearchDeploy
+    jenkinsJob: AaC/ElasticsearchDeploy
