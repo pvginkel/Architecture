@@ -233,3 +233,6 @@ producers:
   - id: keycloak-dev-deploy
     repo: pvginkel/KeycloakDeploy
     jenkinsJob: AaC/KeycloakDeploy-dev
+  - id: jenkins-deploy
+    repo: pvginkel/JenkinsDeploy
+    jenkinsJob: AaC/JenkinsDeploy
