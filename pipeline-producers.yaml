@@ -248,3 +248,6 @@ producers:
   - id: ceph-csi-rbd-deploy
     repo: pvginkel/CephCsiRbdDeploy
     jenkinsJob: AaC/CephCsiRbdDeploy
+  - id: ceph-csi-cephfs-deploy
+    repo: pvginkel/CephCsiCephfsDeploy
+    jenkinsJob: AaC/CephCsiCephfsDeploy
