@@ -260,3 +260,6 @@ producers:
   - id: mosquitto-deploy
     repo: pvginkel/MosquittoDeploy
     jenkinsJob: AaC/MosquittoDeploy
+  - id: nginx-deploy
+    repo: pvginkel/NginxDeploy
+    jenkinsJob: AaC/NginxDeploy
