@@ -239,3 +239,6 @@ producers:
   - id: elasticsearch-deploy
     repo: pvginkel/ElasticsearchDeploy
     jenkinsJob: AaC/ElasticsearchDeploy
+  - id: cloudnative-pg-deploy
+    repo: pvginkel/CloudnativePgDeploy
+    jenkinsJob: AaC/CloudnativePgDeploy
