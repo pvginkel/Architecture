@@ -263,3 +263,6 @@ producers:
   - id: nginx-deploy
     repo: pvginkel/NginxDeploy
     jenkinsJob: AaC/NginxDeploy
+  - id: grafana-deploy
+    repo: pvginkel/GrafanaDeploy
+    jenkinsJob: AaC/GrafanaDeploy
