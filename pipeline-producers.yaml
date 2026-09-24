@@ -206,3 +206,6 @@ producers:
   - id: version-poller-deploy
     repo: pvginkel/VersionPollerDeploy
     jenkinsJob: AaC/VersionPollerDeploy
+  - id: headlamp-deploy
+    repo: pvginkel/HeadlampDeploy
+    jenkinsJob: AaC/HeadlampDeploy
