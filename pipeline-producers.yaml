@@ -209,3 +209,6 @@ producers:
   - id: headlamp-deploy
     repo: pvginkel/HeadlampDeploy
     jenkinsJob: AaC/HeadlampDeploy
+  - id: iot-deploy
+    repo: pvginkel/IotDeploy
+    jenkinsJob: AaC/IotDeploy
