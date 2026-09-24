@@ -215,3 +215,6 @@ producers:
   - id: tfmirror-deploy
     repo: pvginkel/TfmirrorDeploy
     jenkinsJob: AaC/TfmirrorDeploy
+  - id: charts-deploy
+    repo: pvginkel/ChartsDeploy
+    jenkinsJob: AaC/ChartsDeploy
