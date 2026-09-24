@@ -20,8 +20,8 @@ be assembled without opening them all.
 ## Not topic docs
 
 `docs/architecture/*.yaml` is this repo's **own** published architecture artifact (the
-self-producer dataset), not workflow documentation. `docs/backfill/` and
-`docs/iotsupport-iot-architecture-guidance.md` are likewise data/guidance, not topic docs.
+self-producer dataset), not workflow documentation.
+`docs/iotsupport-iot-architecture-guidance.md` is likewise guidance, not a topic doc.
 
 `.claude/` is the producer-side kit itself — the producer manual, the starter skeleton,
 `arch-validate.py`, the `seed-architecture` skill and the two architecture agents — plus the

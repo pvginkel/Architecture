@@ -64,7 +64,6 @@ viewer/        # React + ReactFlow + ELK SPA (Vite, TypeScript)
 views/         # curated view definitions (YAML) inlined into the dataset by the collector
 docs/
   architecture/        the `architecture` self-producer's own artifacts (this repo's elements)
-  backfill/            one-off onboarding harness that seeded producer artifacts
   *.md                 project docs, indexed by docs/index.md
 .claude/       # the producer-side kit, staged into a clone of each producer repo per run
   agents/              triage-architecture · update-architecture — the headless update sessions
