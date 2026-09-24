@@ -257,3 +257,6 @@ producers:
   - id: external-secrets-deploy
     repo: pvginkel/ExternalSecretsDeploy
     jenkinsJob: AaC/ExternalSecretsDeploy
+  - id: mosquitto-deploy
+    repo: pvginkel/MosquittoDeploy
+    jenkinsJob: AaC/MosquittoDeploy
