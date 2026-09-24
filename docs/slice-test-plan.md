@@ -30,7 +30,7 @@ behind, and that is a finding, not something to tidy away.
 
 ```bash
 kc project build      # generate.py --check, viewer tsc+vite, service tsc
-kc project test       # root artifact validation, tooling pytest + validate.py meta, viewer/service vitest
+kc project test       # root artifact + views validation, tooling pytest + validate.py meta, viewer/service vitest
 ```
 
 Both must be green. `kc project build` is also what preflight demands, so a red build here means

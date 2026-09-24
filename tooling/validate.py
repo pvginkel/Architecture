@@ -1,11 +1,16 @@
-"""Validate architecture artifacts and meta-validate every v0.1 schema.
+"""Validate architecture artifacts and views, and meta-validate every v0.1 schema.
 
-Two modes:
+Three modes:
 
     poetry run python validate.py meta
         Walk every YAML schema file under schema/v0.1/ and meta-validate
         against JSON Schema 2020-12. Catches structural mistakes in the
         schemas themselves. Used by the validation service at boot.
+
+    poetry run python validate.py views
+        Load the repo's views/ the way the collector does (views.schema.yaml
+        plus the _order.yaml permutation check), so a broken view fails
+        before the push instead of in the central build.
 
     poetry run python validate.py <artifact.yaml>
         Validate one architecture artifact against
@@ -26,11 +31,13 @@ import click
 
 from _arch import (
     REPO_ROOT,
+    VIEWS_DIR,
     load_yaml,
     meta_validate_schemas,
     normalize,
     validate_doc,
 )
+from collect import CollectorError, load_views
 
 
 def meta_validate() -> int:
@@ -44,6 +51,19 @@ def meta_validate() -> int:
             click.echo(f"FAIL {rel}: {error}", err=True)
             failures += 1
     return 1 if failures else 0
+
+
+def views_validate(views_dir: Path) -> int:
+    """Load the authored views under `views_dir`. Returns process exit code."""
+    try:
+        views = load_views(views_dir)
+    except CollectorError as e:
+        click.echo(f"FAIL [{e.phase}] {len(e.messages)} error(s):", err=True)
+        for m in e.messages:
+            click.echo(f"  {m}", err=True)
+        return 1
+    click.echo(f"OK   {views_dir}: {len(views)} view(s)")
+    return 0
 
 
 def parse_expected_pointer(artifact_path: Path) -> str | None:
@@ -112,9 +132,12 @@ def validate_artifact(artifact_path: Path) -> int:
 @click.command()
 @click.argument("target", required=True)
 def main(target: str) -> None:
-    """TARGET is either 'meta' (meta-validate schemas) or a path/glob to artifact(s)."""
+    """TARGET is 'meta' (meta-validate schemas), 'views' (load the repo's views/) or a
+    path/glob to artifact(s)."""
     if target == "meta":
         sys.exit(meta_validate())
+    if target == "views":
+        sys.exit(views_validate(VIEWS_DIR))
 
     # Path or glob — supports `validate.py 'schema/v0.1/examples/*.yaml'`.
     paths: list[Path] = []

@@ -186,6 +186,7 @@ enums:
 cd tooling && cexec modern-app poetry run python generate.py          # writes generated/ + viewer vocab
 cd tooling && cexec modern-app poetry run python generate.py --check   # CI: fail if anything is stale
 cd tooling && cexec modern-app poetry run python validate.py meta      # self-validate every schema
+cd tooling && cexec modern-app poetry run python validate.py views     # load views/ as the collector does
 cd tooling && cexec modern-app poetry run python tests/run_fixtures.py # collector end-to-end fixtures
 cd viewer  && cexec modern-app npm run build                            # tsc --noEmit && vite build
 ```

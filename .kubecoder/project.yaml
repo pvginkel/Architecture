@@ -7,16 +7,19 @@ projects:
     # No setup: the root Poetry env existed only for the code-health grader,
     # which /dev:onboard retired along with the root pyproject.toml.
     #
-    # Root's testable asset is docs/architecture/ — this repo's own published
-    # architecture artifact, which the collector federates like any producer's.
-    # Until now nothing checked it before CI: a broken self-producer file only
-    # surfaced in the Jenkins collector stage. validate.py checks one artifact
-    # against schema/v0.1/architecture.schema.yaml offline, so the loop below is
-    # a cheap local gate on the files a root-targeted phase actually edits. It
-    # borrows tooling's Poetry env, which `kc project setup` installs.
-    test: >-
-      cexec modern-app sh -c 'cd tooling && for f in ../docs/architecture/*.yaml;
-      do poetry run python validate.py "$f" || exit 1; done'
+    # Root's testable assets are docs/architecture/ — this repo's own published
+    # architecture artifact, which the collector federates like any producer's —
+    # and views/, which the collector inlines into the dataset. A broken file in
+    # either would otherwise surface only in the Jenkins collector stage. Both
+    # checks run offline: validate.py checks each artifact against
+    # schema/v0.1/architecture.schema.yaml, and `validate.py views` loads views/
+    # the way the collector does. They borrow tooling's Poetry env, which
+    # `kc project setup` installs.
+    test:
+      - >-
+        cexec modern-app sh -c 'cd tooling && for f in ../docs/architecture/*.yaml;
+        do poetry run python validate.py "$f" || exit 1; done'
+      - cexec modern-app sh -c 'cd tooling && poetry run python validate.py views'
 
   tooling:
     description: >-

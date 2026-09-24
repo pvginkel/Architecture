@@ -59,7 +59,7 @@ What that means per component:
 | `tooling` | pytest, under `tooling/tests/` | `kc project test --project tooling` (also runs `validate.py meta`) |
 | `viewer` | Vitest | `kc project test --project viewer` |
 | `service` | Vitest + supertest | `kc project test --project service` |
-| `root` | `validate.py` over `docs/architecture/*.yaml` | `kc project test --project root` |
+| `root` | `validate.py` over `docs/architecture/*.yaml`, and `validate.py views` over `views/` | `kc project test --project root` |
 
 A change that genuinely cannot be covered by any of those is a change whose testability problem is
 the first thing to solve — say so and fix the seam, rather than shipping it uncovered.
