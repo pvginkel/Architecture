@@ -242,3 +242,6 @@ producers:
   - id: cloudnative-pg-deploy
     repo: pvginkel/CloudnativePgDeploy
     jenkinsJob: AaC/CloudnativePgDeploy
+  - id: step-ca-deploy
+    repo: pvginkel/StepCaDeploy
+    jenkinsJob: AaC/StepCaDeploy
