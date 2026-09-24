@@ -51,6 +51,7 @@ properties:
     type: string
     enum:
     - ansible
+    - argo-cd
     - c
     - calico
     - ceph

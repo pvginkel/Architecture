@@ -243,6 +243,7 @@ export const ENVIRONMENT_LABELS = {
 
 export const LOGO_FILES = {
   "ansible": "ansible.svg",
+  "argo-cd": "argo-cd.svg",
   "c": "c.svg",
   "calico": "calico.png",
   "ceph": "ceph.svg",
