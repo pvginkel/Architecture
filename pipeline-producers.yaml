@@ -266,3 +266,6 @@ producers:
   - id: grafana-deploy
     repo: pvginkel/GrafanaDeploy
     jenkinsJob: AaC/GrafanaDeploy
+  - id: prometheus-deploy
+    repo: pvginkel/PrometheusDeploy
+    jenkinsJob: AaC/PrometheusDeploy
