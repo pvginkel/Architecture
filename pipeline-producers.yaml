@@ -251,3 +251,6 @@ producers:
   - id: ceph-csi-cephfs-deploy
     repo: pvginkel/CephCsiCephfsDeploy
     jenkinsJob: AaC/CephCsiCephfsDeploy
+  - id: csi-driver-smb-deploy
+    repo: pvginkel/CsiDriverSmbDeploy
+    jenkinsJob: AaC/CsiDriverSmbDeploy
