@@ -224,3 +224,6 @@ producers:
   - id: storage-deploy
     repo: pvginkel/StorageDeploy
     jenkinsJob: AaC/StorageDeploy
+  - id: dnsmasq-deploy
+    repo: pvginkel/DnsmasqDeploy
+    jenkinsJob: AaC/DnsmasqDeploy
