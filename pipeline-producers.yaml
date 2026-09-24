@@ -218,3 +218,6 @@ producers:
   - id: charts-deploy
     repo: pvginkel/ChartsDeploy
     jenkinsJob: AaC/ChartsDeploy
+  - id: registry-deploy
+    repo: pvginkel/RegistryDeploy
+    jenkinsJob: AaC/RegistryDeploy
