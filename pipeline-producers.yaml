@@ -212,3 +212,6 @@ producers:
   - id: iot-deploy
     repo: pvginkel/IotDeploy
     jenkinsJob: AaC/IotDeploy
+  - id: tfmirror-deploy
+    repo: pvginkel/TfmirrorDeploy
+    jenkinsJob: AaC/TfmirrorDeploy
