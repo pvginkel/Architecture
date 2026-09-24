@@ -227,3 +227,6 @@ producers:
   - id: dnsmasq-deploy
     repo: pvginkel/DnsmasqDeploy
     jenkinsJob: AaC/DnsmasqDeploy
+  - id: keycloak-deploy
+    repo: pvginkel/KeycloakDeploy
+    jenkinsJob: AaC/KeycloakDeploy
