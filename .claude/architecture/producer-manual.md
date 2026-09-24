@@ -408,7 +408,8 @@ the only one that sees the env value, which is runtime state and stays
 unpublished). For each deployed instance that specialises the consumer
 product, that producer reads the env var's rendered value, parses out the
 host, maps the host to a provider element (its own services, an exposed
-host, or a hand-mapped cross-producer host), checks the invariant above,
+host, another producer's in-cluster Service found through the lookup
+below, or a hand-mapped cross-producer host), checks the invariant above,
 and emits the concrete `provider —Serving→ instance` edge. An
 unresolvable host fails loudly; nothing is silently skipped.
 
@@ -454,6 +455,37 @@ resolver — the details bite:
   For a deployer-owned wire with *no* env signal (a secret store, below),
   don't manufacture pod-level precision — attach to the primary controller,
   not every pod that shares the capability.
+
+### In-cluster Services: the cross-producer host lookup
+
+An env value often names a Kubernetes Service that another producer
+deploys (`http://<svc>.<ns>.svc.cluster.local:8080`). The producer that
+renders a Service publishes it, so a resolver in any producer finds what
+serves that host in the published dataset, the same way it resolves any
+cross-producer id, instead of hand-mapping it.
+
+**Publishing — the producer that renders the Service.** Per Service:
+
+- one `ApplicationInterface`, whatever the kind of the instances behind
+  it, labelled with the host. `stats.url` is the host as
+  `<svc>.<ns>.svc`: no scheme, no port, no `.cluster.local`. A generated
+  producer derives its UUID from the natural key `svcif.<ns>.<svc>`.
+  `environment` and `cluster` are set as on any deployed element;
+- one `Association` to that interface from each instance behind the
+  Service — every non-init container the Service's selector matches,
+  SystemSoftware or ApplicationComponent — with the id
+  `rel:<instance hint>-behind-<interface hint>`.
+
+The interface carries no other relations: it is a lookup entry for
+resolvers, not a consumption surface.
+
+**Resolving — the consumer's deployer.** Normalize the env host to
+`<svc>.<ns>.svc` (the parsing rule above), find the `ApplicationInterface`
+whose `stats.url` equals it, and follow the `Association`s that target it
+back to their sources: those instances are the providers. Apply the same
+rules as to a host of your own — the `cap:` invariant included — and emit
+`provider —Serving→ instance`. A host no published interface carries is
+unresolvable and fails loudly.
 
 ### An application's exposed surface
 
