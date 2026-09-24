@@ -221,3 +221,6 @@ producers:
   - id: registry-deploy
     repo: pvginkel/RegistryDeploy
     jenkinsJob: AaC/RegistryDeploy
+  - id: storage-deploy
+    repo: pvginkel/StorageDeploy
+    jenkinsJob: AaC/StorageDeploy
