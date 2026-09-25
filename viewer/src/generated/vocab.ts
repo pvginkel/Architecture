@@ -307,6 +307,7 @@ export const LOGO_FILES = {
   "qemu": "qemu.svg",
   "rabbitmq": "rabbitmq.svg",
   "rclone": "rclone.svg",
+  "redis": "redis.svg",
   "ruff": "ruff.svg",
   "rust": "rust.png",
   "s3": "s3.svg",

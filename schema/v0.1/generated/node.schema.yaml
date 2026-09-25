@@ -115,6 +115,7 @@ properties:
     - qemu
     - rabbitmq
     - rclone
+    - redis
     - ruff
     - rust
     - s3
