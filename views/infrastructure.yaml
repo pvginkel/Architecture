@@ -9,4 +9,43 @@ predicate:
 # this can't be excludeInstances — the prd server Nodes are themselves env-tagged
 # instances, and dropping instances would delete the servers.
 excludeProducers: [home-automation-fleet, iotsupport-app]
+# The shared catalog's products (docs/architecture/catalog.yaml) are the
+# software the deploy repos run, not substrate. They share the architecture
+# producer with the rack hardware, so they are excluded by id.
+exclude:
+  - ss:alertmanager,2bf90d10-968d-58dd-988b-64e60ed66577 # Alertmanager
+  - ss:ceph-csi,99b0ab70-52e7-5561-bff1-2ab0726805f5 # Ceph CSI
+  - ss:cloudnative-pg,45788854-0235-5907-8215-b69933d7a51a # CloudNativePG
+  - ss:code-server,ac5d5bb3-b443-5d06-953b-d9537f74a5ca # code-server
+  - ss:csi-driver-smb,dcffca3c-ce4e-5331-98a7-2b2d565d543a # CSI Driver SMB
+  - ss:csi-sidecars,65d1b6b0-c46f-5e04-a104-a4d2330be20f # Kubernetes CSI sidecars
+  - ss:elasticsearch,2785b71a-323e-5e7c-9930-77e2cc6d91b9 # Elasticsearch
+  - ss:external-secrets,8e55b3e7-55cc-5474-944c-5fe1da61e4a8 # External Secrets Operator
+  - ss:filebeat,de617dc4-7fb3-51f2-b6b5-853e49845ccb # Filebeat
+  - ss:gitblit,5b20c5e2-f7a9-5260-b290-fcaafadbb786 # Gitblit
+  - ss:gluetun,ffbdb696-0a4c-5a53-81e8-82bd9a3926c9 # Gluetun
+  - ss:grafana,cf2a31ec-e091-578e-8790-243fe2033d19 # Grafana
+  - ss:guacamole,78a04457-f776-5de7-a921-17a8456608c0 # Apache Guacamole
+  - ss:guacd,e5c50537-5f0e-5aba-a453-ebf2e4016f76 # guacd
+  - ss:ha-mcp,8e184e95-d2a3-5d13-bbae-0278d227d13d # Home Assistant MCP
+  - ss:headlamp,fd569d7a-7ddb-53a3-b4ee-9d1221924c7e # Headlamp
+  - ss:jenkins,75976213-4d44-5e55-8d75-8fe7d0f31a5b # Jenkins
+  - ss:keycloak,9409aeb9-c50a-59db-a7dc-450b47ee90d8 # Keycloak
+  - ss:kibana,7a74e885-7e5a-57f4-8f60-c453ff77a2f4 # Kibana
+  - ss:kube-state-metrics,704373e8-64f6-5951-91ba-aacc11ff2d84 # kube-state-metrics
+  - ss:mosquitto,9a6db5ed-3ea0-5448-b44c-fdd820046ac8 # Eclipse Mosquitto
+  - ss:nginx,52f8a89b-3c97-5d93-96c5-ddb11ea99419 # NGINX
+  - ss:pgadmin,7a8a31f5-13ed-5d39-8d80-f69e8a597109 # pgAdmin
+  - ss:pgbouncer,2341e63d-ff3d-5b88-8ae8-858972687b49 # PgBouncer
+  - ss:plex,46e0f5cc-e890-546b-8bbe-75349844b873 # Plex Media Server
+  - ss:postgresql,95d28707-a44c-5ce5-a797-759616b6935b # PostgreSQL
+  - ss:prometheus,4387fd7b-496d-5d1b-9a59-7bf6802118bc # Prometheus
+  - ss:prometheus-config-reloader,27ec8609-42a7-58ca-88bf-db9d07042beb # Prometheus config-reloader
+  - ss:pushgateway,2d30f39a-ed07-5079-8513-9eccf0e4b40b # Prometheus Pushgateway
+  - ss:registry,a7a12ba2-d9ad-5e4a-aef1-2345679411fe # Docker Registry
+  - ss:samba,37d9b478-532d-550e-b0d0-a0c04e637306 # Samba
+  - ss:step-ca,840e0bef-c625-50f0-9d98-04db30f4a465 # step-ca
+  - ss:trello-mcp,0cfa3247-387f-5ec4-b10a-c75f09fc6487 # Trello MCP Server
+  - ss:youtrack,2ae1a926-acfc-5cb6-9a69-a5c81605fc87 # YouTrack
+  - ss:zigbee2mqtt,b9996e83-6dc4-5fc2-92ad-e361c4fcfb24 # Zigbee2MQTT
 neighbourDepth: 0
