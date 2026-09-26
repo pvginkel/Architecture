@@ -1,0 +1,337 @@
+# Architecture repo as self-producer — the shared catalog.
+#
+# Third-party «SoftwareProduct» entries, declared once here and referenced by
+# UUID: the deploy repos' running instances Specialize them. Plus the two
+# in-cluster Ceph storage services the ceph-csi deploy repos' instances
+# realize. Every edge to these elements is authored in the consuming
+# producer's own artifact, not here.
+
+schemaVersion: "0.1"
+producer: architecture
+
+systemSoftware:
+  - id: ss:alertmanager,2bf90d10-968d-58dd-988b-64e60ed66577
+    label: Alertmanager
+    summary: Handles and routes alerts sent by Prometheus.
+    homepage: https://prometheus.io/docs/alerting/latest/alertmanager/
+    logo: prometheus
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:ceph-csi,99b0ab70-52e7-5561-bff1-2ab0726805f5
+    label: Ceph CSI
+    summary: Container Storage Interface driver for Ceph RBD and CephFS.
+    homepage: https://github.com/ceph/ceph-csi
+    logo: ceph
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:cloudnative-pg,45788854-0235-5907-8215-b69933d7a51a
+    label: CloudNativePG
+    summary: Kubernetes operator that manages the lifecycle of PostgreSQL clusters.
+    homepage: https://cloudnative-pg.io/
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:code-server,ac5d5bb3-b443-5d06-953b-d9537f74a5ca
+    label: code-server
+    summary: VS Code running in the browser, served from a container.
+    homepage: https://github.com/coder/code-server
+    logo: code-server
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:csi-driver-smb,dcffca3c-ce4e-5331-98a7-2b2d565d543a
+    label: CSI Driver SMB
+    summary: Container Storage Interface driver for SMB/CIFS shares.
+    homepage: https://github.com/kubernetes-csi/csi-driver-smb
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:csi-sidecars,65d1b6b0-c46f-5e04-a104-a4d2330be20f
+    label: Kubernetes CSI sidecars
+    summary: Upstream CSI helper sidecars (provisioner, attacher, resizer, snapshotter, node-driver-registrar, livenessprobe).
+    homepage: https://kubernetes-csi.github.io/docs/sidecar-containers.html
+    logo: kubernetes
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:elasticsearch,2785b71a-323e-5e7c-9930-77e2cc6d91b9
+    label: Elasticsearch
+    summary: Distributed search and analytics engine.
+    homepage: https://www.elastic.co/elasticsearch
+    logo: elasticsearch
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:external-secrets,8e55b3e7-55cc-5474-944c-5fe1da61e4a8
+    label: External Secrets Operator
+    summary: Syncs secrets from external stores into Kubernetes Secrets.
+    homepage: https://external-secrets.io/
+    logo: external-secrets
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:filebeat,de617dc4-7fb3-51f2-b6b5-853e49845ccb
+    label: Filebeat
+    summary: Lightweight log shipper for the Elastic stack.
+    homepage: https://www.elastic.co/beats/filebeat
+    logo: elastic
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:gitblit,5b20c5e2-f7a9-5260-b290-fcaafadbb786
+    label: Gitblit
+    summary: Git repository server with web UI and access control.
+    homepage: https://gitblit.github.io/gitblit/
+    logo: gitblit
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:gluetun,ffbdb696-0a4c-5a53-81e8-82bd9a3926c9
+    label: Gluetun
+    summary: VPN client container providing an encrypted network tunnel.
+    homepage: https://github.com/qdm12/gluetun
+    logo: gluetun
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:grafana,cf2a31ec-e091-578e-8790-243fe2033d19
+    label: Grafana
+    summary: Dashboards and visualization over metrics and logs.
+    homepage: https://grafana.com/
+    logo: grafana
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:guacamole,78a04457-f776-5de7-a921-17a8456608c0
+    label: Apache Guacamole
+    summary: Clientless remote desktop gateway (web RDP/VNC/SSH).
+    homepage: https://guacamole.apache.org/
+    logo: guacamole
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:guacd,e5c50537-5f0e-5aba-a453-ebf2e4016f76
+    label: guacd
+    summary: Guacamole proxy daemon that speaks the remote-desktop protocols.
+    homepage: https://guacamole.apache.org/
+    logo: guacamole
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:ha-mcp,8e184e95-d2a3-5d13-bbae-0278d227d13d
+    label: Home Assistant MCP
+    summary: MCP server exposing Home Assistant to AI/LLM clients.
+    homepage: https://github.com/homeassistant-ai/ha-mcp
+    logo: home-assistant
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:headlamp,fd569d7a-7ddb-53a3-b4ee-9d1221924c7e
+    label: Headlamp
+    summary: Web UI for Kubernetes cluster management and visualization.
+    homepage: https://headlamp.dev/
+    logo: headlamp
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:jenkins,75976213-4d44-5e55-8d75-8fe7d0f31a5b
+    label: Jenkins
+    summary: Automation server for CI/CD pipelines.
+    homepage: https://www.jenkins.io/
+    logo: jenkins
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:keycloak,9409aeb9-c50a-59db-a7dc-450b47ee90d8
+    label: Keycloak
+    summary: Open-source identity and access management / OIDC provider.
+    homepage: https://www.keycloak.org/
+    logo: keycloak
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:kibana,7a74e885-7e5a-57f4-8f60-c453ff77a2f4
+    label: Kibana
+    summary: Visualization and exploration UI for Elasticsearch.
+    homepage: https://www.elastic.co/kibana
+    logo: kibana
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:kube-state-metrics,704373e8-64f6-5951-91ba-aacc11ff2d84
+    label: kube-state-metrics
+    summary: Exposes Kubernetes object state as Prometheus metrics.
+    homepage: https://github.com/kubernetes/kube-state-metrics
+    logo: kubernetes
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:mosquitto,9a6db5ed-3ea0-5448-b44c-fdd820046ac8
+    label: Eclipse Mosquitto
+    summary: MQTT message broker.
+    homepage: https://mosquitto.org/
+    logo: mosquitto
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:nginx,52f8a89b-3c97-5d93-96c5-ddb11ea99419
+    label: NGINX
+    summary: HTTP server and reverse proxy.
+    homepage: https://nginx.org/
+    logo: nginx
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:pgadmin,7a8a31f5-13ed-5d39-8d80-f69e8a597109
+    label: pgAdmin
+    summary: Web administration UI for PostgreSQL.
+    homepage: https://www.pgadmin.org/
+    logo: pgadmin
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:pgbouncer,2341e63d-ff3d-5b88-8ae8-858972687b49
+    label: PgBouncer
+    summary: Lightweight connection pooler for PostgreSQL.
+    homepage: https://www.pgbouncer.org/
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:plex,46e0f5cc-e890-546b-8bbe-75349844b873
+    label: Plex Media Server
+    summary: Media library server with transcoding and client delivery.
+    homepage: https://www.plex.tv/
+    logo: plex
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:postgresql,95d28707-a44c-5ce5-a797-759616b6935b
+    label: PostgreSQL
+    summary: Object-relational SQL database.
+    homepage: https://www.postgresql.org/
+    logo: postgresql
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:prometheus,4387fd7b-496d-5d1b-9a59-7bf6802118bc
+    label: Prometheus
+    summary: Time-series metrics collection and alerting.
+    homepage: https://prometheus.io/
+    logo: prometheus
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:prometheus-config-reloader,27ec8609-42a7-58ca-88bf-db9d07042beb
+    label: Prometheus config-reloader
+    summary: Sidecar that reloads Prometheus/Alertmanager config on change.
+    homepage: https://github.com/prometheus-operator/prometheus-operator
+    logo: prometheus
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:pushgateway,2d30f39a-ed07-5079-8513-9eccf0e4b40b
+    label: Prometheus Pushgateway
+    summary: Accepts metrics pushed by short-lived/batch jobs for Prometheus.
+    homepage: https://github.com/prometheus/pushgateway
+    logo: prometheus
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:registry,a7a12ba2-d9ad-5e4a-aef1-2345679411fe
+    label: Docker Registry
+    summary: OCI image storage and distribution (distribution/registry).
+    homepage: https://distribution.github.io/distribution/
+    logo: docker
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:samba,37d9b478-532d-550e-b0d0-a0c04e637306
+    label: Samba
+    summary: SMB/CIFS file and print server.
+    homepage: https://www.samba.org/
+    logo: samba
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:step-ca,840e0bef-c625-50f0-9d98-04db30f4a465
+    label: step-ca
+    summary: Online certificate authority with ACME support.
+    homepage: https://smallstep.com/docs/step-ca/
+    logo: smallstep
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:trello-mcp,0cfa3247-387f-5ec4-b10a-c75f09fc6487
+    label: Trello MCP Server
+    summary: MCP server exposing Trello boards, lists, and cards as tools, served over Streamable HTTP.
+    homepage: https://github.com/delorenj/mcp-server-trello
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:youtrack,2ae1a926-acfc-5cb6-9a69-a5c81605fc87
+    label: YouTrack
+    summary: Issue tracker and agile project management server.
+    homepage: https://www.jetbrains.com/youtrack/
+    logo: youtrack
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+  - id: ss:zigbee2mqtt,b9996e83-6dc4-5fc2-92ad-e361c4fcfb24
+    label: Zigbee2MQTT
+    summary: Bridges Zigbee devices to MQTT for home automation.
+    homepage: https://www.zigbee2mqtt.io/
+    logo: zigbee2mqtt
+    stereotype: SoftwareProduct
+    lifecycle: active
+    introduced: 2024-07-13
+
+technologyServices:
+  - id: svc:cluster-ceph-cephfs,6d5615a9-59fd-59c7-822a-d31c86cd476c
+    label: Cluster Ceph Cephfs
+    summary: In-cluster Ceph storage service (cluster-ceph-cephfs) provided by the CSI driver and consumed by workload PVCs.
+    introduced: 2024-08-25
+    lifecycle: active
+    cluster: prd
+
+  - id: svc:cluster-ceph-rbd,02509593-ffcf-5740-9fa9-c14f90c1a160
+    label: Cluster Ceph Rbd
+    summary: In-cluster Ceph storage service (cluster-ceph-rbd) provided by the CSI driver and consumed by workload PVCs.
+    introduced: 2024-08-25
+    lifecycle: active
+    cluster: prd

@@ -30,8 +30,8 @@ the consolidated dataset at:
   https://architecture.webathome.org/data/v0.1/validation-report.json
 
 Other producers reference your elements by UUID. Ansible publishes
-nodes/VMs/clusters → HelmCharts references those when declaring
-cluster services → app repos reference HelmCharts's service UUIDs.
+nodes/VMs/clusters → deploy repos reference those when declaring the
+instances they run → other producers reference those instances' UUIDs.
 The merged dataset eventually drives the rendered architecture
 diagram (viewer migration is later).
 
@@ -736,7 +736,7 @@ adds this repo as a registered producer:
 producers:
   # … other entries …
   - id: <kebab-id>                  # matches the bare kebab in this repo's architecture YAML producer: key
-    jenkinsJob: <Jenkins job path>  # e.g. ansible/master, HelmCharts/master
+    jenkinsJob: <Jenkins job path>  # e.g. AaC/Ansible, AaC/KubeCoderDeploy
     repo: <owner>/<name>            # GitHub repo the central architecture update clones
 ```
 
@@ -780,10 +780,10 @@ The conventions below describe the **expected** ownership patterns per producer 
 | Producer | Typically owns |
 |---|---|
 | Ansible | Devices, Nodes (hypervisors/VMs/clusters), VM-level daemons, OS-layer services |
-| HelmCharts | Cluster-deployed SystemSoftware, ApplicationServices/Interfaces, SoftwareProduct entries for cluster-published software |
+| Deploy repos (`<App>Deploy`) | The running instances of what they deploy (cluster SystemSoftware, ApplicationComponents), the ApplicationServices/Interfaces those publish, and the `Specialization` edges to their products |
 | Per-app repos (EI, IoT, …) | ApplicationComponents (pods), ApplicationServices/Interfaces, app-specific SoftwareProduct entries |
 | DockerImages | Each in-house app's **full logical architecture** — the «SoftwareProduct» identity (`app:<name>,<uuid>`, via `sourceRepository`), the ApplicationServices/Interfaces it exposes, any capability it realizes, and its consumption edges. Source for many apps lives here, so it plays the per-app-repo role for each. Image identity / build provenance is a *separate* concern, still v0.2 (no v0.1 element kind for container images). |
-| Architecture (self-producer) | Homeless elements: physical network/rack hardware, IoT/RF devices, Home Assistant. Files live under `docs/architecture/` in the Architecture repo itself. |
+| Architecture (self-producer) | Homeless elements: physical network/rack hardware, IoT/RF devices, Home Assistant, and the shared catalog (`catalog.yaml`) — the upstream «SoftwareProduct» entries deploy repos' instances Specialize, plus the cluster Ceph storage services. Files live under `docs/architecture/` in the Architecture repo itself. |
 
 ### Product vs instance, across producers
 
@@ -796,11 +796,12 @@ merge-conflict point:
 - The repo that **deploys** it owns the running **instance** and the
   `Specialization` instance→product edge — referencing the product by
   its UUID.
-- A **repackaged upstream** image emits no product of its own; the
-  **deployer** owns the upstream product entry (`ss:dnsmasq,<uuid>`,
-  `ss:keycloak,<uuid>`). When more than one producer deploys the same
-  upstream, one owns the single catalog entry and the others reference
-  its UUID.
+- A **repackaged upstream** image emits no product of its own; its
+  upstream product entry is in the Architecture repo's shared catalog
+  (`ss:keycloak,<uuid>`), or, where the catalog does not carry it, the
+  **deployer** owns it (`ss:dnsmasq,<uuid>`). When more than one
+  producer deploys the same upstream, one owns the single catalog entry
+  and the others reference its UUID.
 - A product is declared **once**; everyone else references the UUID,
   resolved from the published dataset.
 - **Model what a thing is, not how it's packaged.** A custom-built image
@@ -826,7 +827,8 @@ Two shapes:
   consumes their backend and `Realization`-s a new cluster-local
   `TechnologyService` **you** own, which your workloads then consume.
   Ceph storage: `ceph-csi-rbd` realises `svc:cluster-ceph-rbd,<uuid>`
-  (yours), served by Ansible's `svc:ceph-vip-prd,<uuid>`.
+  (declared in the Architecture repo's shared catalog), served by
+  Ansible's `svc:ceph-vip-prd,<uuid>`.
 - **Operator-mediated** — a deploy-time operator reads a backend on behalf
   of many workloads and hands them a *derived* local resource. The real
   runtime edge is `backend —Serving→ the operator`, drawn once from the

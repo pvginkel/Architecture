@@ -431,7 +431,7 @@ def load_state(spec_repo: Path) -> dict[str, Review]:
 
     The state file maps producer id to the producer's last review:
 
-        helm-charts:
+        docker-images:
           reviewed: <commit its architecture was last reviewed at>
           gaps:
             - <a gap its AaC build reported then>

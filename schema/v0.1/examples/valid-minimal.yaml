@@ -2,7 +2,7 @@
 # Demonstrates the smallest dataset the validator accepts.
 
 schemaVersion: "0.1"
-producer: helmcharts
+producer: example
 
 nodes:
   - id: node:prd-cluster,33333333-3333-4333-8333-333333333331

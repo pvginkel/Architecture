@@ -72,6 +72,6 @@ properties:
             owner). For single-family in-house producers, this gives the whole
             product family one logo from a single line. Validated against the
             bundled logo library at collect time. Omit for multi-product
-            producers (docker-images, helm-charts) — they carry per-product
+            producers (docker-images, architecture) — they carry per-product
             logos instead.
           minLength: 1

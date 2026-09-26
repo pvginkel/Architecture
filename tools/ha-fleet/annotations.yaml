@@ -4,7 +4,7 @@
 # are "zigbee:0x<ieee>", others "<domain>:<id>" or "mac:<mac>".
 
 # Maps each Zigbee2MQTT *bridge* (by its bridge IEEE) to the Z2M *instance*
-# element id (helm-charts producer) the leaves under it should Serve. This is
+# element id (zigbee2mqtt-deploy producer) the leaves under it should Serve. This is
 # what puts each leaf within depth-1 of cap:home-automation in the view.
 #
 # NOTE TO OPERATOR — VERIFY THE FLOOR ASSIGNMENT. HA does not expose which

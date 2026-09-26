@@ -1,11 +1,11 @@
 # Full-coverage artifact: exercises every subset element kind plus one
 # representative relation of several ArchiMate relationship types. Mirrors
-# (a simplified slice of) what HelmCharts would emit for the prd cluster:
+# (a simplified slice of) the prd cluster:
 # Keycloak realising IAM, EI as an in-house application stack, Postgres as
 # a shared platform service, plus an external API endpoint.
 
 schemaVersion: "0.1"
-producer: helmcharts
+producer: example
 
 devices:
   - id: device:proxmox-pve1,22222222-2222-4222-8222-222222222221

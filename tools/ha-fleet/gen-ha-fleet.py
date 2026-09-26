@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Generate the `home-automation-fleet` architecture artifact from live Home Assistant.
 
-This is a *generated* architecture producer (same pattern as HelmCharts /
-DockerImages): the artifact is a build output, the source of truth is this
-generator plus the per-element annotation layer (`annotations.yaml`). It is its
-OWN producer (`producer: home-automation-fleet`), built by its OWN scheduled
-Jenkins job, not the main collector pipeline — only this job touches HA.
+This is a *generated* architecture producer (same pattern as DockerImages):
+the artifact is a build output, the source of truth is this generator plus the
+per-element annotation layer (`annotations.yaml`). It is its OWN producer
+(`producer: home-automation-fleet`), built by its OWN scheduled Jenkins job,
+not the main collector pipeline — only this job touches HA.
 
 It introspects HA's device/entity/area registries over the WebSocket API and
 emits one `device:` element for every HA-integrated *home-automation* hardware
@@ -16,7 +16,7 @@ INCLUSION RULE (explicit allowlist; everything else is dropped and logged):
   - Zigbee leaves: a device whose registry `identifiers` carry an
     `("mqtt", "zigbee2mqtt_0x<ieee>")` tuple AND that walks `via_device_id` to a
     `Zigbee2MQTT / Bridge` pseudo-device. The bridge pseudo-devices themselves
-    are excluded (the Z2M *software* is modeled by helm-charts).
+    are excluded (the Z2M *software* is modeled by zigbee2mqtt-deploy).
   - Integration devices in ALLOWED_INTEGRATIONS (dsmr / ecowitt / smlight /
     matter / esphome / overkiz) — the P1 energy meters, the Ecowitt weather
     gateway, the SLZB coordinators, Matter and ESPHome/WiFi devices, and the

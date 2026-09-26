@@ -189,8 +189,8 @@ export function resolveViewScope(
   const capMembers = capabilityMembers(manifest);
   // Universe gates: excludeInstances (env-/release-tagged runtime instances, see
   // model.ts), excludeKinds (whole kinds, e.g. the physical Device fleet) and
-  // excludeProducers (everything from a producer, e.g. the home-automation /
-  // helm-charts fleets) drop matching elements from the predicate base and the
+  // excludeProducers (everything from a producer, e.g. the home-automation
+  // fleet) drop matching elements from the predicate base and the
   // neighbour expansion, and they aren't traversed, so neighbourDepth can't pull
   // them back. An explicit `include` overrides them (see below). With no gate
   // set, admits is a cheap pass-through.

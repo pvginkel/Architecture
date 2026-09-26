@@ -5,7 +5,7 @@
 # rejected at the element's path.
 
 schemaVersion: "0.1"
-producer: helmcharts
+producer: example
 
 nodes:
   - id: node:prd-cluster

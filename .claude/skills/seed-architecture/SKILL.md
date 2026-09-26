@@ -82,7 +82,7 @@ remove it:
 ```
 
 `<producer-id>` is the bare kebab this repo will use as its `producer:`
-envelope key (e.g. `ansible`, `helm-charts`, `docker-images`) — infer from
+envelope key (e.g. `ansible`, `docker-images`, `kubecoder-deploy`) — infer from
 `CLAUDE.md`/repo name, or ask the operator.
 
 ### Bucket vocabulary — tag every candidate with exactly one

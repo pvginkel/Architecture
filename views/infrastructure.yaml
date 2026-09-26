@@ -5,9 +5,8 @@ icon: Network
 predicate:
   kinds: [Node, Device, SystemSoftware]
 # Keep the substrate (compute Nodes, network Devices, host system software), drop
-# the noise: the home-automation/IoT device fleets and the helm-charts release
-# instances (apps deployed into environments) belong in their own views. Note
+# the noise: the home-automation/IoT device fleets belong in their own views. Note
 # this can't be excludeInstances — the prd server Nodes are themselves env-tagged
 # instances, and dropping instances would delete the servers.
-excludeProducers: [home-automation-fleet, iotsupport-app, helm-charts]
+excludeProducers: [home-automation-fleet, iotsupport-app]
 neighbourDepth: 0

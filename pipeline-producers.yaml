@@ -23,9 +23,6 @@ producers:
     # No `repo`: the artifact is generated from the live fleet, not from
     # sources in a producer repo.
     jenkinsJob: AaC/Home Assistant Fleet
-  - id: helm-charts
-    repo: pvginkel/HelmCharts
-    jenkinsJob: AaC/HelmCharts
   - id: docker-images
     repo: pvginkel/DockerImages
     jenkinsJob: AaC/DockerImages

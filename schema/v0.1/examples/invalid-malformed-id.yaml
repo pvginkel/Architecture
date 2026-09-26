@@ -3,7 +3,7 @@
 # Node id violates the kebab-case regex (uppercase + underscore not allowed).
 
 schemaVersion: "0.1"
-producer: helmcharts
+producer: example
 
 nodes:
   - id: node:Bad_ID

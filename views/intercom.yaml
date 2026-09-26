@@ -29,7 +29,7 @@ include:
   # in each id (device:intercom-vN-<hash>) doesn't need pinning.
   - "/^device:intercom-v/"
 includeUnexpanded:
-  # The helm-charts instances are matched by id prefix, like the units.
+  # The deploy-repo instances are matched by id prefix, like the units.
   - "/^ss:jenkins-prd-jenkins-jenkins,/"
   - "/^ss:trello-mcp-prd-trello-mcp-server,/"
   - "/^ss:git-sync-prd-gitblit-gitblit-app,/"

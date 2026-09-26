@@ -4,7 +4,7 @@
 # not in that list is rejected.
 
 schemaVersion: "0.1"
-producer: helmcharts
+producer: example
 
 nodes:
   - id: node:prd-cluster

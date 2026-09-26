@@ -181,7 +181,7 @@ function ArchitectureNodeCard({ data }: NodeProps<Node<ArchNodeData>>) {
     }
   }
 
-  // A deployed-container instance (helm-charts producer) carries release /
+  // A deployed-container instance (a deploy-repo producer) carries release /
   // workload / container in stats; its card leads with the container and a
   // "release » workload" locator. Everything else (products, services) keeps
   // the label + kind-label shape.

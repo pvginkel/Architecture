@@ -3,7 +3,7 @@
 A **separate** architecture producer that snapshots the live Home Assistant
 device fleet once a day and emits it as an Architecture-as-Code artifact, so the
 Home Assistant view *is* the live network. Same generated-producer pattern as
-HelmCharts / DockerImages: the artifact is a build output; the source of truth is
+DockerImages: the artifact is a build output; the source of truth is
 `gen-ha-fleet.py` + the `annotations.yaml` layer.
 
 It is its **own** producer (`producer: home-automation-fleet`) with its **own
@@ -26,7 +26,7 @@ each related into `cap:home-automation`:
 
 **Excluded (logged):** `manufacturer == "Pieter"` (in-house firmware, modeled by
 the firmware producers + `cap:iot-device` — avoids double-modeling), the Z2M
-Bridge pseudo-devices (Z2M software is modeled by helm-charts), HACS virtual
+Bridge pseudo-devices (Z2M software is modeled by zigbee2mqtt-deploy), HACS virtual
 helpers, and everything outside the allowlist (AV/media/companion/HA-internal:
 sonos, samsungtv, cast, mobile_app, sun, backup, sql, …). The inclusion rule is
 an explicit allowlist; every dropped device is counted in the stderr gap report.

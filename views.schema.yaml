@@ -149,7 +149,7 @@ properties:
       every element is dropped from the view — the same universe gate as
       `excludeInstances`/`excludeKinds`, keyed on producer. Use to keep a whole
       source out of an otherwise-broad view, e.g. the home-automation/IoT device
-      fleets and the helm-charts release instances out of Infrastructure.
+      fleets out of Infrastructure.
   neighbourDepth:
     type: integer
     minimum: 0
