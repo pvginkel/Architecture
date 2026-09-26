@@ -12,9 +12,10 @@ anything and does not verify against a deployed instance. It runs the suites tre
 exercises both live surfaces in this environment, from the merged working tree.
 
 **Production still redeploys, downstream and unattended.** `Jenkinsfile` triggers on
-`githubPush()` and its final stage is `cicd.helmDeploy()`, so the push this phase performs (below)
-starts a build that ends in a prod rollout. That is the repo's standing behaviour — every push to
-`main` has always done it — not something this phase controls. The consequence for ordering is the
+`githubPush()` and its final stage pins the new image into `WebathomeOrgDeploy`, which Argo CD
+syncs, so the push this phase performs (below) starts a build that ends in a prod rollout. That is
+the repo's standing behaviour — every push to `main` has always done it — not something this phase
+controls. The consequence for ordering is the
 whole point of this doc: **everything is verified before the push, because after the push it is
 live.**
 

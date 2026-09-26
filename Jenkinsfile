@@ -22,7 +22,7 @@
 //    `run-collector` stage reruns collect.py against the same inputs
 //    inside the image; output is byte-identical to step 5 by the
 //    collector's determinism guarantee.
-// 8. Trigger the Helm-side redeploy job (unchanged from v2).
+// 8. Pin the image into WebathomeOrgDeploy, which Argo CD syncs.
 //
 // Triggers wired below:
 //   - SCM push to this repo (the default poll-or-webhook).

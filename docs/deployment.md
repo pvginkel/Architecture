@@ -2,9 +2,9 @@
 
 The Architecture stack is self-hosted: Kubernetes, Jenkins, Kaniko, Ansible. The deliverable
 from this repo is the **container artifact** — the `service/` image that serves the viewer bundle
-and the published dataset, built by `Dockerfile` / `Jenkinsfile`. The K8s manifests, Jenkins
-jobs, and Ansible glue that deploy it are the operator's, living in the `HelmCharts` / `Ansible`
-repos.
+and the published dataset, built by `Dockerfile` / `Jenkinsfile`, whose last stage pins the image
+into the `WebathomeOrgDeploy` repo for Argo CD to sync. That deploy repo, the Jenkins jobs, and the
+Ansible glue are the operator's.
 
 - Don't propose hosting alternatives or redesign the CI/CD. Focus on the container artifact;
   the K8s/Jenkins glue is the operator's.
