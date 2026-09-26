@@ -53,6 +53,16 @@ properties:
             from `jenkinsJob`'s archive, and leaves `jenkinsJob` — this very
             pipeline — out of its upstream triggers. Omit for every other
             producer.
+        trigger:
+          type: boolean
+          const: false
+          description: |
+            Leaves `jenkinsJob` out of the Jenkinsfile's upstream triggers; its
+            artifact is still copied, at the next build something else starts.
+            For a producer whose repo this pipeline writes into — the image pin
+            in WebathomeOrgDeploy — where the trigger would start this pipeline
+            again on every build of its own, without end. Omit for every other
+            producer.
         defaultLogo:
           type: string
           description: |

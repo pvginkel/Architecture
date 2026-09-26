@@ -104,9 +104,13 @@ def test_committed_registry_names_a_repo_for_every_fleet_producer(tmp_path: Path
     assert [p["id"] for p in producers if "repo" not in p] == ["home-automation-fleet"]
     assert all("jenkinsJob" in p for p in producers)
     assert [p["id"] for p in producers if p.get("self")] == ["architecture"]
+    assert [p["id"] for p in producers if p.get("trigger") is False] == ["webathome-org-deploy"]
     proc = _collect(REGISTRY, tmp_path)
     assert "  - architecture (jenkinsJob=AaC/Architecture, self)\n" in proc.stdout
     assert "  - ansible (jenkinsJob=AaC/Ansible)\n" in proc.stdout
+    assert (
+        "  - webathome-org-deploy (jenkinsJob=AaC/WebathomeOrgDeploy, no trigger)\n" in proc.stdout
+    )
     assert "FAIL [registry]" not in proc.stderr, proc.stderr
     assert f"Loaded {len(producers)} registered producer(s)" in proc.stdout
 

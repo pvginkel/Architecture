@@ -1247,6 +1247,7 @@ def main(
     click.echo(f"Loaded {len(producers)} registered producer(s) from {producers_path}.")
     for p in producers:
         marker = ", self" if p.get("self") else ""
+        marker += ", no trigger" if p.get("trigger") is False else ""
         click.echo(f"  - {p['id']} (jenkinsJob={p['jenkinsJob']}{marker})")
 
     try:

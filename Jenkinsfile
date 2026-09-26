@@ -27,8 +27,10 @@
 // Triggers wired below:
 //   - SCM push to this repo (the default poll-or-webhook).
 //   - Upstream success of every registered producer's Jenkins job
-//     except the self-producer's, which is this pipeline. Registering
-//     a producer wires its trigger on the next run of this Jenkinsfile.
+//     except the self-producer's, which is this pipeline, and those
+//     marked `trigger: false`: WebathomeOrgDeploy, which the image pin
+//     below writes into. Registering a producer wires its trigger on the
+//     next run of this Jenkinsfile.
 //   - Manual "Build Now" in the Jenkins UI is always available.
 
 library identifier: 'JenkinsPipelineUtils', changelog: false
@@ -45,7 +47,7 @@ podTemplate(inheritFrom: 'jenkins-agent kaniko', containers: [
         // Triggers wiring derived from pipeline-producers.yaml.
         def producersDoc = readYaml(file: 'pipeline-producers.yaml')
         def producers = producersDoc.producers ?: []
-        def upstreamJobs = producers.findAll { !it.self }.collect { it.jenkinsJob }.join(', ')
+        def upstreamJobs = producers.findAll { !it.self && it.trigger != false }.collect { it.jenkinsJob }.join(', ')
 
         def triggers = [githubPush()]
         if (upstreamJobs) {
