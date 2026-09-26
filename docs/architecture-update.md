@@ -47,7 +47,8 @@ deliberately not part of it.
 
 - **`gap:` lines, for a generated producer.** Its generator prints each thing it could not map on a
   console line of its own, `gap: <what>`, in the `jenkinsJob` build, and the build stays green.
-  HelmCharts' `gen_architecture.py` does this, for an image no annotation maps, for instance. The
+  The `aac-tools` image's `gen-architecture`, which the deploy repos' producer pipelines run, does
+  this, for an image no annotation maps, for instance. The
   tool reads the lines from that job's last successful build.
 
 A hand-authored producer is cross-checked before any session: the first YAML among its sources that
@@ -112,7 +113,7 @@ is the registry's own, the producer is unresolved: its commits are pushed all th
 artifact build went unverified and the report says so.
 
 Attribution is per build, by that build's own job. The tracker follows a chain — the tracked job's
-build and every build it started downstream, `IaC/HelmCharts` for most of the fleet — and a failed
+build and every build it started downstream — and a failed
 build anywhere in it is compared with its own job's last completed result before this producer's
 first build of that job in the run, read from Jenkins' build history and remembered across the fix
 rounds. Green before and red now is the update's doing: the tool resumes the same update session

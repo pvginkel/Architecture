@@ -146,8 +146,8 @@ Pick one and apply it uniformly.)
 - **Image→product mapping** (a single IoT Support annotation file): maps each firmware
   **image name** (`calendar_display`, `doorbell_receiver`, …) → the firmware
   «SoftwareProduct» (`ss:<hint>`). v0.1 has no artifact/image element, so this side-channel
-  is how device→product resolves — the same shape HelmCharts uses for container images
-  (`charts/<chart>/architecture.yaml` `images:`). Stopgap until the v0.2 Artifact element
+  is how device→product resolves — the same shape a deploy repo uses for container images
+  (the `images:` map in its root `architecture.yaml`). Stopgap until the v0.2 Artifact element
   lands (§7).
 - **Published dataset** (`https://architecture.webathome.org/data/v0.1/architecture.yaml`):
   resolve the firmware «SoftwareProduct»s, their logical edges, and the concrete provider
@@ -161,7 +161,7 @@ Pick one and apply it uniformly.)
 
 ## 6. Provider reference (orientation — resolve live from the dataset)
 
-Logical targets are stable hand-authored ids; the realizing **instances** are HelmCharts /
+Logical targets are stable hand-authored ids; the realizing **instances** are deploy-repo /
 self-producer uuid5 ids you should resolve from the published dataset at build time:
 
 | Logical target | Realizing instance (resolve live) |
@@ -189,6 +189,6 @@ are new (self-producer / `intercom-server`); they resolve once those producers n
   `docs/architecture/SEED-NOTES.md` (durable, not part of any backfill scratch folder).
 - The image→product mapping file is a stopgap for a v0.1 gap: build artifacts (container
   images, firmware binaries) have no element kind, so name→product is a side-channel in both
-  HelmCharts and IoT Support. The proper fix is a v0.2 ArchiMate
+  the deploy repos and IoT Support. The proper fix is a v0.2 ArchiMate
   «Artifact» element (build-name identity + `Artifact —Realization→ «SoftwareProduct»`),
   after which both side-channels resolve through the model.

@@ -2,7 +2,7 @@
 
 A federated **Architecture-as-Code** system for [webathome.org](https://webathome.org)
 and the homelab estate behind it. Every repo that owns a slice of the estate
-(Ansible, HelmCharts, DockerImages, the app repos, …) emits an `architecture.yaml`
+(Ansible, the deploy repos, DockerImages, the app repos, …) emits an `architecture.yaml`
 describing its elements in an ArchiMate-derived schema. A pipeline collects those
 artifacts, merges them into one dataset, and a data-driven viewer renders the
 whole estate as a single filterable diagram.
@@ -213,8 +213,9 @@ and clears the `.dockerignore` exclusion before kaniko runs.
 
 ## Deployment
 
-Self-hosted homelab: Kubernetes, Jenkins, Kaniko, Ansible. The Helm chart lives in
-`pvginkel/HelmCharts`. The pipeline collects, builds with Kaniko, and redeploys.
+Self-hosted homelab: Kubernetes, Jenkins, Kaniko, Ansible, Argo CD. The Helm chart lives in the
+deploy repo `pvginkel/WebathomeOrgDeploy`. The pipeline collects, builds with Kaniko, and pins
+the new image in that deploy repo, which Argo CD syncs.
 
 ## Design decisions worth knowing
 

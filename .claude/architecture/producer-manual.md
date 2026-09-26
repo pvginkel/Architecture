@@ -826,9 +826,10 @@ Two shapes:
 - **Re-provide via your own service layer** — deploy a driver that
   consumes their backend and `Realization`-s a new cluster-local
   `TechnologyService` **you** own, which your workloads then consume.
-  Ceph storage: `ceph-csi-rbd` realises `svc:cluster-ceph-rbd,<uuid>`
-  (declared in the Architecture repo's shared catalog), served by
-  Ansible's `svc:ceph-vip-prd,<uuid>`.
+  Ceph storage: `ceph-csi-rbd` realises `svc:cluster-ceph-rbd,<uuid>`,
+  served by Ansible's `svc:ceph-vip-prd,<uuid>`. That one service sits
+  in the Architecture repo's shared catalog, not with the driver; a
+  service you add this way you declare yourself.
 - **Operator-mediated** — a deploy-time operator reads a backend on behalf
   of many workloads and hands them a *derived* local resource. The real
   runtime edge is `backend —Serving→ the operator`, drawn once from the

@@ -4,7 +4,7 @@ This container is the runtime side of the `webathome.org` architecture
 metaschema. It hosts the v0.1 JSON Schemas, validates submitted architecture
 artifacts via `POST /api/validate`, and serves the diagram viewer at `/viewer/`.
 
-Producers (Ansible, HelmCharts, EI, IoT, …) emit one `architecture.yaml` per
+Producers (Ansible, the deploy repos, EI, IoT, …) emit one `architecture.yaml` per
 build. Each producer's CI runs `arch-validate.py` against this service, fails the
 build on non-zero exit, and archives the artifact for the Architecture
 pipeline's collector to pick up.
