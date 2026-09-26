@@ -50,10 +50,17 @@ RUN cd tooling && poetry run python validate.py meta \
 
 # ---- stage 2: viewer ----
 FROM node:20-alpine AS build-viewer
-WORKDIR /app
+# The suite reaches out of viewer/ into the repo: the Infrastructure-view test
+# reads docs/architecture/ (the shared catalog and the rack hardware) and
+# views/infrastructure.yaml through `../../../` from src/views/, and
+# vite.config.ts reads views/ through `../views`. So this stage lays those out
+# where they sit in the repo, with viewer/ beside them at /work/viewer.
+WORKDIR /work/viewer
 COPY viewer/package*.json ./
 RUN npm ci
 COPY viewer/ ./
+COPY docs/architecture/ /work/docs/architecture/
+COPY views/ /work/views/
 RUN npm run build && npm test
 
 # ---- stage 3: service ----
@@ -99,7 +106,7 @@ WORKDIR /app
 
 COPY --from=build-service  /work/service/dist          ./dist
 COPY --from=build-service  /work/service/node_modules  ./node_modules
-COPY --from=build-viewer   /app/dist                   ./viewer-dist
+COPY --from=build-viewer   /work/viewer/dist           ./viewer-dist
 COPY --from=check-schemas  /work/schema                ./schema
 COPY --from=run-collector  /work/dist/data             ./data
 COPY USAGE.md                                          ./USAGE.md
