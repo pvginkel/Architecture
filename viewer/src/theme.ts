@@ -31,6 +31,7 @@ import {
   Map,
   Monitor,
   Network,
+  NotebookPen,
   Package,
   Plug,
   Radio,
@@ -238,4 +239,5 @@ export const VIEW_ICON: Record<string, LucideIcon> = {
   ScanLine,
   Container,
   Globe,
+  NotebookPen,
 };

@@ -4,6 +4,7 @@
 order:
   - landscape
   - kubecoder
+  - fieldnotes
   - intercom
   - scanner
   - delivery

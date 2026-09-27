@@ -1,0 +1,35 @@
+id: fieldnotes
+label: Fieldnotes
+description: Fieldnotes — the curated, cross-project observation store for AI agents, spanning the backend with its MCP server, the operator's triage UI, and what they consume.
+icon: NotebookPen
+# Mirrors the per-app view shape. `releases: [fieldnotes]` selects the prd pod's
+# five containers (app, mcp, ui, sse-gateway, webhook-relay); neighbourDepth 1
+# pulls in each container's product definition via its Specialization edge, the
+# hosts the pod answers on, and Keycloak, which the deployer resolves from the
+# sign-in recipe.
+#
+# The two products are include-anchored: every consumes-* edge and the GitHub
+# Serving edge is authored on a product, so naming them lands the SSE gateway,
+# the models pod's service, YouTrack's, the KubeCoder controller's API and GitHub
+# one hop out. The three services the products realize are anchored too, because
+# their interfaces, one per class of consumer, sit two hops from the products.
+#
+# What runs behind the three in-house services sits two hops out as well
+# (instance -> service -> backend). It is includeUnexpanded, not include: an
+# include is expanded, and depth 1 from YouTrack or the KubeCoder controller
+# would pull in everything else they touch.
+predicate:
+  releases: [fieldnotes]
+include:
+  - app:fieldnotes,1606c9c8-a84b-4725-a952-27688349608c # Backend and MCP server
+  - app:fieldnotes-ui,588b1881-6693-439b-9d67-a07c878946dc # UI
+  - svc:fieldnotes-api,24ec3d57-28ec-4dfa-8901-1031ba7492f3
+  - svc:fieldnotes-mcp,3a0da841-59fb-4df6-b253-373c0b1a1983
+  - svc:fieldnotes-ui-web,e42c9f2b-f515-4daf-9099-fe3162553151
+includeUnexpanded:
+  # The deploy-repo instances are matched by id prefix.
+  - "/^ss:models-prd-models-/" # The models pod: NGINX in front of Text Embeddings Inference
+  - "/^ss:youtrack-prd-youtrack-youtrack,/"
+  - "/^app:kubecoder-prd-kubecoder-controller-kubecoder-controller,/"
+  - app:kubecoder-controller,ae8fd615-65fe-4d32-88d8-8803aa30630a # KubeCoder controller
+neighbourDepth: 1
