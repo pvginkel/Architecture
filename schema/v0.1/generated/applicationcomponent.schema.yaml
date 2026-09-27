@@ -66,6 +66,7 @@ properties:
     - electronics-inventory
     - external-secrets
     - federated-aac
+    - fieldnotes-app
     - ginbov-nl
     - gitblit
     - github

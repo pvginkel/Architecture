@@ -258,6 +258,7 @@ export const LOGO_FILES = {
   "electronics-inventory": "electronics-inventory.png",
   "external-secrets": "external-secrets.png",
   "federated-aac": "federated-aac.png",
+  "fieldnotes-app": "fieldnotes-app.svg",
   "ginbov-nl": "ginbov-nl.png",
   "gitblit": "gitblit.png",
   "github": "github.svg",
