@@ -119,6 +119,10 @@ producers:
     repo: pvginkel/YouTrackMCPServer
     jenkinsJob: AaC/YouTrackMCPServer
     defaultLogo: youtrack
+  - id: fieldnotes-app
+    repo: pvginkel/FieldnotesApp
+    jenkinsJob: AaC/FieldnotesApp
+    defaultLogo: fieldnotes-app
   - id: argocd-deploy
     repo: pvginkel/ArgoCDDeploy
     jenkinsJob: AaC/ArgoCDDeploy
