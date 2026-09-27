@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="52 52 920 920" role="img" aria-labelledby="title description">
+  <title id="title">DHCPApp icon</title>
+  <desc id="description">A blue central server linked to four device nodes, with a green ring marking the active device.</desc>
+
+  <rect id="tile" x="52" y="52" width="920" height="920" rx="184" fill="#F4F6FA"/>
+
+  <g id="network" fill="#2A6DF4">
+    <rect id="server" x="408" y="408" width="208" height="204" rx="42"/>
+
+    <rect id="connector-top" x="496" y="324" width="32" height="80" rx="16"/>
+    <rect id="connector-left" x="300" y="494" width="104" height="32" rx="16"/>
+    <rect id="connector-right" x="622" y="494" width="78" height="32" rx="16"/>
+    <rect id="connector-bottom" x="496" y="616" width="32" height="84" rx="16"/>
+
+    <circle id="device-top" cx="512" cy="250" r="64"/>
+    <circle id="device-left" cx="225" cy="512" r="68"/>
+    <circle id="device-bottom" cx="512" cy="774" r="68"/>
+  </g>
+
+  <g id="live-device">
+    <circle id="pulse-ring" cx="802" cy="510" r="88" fill="none" stroke="#22C55E" stroke-width="20"/>
+    <circle id="active-device" cx="802" cy="510" r="52" fill="#22C55E"/>
+  </g>
+</svg>

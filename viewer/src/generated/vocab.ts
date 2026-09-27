@@ -251,6 +251,7 @@ export const LOGO_FILES = {
   "coredns": "coredns.svg",
   "cpp": "cpp.svg",
   "csharp": "csharp.svg",
+  "dhcp-app": "dhcp-app.svg",
   "dnsmasq": "dnsmasq.svg",
   "docker": "docker.svg",
   "elastic": "elastic.svg",
