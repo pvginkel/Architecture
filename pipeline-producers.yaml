@@ -41,7 +41,7 @@ producers:
   - id: dhcpapp
     repo: pvginkel/DHCPApp
     jenkinsJob: AaC/DHCPApp
-    defaultLogo: dnsmasq
+    defaultLogo: dhcp-app
   - id: zigbee-control
     repo: pvginkel/ZigbeeControl
     jenkinsJob: AaC/ZigbeeControl
