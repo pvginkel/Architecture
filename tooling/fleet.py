@@ -1221,13 +1221,24 @@ def track(
 ) -> Tracked:
     """Follow the build of `commit` in `job`, and the builds it starts, to their end.
 
-    The tracker's own 30 s default for how long it waits for the build to appear is
-    far too short under a loaded queue, and it polls for completion without a
+    The tracker's own 5 min default for how long it waits for the build to appear is
+    too short under a loaded queue, and it polls for completion without a
     deadline, so a build that never finishes would park the whole sequential run:
-    `APPEAR_TIMEOUT` covers the queue and `TRACK_TIMEOUT` bounds the call.
+    `APPEAR_TIMEOUT` covers the queue and `TRACK_TIMEOUT` bounds the call. The
+    tracker's follow into Argo CD is turned off: the question here is whether CI
+    stayed green, and the follow would stop at a deploy repo this environment has
+    not cloned, or blame the push for a roll it did not cause.
     """
     print(f"{producer.id}: tracking {job}", file=sys.stderr, flush=True)
-    argv = [TRACKER, job, "--hash", commit, "--appear-timeout", str(APPEAR_TIMEOUT)]
+    argv = [
+        TRACKER,
+        job,
+        "--hash",
+        commit,
+        "--appear-timeout",
+        str(APPEAR_TIMEOUT),
+        "--no-follow-argocd",
+    ]
     try:
         proc = subprocess.run(
             argv, capture_output=True, encoding="utf-8", check=False, timeout=TRACK_TIMEOUT

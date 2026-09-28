@@ -99,11 +99,13 @@ unknown name starts a plain session instead of failing.
 
 The session's commits are pushed to the repo's default branch, and every job the push starts is
 followed to its end with `track_build.py <job> --hash <sha>`, which follows the downstream chain
-too. The tracker's own default of 30 s for how long it waits for the build to appear is far too
+too. The tracker's own default of 5 minutes for how long it waits for the build to appear is too
 short under a loaded queue, so the tool passes `--appear-timeout APPEAR_TIMEOUT` instead; and
 since the tracker then polls for completion without a deadline, the call is bounded by
 `TRACK_TIMEOUT`, a tracker killed at it being operational like any other that could not finish.
-Without that bound one build that never completes parks the whole sequential run.
+Without that bound one build that never completes parks the whole sequential run. The tool also
+passes `--no-follow-argocd`: the question is whether CI stayed green, not whether Argo CD rolled
+the deploy, and the follow would stop at a deploy repo this environment has not cloned.
 
 Which jobs those are is decided once per run from Jenkins' REST API: every enabled job whose SCM
 checks out the repo and which carries a GitHub push trigger, the registry's `jenkinsJob` first. A

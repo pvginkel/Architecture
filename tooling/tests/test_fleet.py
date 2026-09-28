@@ -1645,7 +1645,7 @@ def test_a_tracker_that_cannot_finish_is_operational_and_unresolved(
     )
 
 
-def test_the_tracker_is_given_an_appear_timeout_that_covers_a_queued_build(
+def test_the_tracker_is_given_a_queue_long_appear_timeout_and_no_argo_cd_follow(
     tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, tracker: FakeTracker
 ) -> None:
     f = _updated(tmp_path, kc, jenkins)
@@ -1653,7 +1653,14 @@ def test_the_tracker_is_given_an_appear_timeout_that_covers_a_queued_build(
     tracker.play({JOB: [_built(42)]})
     _deliver(f)
     assert tracker.argv() == [
-        [JOB, "--hash", _pushed(tmp_path), "--appear-timeout", str(fleet.APPEAR_TIMEOUT)]
+        [
+            JOB,
+            "--hash",
+            _pushed(tmp_path),
+            "--appear-timeout",
+            str(fleet.APPEAR_TIMEOUT),
+            "--no-follow-argocd",
+        ]
     ]
 
 
