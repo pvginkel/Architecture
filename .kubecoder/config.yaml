@@ -14,6 +14,9 @@ tools:
   # Node and Python in one sidecar: the merge pipeline (tooling/) is Python under
   # poetry, the viewer and the service are npm.
   - use: modern-app
+  # The architecture-as-code toolchain: a central update session reads a deploy
+  # repo's annotation contract from its `gen-architecture --help`.
+  - use: aac-tools
 
 # The deliverable is a container image that is not built locally otherwise —
 # Jenkins builds it with helmCharts.kaniko. This is here so a Dockerfile change

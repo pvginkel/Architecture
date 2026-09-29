@@ -6,9 +6,9 @@ federated architecture system. It lives in the Architecture repo at
 and `arch-validate.py`; the central architecture update stages that
 directory into each producer clone it works in. The `seed-architecture`
 skill (first-version authoring) and the `triage-architecture` and
-`update-architecture` agents read it on startup. Producer repos copy
-`arch-validate.py` into `scripts/arch-validate.py` for their
-Jenkinsfile to call.
+`update-architecture` agents read it on startup. Producer repos keep no
+copy of `arch-validate.py`: they run `arch-validate` from the aac-tools
+toolchain (see Validation).
 
 ## What you're producing and why
 
@@ -651,27 +651,33 @@ No conditional rules between lifecycle and other fields. No
 
 ## Validation
 
-Use the `arch-validate.py` script shipped alongside this manual. Copy it
-to `scripts/arch-validate.py` in this repo and `chmod +x` it.
+Validate with `arch-validate` from the **aac-tools toolchain**, the
+`registry:5000/aac-tools` image ArgoCDTools publishes. It ships the
+`arch-validate.py` beside this manual byte for byte, so this repo keeps
+no copy of the script:
+
+- **Jenkins:** run it in the container `containerTemplates.aac_tools`
+  declares (see Jenkins integration).
+- **KubeCoder:** declare the toolchain in `.kubecoder/config.yaml`
+  (`- use: aac-tools` under `tools:`) and run it through
+  `cexec aac-tools`.
 
 ```bash
-./scripts/arch-validate.py architecture.yaml
-./scripts/arch-validate.py architecture/prd.yaml architecture/dev.yaml
-cat architecture.yaml | ./scripts/arch-validate.py -
-./scripts/arch-validate.py --json architecture.yaml      # raw response on stdout
-./scripts/arch-validate.py --quiet architecture.yaml     # suppress OK lines
+cexec aac-tools arch-validate architecture.yaml
+cexec aac-tools arch-validate architecture/prd.yaml architecture/dev.yaml
+cat architecture.yaml | cexec aac-tools arch-validate -
+cexec aac-tools arch-validate --json architecture.yaml      # raw response on stdout
+cexec aac-tools arch-validate --quiet architecture.yaml     # suppress OK lines
 ```
 
-The script POSTs to `https://architecture.webathome.org/api/validate`
-and exits `0` valid, `1` invalid, `2` transport/server error. It's a
-single-file Python script that uses only the standard library, so any
-`python:slim` (or system `python3`) is enough — no `pip install` step.
+`arch-validate` POSTs to `https://architecture.webathome.org/api/validate`
+and exits `0` valid, `1` invalid, `2` transport/server error.
 
 Override the endpoint for local testing:
 
 ```bash
-ARCHITECTURE_VALIDATE_URL=http://localhost:8080/api/validate \
-  ./scripts/arch-validate.py architecture.yaml
+cexec aac-tools env ARCHITECTURE_VALIDATE_URL=http://localhost:8080/api/validate \
+  arch-validate architecture.yaml
 ```
 
 The validation service checks: schema conformance, id format,
@@ -682,6 +688,21 @@ merge time in the Architecture pipeline.
 
 ## Jenkins integration
 
+The validator runs in the aac-tools container, which the pod template
+declares through the JenkinsPipelineUtils shared library:
+
+```groovy
+library identifier: 'JenkinsPipelineUtils', changelog: false
+
+podTemplate(inheritFrom: 'jenkins-agent', containers: [
+    containerTemplates.aac_tools('aac-tools')
+]) {
+    node(POD_LABEL) {
+        // clone this repo, then the steps below
+    }
+}
+```
+
 Two steps in this repo's `Jenkinsfile`. Both use a directory glob so
 they work whether this repo emits one YAML or several:
 
@@ -689,7 +710,9 @@ they work whether this repo emits one YAML or several:
 
    ```groovy
    stage('Validate architecture artifacts') {
-       sh './scripts/arch-validate.py docs/architecture/*.yaml'
+       container('aac-tools') {
+           sh 'arch-validate docs/architecture/*.yaml'
+       }
    }
    ```
 
@@ -717,7 +740,7 @@ commit the YAML — regenerate, validate, archive:
 
 ```groovy
 stage('Generate') { sh 'python tools/gen-architecture.py' }   // may need helm/etc. on the agent
-stage('Validate') { sh './scripts/arch-validate.py docs/architecture/*.yaml' }
+stage('Validate') { container('aac-tools') { sh 'arch-validate docs/architecture/*.yaml' } }
 stage('Archive')  { archiveArtifacts artifacts: 'docs/architecture/*.yaml', fingerprint: true }
 ```
 
@@ -903,7 +926,7 @@ up.
    generate a UUID. The composite IDs in the architecture YAML(s) are
    the single source of truth; no separate id table.
 3. **Author** the architecture YAML(s) under `docs/architecture/`.
-   Iterate against `./scripts/arch-validate.py docs/architecture/*.yaml`
+   Iterate against `cexec aac-tools arch-validate docs/architecture/*.yaml`
    until clean.
 4. **Wire CI**: add the validate + archive steps to this repo's
    Jenkinsfile.

@@ -196,10 +196,12 @@ it together:
 
 - The agents and the skill reference the manual and the validator as `.claude/architecture/…`, which
   is where they sit in a clone as well as here.
-- `arch-validate.py` exists once, at `.claude/architecture/arch-validate.py`. The image's
-  `build-service` stage copies it from there for `service/test/arch-validate.test.ts`, and
-  `Jenkinsfile.ha-fleet` calls it; producer repos keep their own copy at `scripts/arch-validate.py`
-  for their CI to call, re-copied from here when it changes.
+- `arch-validate.py` exists once in this repo, at `.claude/architecture/arch-validate.py`. The
+  image's `build-service` stage copies it from there for `service/test/arch-validate.test.ts`, and
+  `Jenkinsfile.ha-fleet` calls it. Producers keep no copy: they run `arch-validate` from the
+  aac-tools toolchain, whose image ships ArgoCDTools' byte-for-byte copy
+  (`aac-tools/image/arch-validate.py`, md5-pinned by a test there). A change here reaches them when
+  that copy is refreshed and the image republished.
 
 A change to the schema, the enums or what a valid `architecture.yaml` looks like changes what
 producers must write, and so what the manual and the skeleton say —

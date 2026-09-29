@@ -5,7 +5,7 @@ metaschema. It hosts the v0.1 JSON Schemas, validates submitted architecture
 artifacts via `POST /api/validate`, and serves the diagram viewer at `/viewer/`.
 
 Producers (Ansible, the deploy repos, EI, IoT, …) emit one `architecture.yaml` per
-build. Each producer's CI runs `arch-validate.py` against this service, fails the
+build. Each producer's CI runs `arch-validate` against this service, fails the
 build on non-zero exit, and archives the artifact for the Architecture
 pipeline's collector to pick up.
 
@@ -132,18 +132,21 @@ curl -sS \
   | jq .
 ```
 
-## `arch-validate.py` CLI
+## `arch-validate` CLI
 
-The dev-facing artifact. A producer repo drops the file into its own
-`scripts/` directory and runs it in CI.
+The dev-facing artifact. Producers run it from the aac-tools toolchain, the
+`registry:5000/aac-tools` image ArgoCDTools publishes: in Jenkins in the
+container `containerTemplates.aac_tools` declares, in a KubeCoder environment
+that declares the toolchain through `cexec aac-tools`. A producer repo keeps no
+copy of the script.
 
 ```bash
-# from a producer repo
-./scripts/arch-validate.py architecture.yaml
-./scripts/arch-validate.py dev.architecture.yaml prd.architecture.yaml
-cat architecture.yaml | ./scripts/arch-validate.py -      # stdin
-./scripts/arch-validate.py --json architecture.yaml       # raw endpoint JSON
-./scripts/arch-validate.py --quiet architecture.yaml      # suppress OK lines
+# from a producer repo's KubeCoder environment
+cexec aac-tools arch-validate architecture.yaml
+cexec aac-tools arch-validate dev.architecture.yaml prd.architecture.yaml
+cat architecture.yaml | cexec aac-tools arch-validate -      # stdin
+cexec aac-tools arch-validate --json architecture.yaml       # raw endpoint JSON
+cexec aac-tools arch-validate --quiet architecture.yaml      # suppress OK lines
 ```
 
 Exit codes: `0` valid, `1` invalid, `2` transport/server error.
@@ -151,14 +154,14 @@ Exit codes: `0` valid, `1` invalid, `2` transport/server error.
 Override the endpoint for local testing:
 
 ```bash
-ARCHITECTURE_VALIDATE_URL=http://localhost:8080/api/validate \
-  ./scripts/arch-validate.py artifact.yaml
+cexec aac-tools env ARCHITECTURE_VALIDATE_URL=http://localhost:8080/api/validate \
+  arch-validate artifact.yaml
 ```
 
-The script is a single-file Python 3 program that uses only the standard
-library — runs on any `python:slim` image or system `python3`, no `pip
-install` step. Updates are coordinated by re-copying from this repo
-(`.claude/architecture/arch-validate.py`).
+The toolchain ships this repo's `.claude/architecture/arch-validate.py` byte for
+byte: ArgoCDTools vendors it as `aac-tools/image/arch-validate.py`, and a test
+there pins its md5. A change here reaches producers when ArgoCDTools takes the
+new copy and republishes the image.
 
 ## `$schema` pragma
 

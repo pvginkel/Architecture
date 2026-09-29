@@ -145,10 +145,11 @@ diff** — a clean producer is byte-identical (catches non-deterministic ids).
 Per the manual's **Jenkins integration** and **Registration** sections: add
 validate + archive steps (generated producers add a generate step first and
 don't commit the YAML, ideally in a dedicated `Jenkinsfile.architecture`
-isolated from the deploy pipeline), with the validator copied from
-`.claude/architecture/arch-validate.py` to the repo's own
-`scripts/arch-validate.py` for CI to call. Push the seeded commits once the
-operator approves: the central update refuses a clone with unpushed commits.
+isolated from the deploy pipeline), with the validate step running
+`arch-validate` in the aac-tools toolchain's container
+(`containerTemplates.aac_tools`); the repo keeps no copy of the validator.
+Push the seeded commits once the operator approves: the central update
+refuses a clone with unpushed commits.
 Confirm one build archives + validates, then PR `pipeline-producers.yaml` in
 pvginkel/Architecture with the producer's `id`, `jenkinsJob` and `repo`
 (GitHub `owner/name`; without it the central update does not manage the

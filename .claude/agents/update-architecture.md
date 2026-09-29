@@ -44,8 +44,11 @@ Before you start, read:
    missing, stop. You need the vocabulary to make correct edits.
 2. `CLAUDE.md` at repo root: repo conventions, commit cadence, what's in scope.
 3. Every file the sources list. In hand-authored mode they all declare the same `producer:`
-   envelope key, the producer id. In generated mode, if the sources include the generator, read its
-   header docstring: it is the annotation contract.
+   envelope key, the producer id.
+4. In generated mode, the annotation contract. If the sources include the generator, its header
+   docstring is the contract. Otherwise run `cexec aac-tools gen-architecture --help`: it prints
+   the contract of the aac-tools toolchain's generator, which the deploy repos build with, and
+   renders nothing. If it fails, stop: you need the contract to make correct edits.
 
 ## The range
 
@@ -245,8 +248,8 @@ Skipped: <short list, or "none">
 ```
 
 `<validation>` is `validator clean` in hand-authored mode, `validation by the AaC build` in
-generated mode, or `stopped: <reason>` when you stopped early (the manual missing, the validator
-unreachable, the sources listing no files). That's the handoff.
+generated mode, or `stopped: <reason>` when you stopped early (the manual or the contract missing,
+the validator unreachable, the sources listing no files). That's the handoff.
 
 ## Constraints
 

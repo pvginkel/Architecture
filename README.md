@@ -165,7 +165,7 @@ Origin is locked to `https://webathome.org`.
 The runtime side of the metaschema. Hosts the schemas, validates artifacts via
 `POST /api/validate`, serves the merged dataset and the viewer, and renders
 `USAGE.md` at the container root. The full API — request/response shape, schema and
-dataset URLs, the `arch-validate.py` CLI producers drop into their own `scripts/`,
+dataset URLs, the `arch-validate` CLI producers run from the aac-tools toolchain,
 the `$schema` editor pragma, and how to file schema-change requests — is documented
 in [`USAGE.md`](./USAGE.md), which is also served live at
 `architecture.webathome.org/`.
