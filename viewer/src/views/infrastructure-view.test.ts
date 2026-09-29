@@ -54,6 +54,17 @@ describe("the Infrastructure view over the self-producer's artifact", () => {
     expect(ids(catalog).filter((id) => scope.has(id))).toEqual([]);
   });
 
+  it("leaves out system software from other producers", () => {
+    const release = { id: "ss:grafana-prd-grafana,00000000-0000-5000-8000-000000000000",
+      label: "grafana (prd)", producer: "grafana-deploy", environment: "prd" } as ManifestElement;
+    const withRelease = {
+      ...manifest,
+      systemSoftware: [...(manifest.systemSoftware ?? []), release],
+    } as Manifest;
+    const view = readRepo<ViewDefinition>("views/infrastructure.yaml");
+    expect(resolveViewScope(view, buildModel(withRelease), withRelease).has(release.id)).toBe(false);
+  });
+
   it("shows the rack and network hardware", () => {
     expect(ids(hardware).length).toBeGreaterThan(0);
     expect(ids(hardware).filter((id) => !scope.has(id))).toEqual([]);
