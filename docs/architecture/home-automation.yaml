@@ -95,7 +95,7 @@ technologyServices:
 technologyInterfaces:
   - id: if:home-assistant-api,e1606bc9-faf0-4723-b616-63d7c8f9ec6d
     label: Home Assistant
-    summary: External HTTPS endpoint at homeassistant.webathome.org — the Home Assistant dashboard and its HTTP/WebSocket API. Registered as a manual entry in HelmCharts/charts/nginx/files/nginxmanager/external-services.yaml.
+    summary: External HTTPS endpoint at homeassistant.webathome.org — the Home Assistant dashboard and its HTTP/WebSocket API. Registered as a manual entry in NginxDeploy chart/files/nginxmanager/external-services.yaml.
     introduced: 2026-05-28
     lifecycle: active
     environment: prd
