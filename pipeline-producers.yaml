@@ -273,3 +273,6 @@ producers:
   - id: prometheus-deploy
     repo: pvginkel/PrometheusDeploy
     jenkinsJob: AaC/PrometheusDeploy
+  - id: pipelines-deploy
+    repo: pvginkel/PipelinesDeploy
+    jenkinsJob: AaC/PipelinesDeploy
