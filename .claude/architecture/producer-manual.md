@@ -752,8 +752,8 @@ validation on the first build.
 
 ## Registration in the federation pipeline
 
-One PR against `pipeline-producers.yaml` in pvginkel/Architecture
-adds this repo as a registered producer:
+One commit to `pipeline-producers.yaml` on pvginkel/Architecture's
+`main` adds this repo as a registered producer:
 
 ```yaml
 producers:
@@ -932,10 +932,10 @@ up.
    Jenkinsfile.
 5. **Verify**: trigger one build. Confirm every file archives and
    the validation step passes.
-6. **Register**: PR `pipeline-producers.yaml` in pvginkel/Architecture
-   adding this producer. After it lands, the next Architecture
-   pipeline run picks the files up and emits the merged dataset with
-   this repo's elements included.
+6. **Register**: commit to `pipeline-producers.yaml` on
+   pvginkel/Architecture's `main`, adding this producer. After it
+   lands, the next Architecture pipeline run picks the files up and
+   emits the merged dataset with this repo's elements included.
 
 A **generated** producer inverts steps 2–3: instead of minting ids and
 hand-authoring, design the annotation layer + generator (ids derive from
