@@ -105,6 +105,7 @@ properties:
     - openbao
     - opensearch
     - pgadmin
+    - pipelines
     - playwright
     - plex
     - pnpm

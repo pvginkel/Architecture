@@ -297,6 +297,7 @@ export const LOGO_FILES = {
   "openbao": "openbao.svg",
   "opensearch": "opensearch.svg",
   "pgadmin": "pgadmin.png",
+  "pipelines": "pipelines.svg",
   "playwright": "playwright.svg",
   "plex": "plex.svg",
   "pnpm": "pnpm.svg",
