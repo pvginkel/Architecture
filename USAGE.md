@@ -187,7 +187,9 @@ architecture sources last changed — or since that repo was last reviewed,
 whichever is later — change what the architecture must say, and where they do
 runs a headless session in the clone that edits the artifact and commits. Those
 commits are pushed to the repo's default branch, and the builds the push starts
-are followed to their end.
+are followed to their end. A repo whose AaC job builds a promotion branch, such
+as a deploy repo's `prd`, which only fast-forwards along the default branch,
+gets the same push; its artifact picks the edit up when that branch is promoted.
 
 A generated producer is also judged on the gaps its generator reports: the
 `gap: <what>` lines of its last successful AaC build. A gap no run has judged

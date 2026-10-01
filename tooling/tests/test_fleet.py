@@ -1208,6 +1208,11 @@ JOB_CONFIG = """\
           <url>{url}</url>
         </hudson.plugins.git.UserRemoteConfig>
       </userRemoteConfigs>
+      <branches>
+        <hudson.plugins.git.BranchSpec>
+          <name>{branch}</name>
+        </hudson.plugins.git.BranchSpec>
+      </branches>
     </scm>
     <scriptPath>Jenkinsfile.architecture</scriptPath>
   </definition>
@@ -1216,7 +1221,9 @@ JOB_CONFIG = """\
 """
 
 
-FakeJob = tuple[str, list[tuple[int, str | None]], str, bool, tuple[str, ...], tuple[str, ...]]
+FakeJob = tuple[
+    str, list[tuple[int, str | None]], str, bool, tuple[str, ...], tuple[str, ...], str
+]
 
 
 class FakeJenkins:
@@ -1225,10 +1232,11 @@ class FakeJenkins:
     A job carries its SCM URL, its builds newest first as `(number, result)`
     (`last` alone stands for one build #1 with that result, None for a job
     never built), the trigger in its config, whether it is disabled, the jobs
-    its last completed build's console says it started, and the lines its last
-    successful build's console adds; the folders are the job names' prefixes,
-    at any depth. `no_history` refuses the build listing the tool reads a
-    failed build's prior result from.
+    its last completed build's console says it started, the lines its last
+    successful build's console adds and the branch spec its SCM checks out;
+    the folders are the job names' prefixes, at any depth. `no_history`
+    refuses the build listing the tool reads a failed build's prior result
+    from.
     """
 
     def __init__(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1251,10 +1259,11 @@ class FakeJenkins:
         builds: list[tuple[int, str | None]] | None = None,
         starts: tuple[str, ...] = (),
         console: tuple[str, ...] = (),
+        branch: str = "*/main",
     ) -> None:
         if builds is None:
             builds = [(1, last)] if last is not None else []
-        self.jobs[name] = (scm, builds, trigger, disabled, starts, console)
+        self.jobs[name] = (scm, builds, trigger, disabled, starts, console, branch)
 
     def _completed(self, name: str) -> tuple[int, str] | None:
         completed = [(n, r) for n, r in self.jobs[name][1] if r is not None]
@@ -1288,8 +1297,10 @@ class FakeJenkins:
         name = "/".join(parts[1:-2:2] if console else parts[1:-1:2])
         body: Any
         if path.endswith("/config.xml") and name in self.jobs:
-            scm, _, trigger, disabled, _, _ = self.jobs[name]
-            config = JOB_CONFIG.format(url=scm, trigger=trigger, disabled=str(disabled).lower())
+            scm, _, trigger, disabled, _, _, branch = self.jobs[name]
+            config = JOB_CONFIG.format(
+                url=scm, trigger=trigger, disabled=str(disabled).lower(), branch=branch
+            )
             return io.BytesIO(config.encode())
         if console and name in self.jobs:
             number = int(parts[-2])
@@ -1440,6 +1451,9 @@ def _pushed(tmp_path: Path) -> str:
     return _git(tmp_path / "remotes" / f"{REPO}.git", "rev-parse", "main")
 
 
+ARCH_REPO = "pvginkel/Architecture"
+
+
 def test_the_job_index_reads_every_folder_level_once_per_run(jenkins: FakeJenkins) -> None:
     jenkins.job(JOB)
     jenkins.job("Apps/Web/NewsFilter", "https://github.com/pvginkel/newsfilter")
@@ -1450,19 +1464,45 @@ def test_the_job_index_reads_every_folder_level_once_per_run(jenkins: FakeJenkin
     )
     jenkins.job("Standalone", "https://github.com/pvginkel/PaperClock.git")
     jenkins.job("Mirrors/Elsewhere", "https://git.example.invalid/pvginkel/NewsFilter.git")
+    jenkins.job("Apps/Release", branch="*/prd")
     client = fleet.Jenkins.from_env()
     assert client.jobs_by_repo() == {
-        "pvginkel/newsfilter": (JOB, "Apps/Web/NewsFilter"),
-        "pvginkel/paperclock": ("Standalone",),
+        "pvginkel/newsfilter": {
+            JOB: ("*/main",),
+            "Apps/Release": ("*/prd",),
+            "Apps/Web/NewsFilter": ("*/main",),
+        },
+        "pvginkel/paperclock": {"Standalone": ("*/main",)},
     }
     read = len(jenkins.paths)
     client.jobs_by_repo()
     assert len(jenkins.paths) == read
     assert "/job/Apps/job/Web/api/json" in jenkins.paths
     assert "/job/AaC/job/Home Assistant Fleet/config.xml" in jenkins.paths
-    assert fleet.tracked_jobs(JOB, REPO, client) == [JOB, "Apps/Web/NewsFilter"]
-    assert fleet.tracked_jobs("AaC/PaperClock", "pvginkel/PaperClock", client) == ["Standalone"]
-    assert fleet.tracked_jobs("AaC/Home Assistant Fleet", "pvginkel/Architecture", client) == []
+    assert fleet.tracked_jobs(JOB, REPO, "main", client) == [JOB, "Apps/Web/NewsFilter"]
+    assert fleet.tracked_jobs("Apps/Release", REPO, "prd", client) == ["Apps/Release"]
+    paperclock = fleet.tracked_jobs("AaC/PaperClock", "pvginkel/PaperClock", "main", client)
+    assert paperclock == ["Standalone"]
+    architecture = fleet.tracked_jobs("AaC/Home Assistant Fleet", ARCH_REPO, "main", client)
+    assert architecture == []
+
+
+@pytest.mark.parametrize(
+    ("spec", "builds"),
+    [
+        ("*/main", True),
+        ("main", True),
+        ("origin/main", True),
+        ("refs/heads/main", True),
+        ("**", True),
+        ("*/ma*", True),
+        ("*/prd", False),
+        ("prd", False),
+        ("*/main-old", False),
+    ],
+)
+def test_a_branch_spec_names_the_branch_as_the_git_plugin_reads_it(spec: str, builds: bool) -> None:
+    assert fleet.builds_branch((spec,), "main") is builds
 
 
 def test_a_builds_prior_result_is_its_jobs_newest_completed_build_below_it(
@@ -1604,6 +1644,37 @@ def test_a_registry_job_the_push_does_not_start_is_unresolved_and_the_rest_track
     )
     assert outcome.detail == (
         f"1 delta applied, 1 commit, validator clean. Skipped: none; {outcome.issues[0]}"
+    )
+
+
+def test_a_registry_job_on_a_promotion_branch_awaits_promotion_and_is_checked_before_the_run(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins, tracker: FakeTracker
+) -> None:
+    f = _updated(tmp_path, kc, jenkins)
+    jenkins.job(JOB, branch="*/prd")
+    jenkins.job(APP)
+    tracker.play({APP: [_built(7, APP)]})
+    assert fleet.fleet_jobs(fleet.load_registry(f.registry), fleet.Jenkins.from_env()) == [
+        JOB,
+        APP,
+    ]
+    assert fleet.run(["update"], f, NOW) == 0
+    pushed = _pushed(tmp_path)
+    assert tracker.calls() == [(APP, pushed)]
+    awaiting = (
+        f"{JOB} builds */prd, not main: {pushed[:12]} is published once that is promoted to it"
+    )
+    assert _state(f)[ID] == {
+        "reviewed": pushed,
+        "date": "2026-09-11",
+        "outcome": (
+            f"updated: 1 delta applied, 1 commit, validator clean. Skipped: none; {awaiting}"
+        ),
+    }
+    report = (f.spec_repo / fleet.report_file(NOW)).read_text()
+    assert report.endswith(
+        f"## Awaiting promotion\n\n- `newsfilter`: {awaiting}\n\n"
+        "## Judgment calls\n\nNone.\n\n## Unresolved\n\nNothing.\n"
     )
 
 

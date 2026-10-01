@@ -35,7 +35,8 @@ deliberately not part of it.
 - **`jenkinsJob:`** — the job that builds and archives the artifact, which every producer has. After
   a push the tool tracks it first; a push that does not start it (no push trigger, or disabled)
   leaves the producer unresolved with that said, because a run cannot otherwise tell a
-  verified-green producer from one whose artifact build was never followed. This repo is a producer
+  verified-green producer from one whose artifact build was never followed. A job that builds a
+  promotion branch instead of the default one is the exception, below. This repo is a producer
   too — `architecture`, marked `self: true` — and its job is the `AaC/Architecture` pipeline itself,
   which the Jenkinsfile therefore copies locally rather than from an archive and leaves out of its
   own upstream triggers; the tool tracks it after a push like any other.
@@ -108,11 +109,25 @@ passes `--no-follow-argocd`: the question is whether CI stayed green, not whethe
 the deploy, and the follow would stop at a deploy repo this environment has not cloned.
 
 Which jobs those are is decided once per run from Jenkins' REST API: every enabled job whose SCM
-checks out the repo and which carries a GitHub push trigger, the registry's `jenkinsJob` first. A
-timer-driven, hand-run or disabled job on the same repo is left out on purpose — it will never build
-the pushed commit, and the tracker would wait for a build that never appears. When the job left out
-is the registry's own, the producer is unresolved: its commits are pushed all the same, but its
-artifact build went unverified and the report says so.
+checks out the repo's default branch (its branch spec, `*/main` and the like, matched as the git
+plugin matches one) and which carries a GitHub push trigger, the registry's `jenkinsJob` first. A
+timer-driven, hand-run or disabled job on the same repo is left out on purpose, and so is a job that
+builds another branch: none of them will build the pushed commit, and the tracker would wait for a
+build that never appears. When the job left out is the registry's own, the producer is unresolved:
+its commits are pushed all the same, but its artifact build went unverified and the report says so.
+
+The exception is a registry job that a push starts on another branch only, a **promotion branch**.
+KubeCoderDeploy's `AaC/KubeCoderDeploy` builds `prd`, which Argo CD syncs the prd stage from and
+which its promote job fast-forwards along `main` by hand, so it never carries a commit `main` does
+not. Everything that branch will publish is on the default branch first, so the clone, the
+watermark, the triage and the update all stay on the default branch, and the push goes there too.
+The producer is then *awaiting promotion*: the report lists it under its own heading, with the
+pushed commit and the branch it waits for, and that is neither unresolved nor counted in the exit
+code. Its gaps need nothing special: a gap the update fixes on the default branch is still reported
+by the promotion branch's build until the promotion, but it is recorded with the review, so it costs
+no further session. The edit is checked when it is promoted: a broken judgment layer turns that
+build red, `AaC/Architecture` keeps copying the last successful one, and the next run's preflight
+(below) stops on the red.
 
 Attribution is per build, by that build's own job. The tracker follows a chain — the tracked job's
 build and every build it started downstream — and a failed
@@ -125,8 +140,8 @@ recorded as pre-existing and left alone, a job with no completed build before is
 and a tracker that could not finish — or a prior result the tool could not read — is operational.
 All are unresolved, none is fixed here.
 
-Before the first producer, the run reads the last completed result of every job it would track for
-the producers it is about to run, and of every job those builds started (off their console logs, as
+Before the first producer, the run reads the last completed result of every job a push to the repos
+of the producers it is about to run starts, on any branch, and of every job those builds started (off their console logs, as
 the tracker discovers downstream). Any red stops the run with exit 3 and the list — before anything
 is cloned or pushed — so the operator can run a fixup session first; `--force` runs anyway, and the
 report's header records what was red. The accepted trade-off is that one red build anywhere the
@@ -152,8 +167,8 @@ Both live in the specs repo (`spec_repo` in `.aiworkflowrc`), under `architectur
   keeps every producer it got through and the next run resumes from there.
 - **`<YYYY-MM-DD>T<HHMM>.md`** — one per run: a section per producer (repo, triage verdict, the gaps
   its build reports, handoff, the commits and the commit they were pushed as, each tracked job's
-  result with its builds and the log of a failed one, a block per fix round), then **Judgment
-  calls**, closing with **Unresolved**.
+  result with its builds and the log of a failed one, a block per fix round), then **Awaiting
+  promotion** when a producer is, **Judgment calls**, closing with **Unresolved**.
 
 Unresolved is the run's product and what decides the exit code — 0 when it is empty, 1 otherwise:
 a failed producer, a red build, a session that did not finish. Exit 1 means something actually

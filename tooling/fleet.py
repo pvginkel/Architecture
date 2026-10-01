@@ -34,19 +34,23 @@ agent, `send` under a timeout this tool enforces, `status` for the session
 id, and `end` always.
 
 An update's commits are pushed to the default branch, and each job the push
-starts (every enabled Jenkins job whose SCM checks out the repo and which a
-GitHub push trigger starts, the registry's AaC job first) is followed with
-`track_build.py`; a registry job the push does not start is unresolved, since
-the producer's artifact build then went unverified. A build red after the
-push where its own job was green before it resumes the update session to fix
-it, FIX_ROUNDS times at most; red where it was red before is pre-existing.
+starts (every enabled Jenkins job whose SCM checks out that branch of the repo
+and which a GitHub push trigger starts, the registry's AaC job first) is
+followed with `track_build.py`; a registry job the push does not start is
+unresolved, since the producer's artifact build then went unverified. One that
+a push starts on another branch, a promotion branch such as a deploy repo's
+`prd`, builds the update once that branch is promoted to it: the producer is
+reported as awaiting promotion instead, its build checked by the next run's
+preflight. A build red after the push where its own job was green before it
+resumes the update session to fix it, FIX_ROUNDS times at most; red where it
+was red before is pre-existing.
 Jenkins is `$JENKINS_URL` as `$JENKINS_USER`, by default JENKINS_URL and
 JENKINS_USER below; `$JENKINS_TOKEN` is the only credential.
 
-Before the first producer, the last completed result of every job the run
-would track, and of every job those builds started, is read: any red stops
-the run with exit 3 and the list, so the operator can fix it first, unless
-`--force` runs it anyway.
+Before the first producer, the last completed result of every job a push
+to the producers' repos starts, on any branch, and of every job those builds
+started, is read: any red stops the run with exit 3 and the list, so the
+operator can fix it first, unless `--force` runs it anyway.
 
 The run writes its report beside the state file, commits both by name because
 the specs repo's working tree is shared with the dev pipeline, and pushes. It
@@ -61,6 +65,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import fnmatch
 import itertools
 import json
 import os
@@ -387,7 +392,8 @@ class Outcome:
     update's commits are delivered as `push`, then `fixes`. `issues` is what went wrong for this
     producer, one item per string: the report's Unresolved section lists them and the exit code
     counts them. What the sessions deliberately skipped is `judgment_calls(outcome)`, reported
-    apart from them."""
+    apart from them, as is `awaiting`: what reaches the artifact only once a promotion branch
+    its AaC job builds is promoted to the pushed commit."""
 
     producer: Producer
     status: str
@@ -399,6 +405,7 @@ class Outcome:
     update: UpdateResult | None = None
     push: Push | None = None
     fixes: tuple[FixRound, ...] = ()
+    awaiting: str | None = None
 
     @property
     def state_outcome(self) -> str:
@@ -1019,7 +1026,7 @@ class Jenkins:
         self.base = base.rstrip("/")
         self.user = user
         self.token = token
-        self._index: dict[str, tuple[str, ...]] | None = None
+        self._index: dict[str, dict[str, tuple[str, ...]]] | None = None
 
     @classmethod
     def from_env(cls) -> Jenkins:
@@ -1057,8 +1064,9 @@ class Jenkins:
             else:
                 yield item["fullName"]
 
-    def jobs_by_repo(self) -> dict[str, tuple[str, ...]]:
-        """Each GitHub repo, as lowercase `owner/name`, with the jobs a push to it starts.
+    def jobs_by_repo(self) -> dict[str, dict[str, tuple[str, ...]]]:
+        """Each GitHub repo, as lowercase `owner/name`, with the jobs a push to it starts, each
+        with the branch specs its SCM checks out, in job order.
 
         A job whose SCM checks the repo out but which carries no PUSH_TRIGGER is
         started by a timer or by hand, never by the push, and a disabled job
@@ -1067,17 +1075,20 @@ class Jenkins:
         appears and exit 3.
         """
         if self._index is None:
-            index: dict[str, set[str]] = {}
+            index: dict[str, dict[str, tuple[str, ...]]] = {}
             for job in self._jobs(""):
                 config = ET.fromstring(self.get(f"{job_path(job)}/config.xml"))
                 if config.findtext("disabled") == "true":
                     continue
                 if next(config.iter(PUSH_TRIGGER), None) is None:
                     continue
-                for url in config.iterfind(".//userRemoteConfigs/*/url"):
-                    if repo := GITHUB_REPO.fullmatch((url.text or "").strip()):
-                        index.setdefault(repo[1].lower(), set()).add(job)
-            self._index = {repo: tuple(sorted(jobs)) for repo, jobs in index.items()}
+                for scm in config.iterfind(".//userRemoteConfigs/.."):
+                    names = scm.iterfind("branches/*/name")
+                    specs = tuple((name.text or "").strip() for name in names)
+                    for url in scm.iterfind("userRemoteConfigs/*/url"):
+                        if repo := GITHUB_REPO.fullmatch((url.text or "").strip()):
+                            index.setdefault(repo[1].lower(), {})[job] = specs
+            self._index = {repo: dict(sorted(jobs.items())) for repo, jobs in index.items()}
         return self._index
 
     def last_completed(self, job: str) -> tuple[int, str] | None:
@@ -1121,20 +1132,40 @@ def scheduled_jobs(console: str) -> list[str]:
     return names
 
 
-def tracked_jobs(job: str, repo: str, jenkins: Jenkins) -> list[str]:
-    """The jobs a push to `repo` starts, the registry's job `job` first when it is one."""
-    started = jenkins.jobs_by_repo().get(repo.lower(), ())
-    return ([job] if job in started else []) + [j for j in started if j != job]
+def builds_branch(specs: tuple[str, ...], branch: str) -> bool:
+    """Whether a job whose git SCM checks out the branch specs `specs` builds `branch`: a spec
+    names it as the git plugin reads one, remote-qualified (`*/main`, `origin/main`), as a ref
+    (`refs/heads/main`) or bare, with wildcards."""
+    names = (branch, f"origin/{branch}", f"refs/heads/{branch}", f"refs/remotes/origin/{branch}")
+    return any(fnmatch.fnmatchcase(name, spec) for spec in specs for name in names)
+
+
+def _registry_first(job: str, jobs: list[str]) -> list[str]:
+    return ([job] if job in jobs else []) + [j for j in jobs if j != job]
+
+
+def tracked_jobs(job: str, repo: str, branch: str, jenkins: Jenkins) -> list[str]:
+    """The jobs a push to `repo`'s `branch` starts, the registry's job `job` first when it is
+    one."""
+    pushed = jenkins.jobs_by_repo().get(repo.lower(), {})
+    return _registry_first(job, [j for j, specs in pushed.items() if builds_branch(specs, branch)])
 
 
 def fleet_jobs(producers: list[Producer], jenkins: Jenkins) -> list[str]:
-    """Every job a push to one of the producers' repos starts, each once, in registry order."""
+    """Every job a push to one of the producers' repos starts, on any branch, each once, in
+    registry order.
+
+    Any branch, because no default branch is known before the clones, and
+    because a registry job that builds a promotion branch is checked nowhere
+    else: the update a run pushes reaches it only once that branch is
+    promoted, after the run.
+    """
     return list(
         dict.fromkeys(
             job
             for p in producers
             if p.repo is not None
-            for job in tracked_jobs(p.job, p.repo, jenkins)
+            for job in _registry_first(p.job, list(jenkins.jobs_by_repo().get(p.repo.lower(), {})))
         )
     )
 
@@ -1165,6 +1196,18 @@ def red_jobs(jobs: list[str], jenkins: Jenkins) -> list[RedJob]:
         if last is not None and last[1] != GREEN:
             red.append(RedJob(job, last[1], tuple(starters)))
     return red
+
+
+def promotion(job: str, repo: str, branch: str, jenkins: Jenkins) -> tuple[str, ...]:
+    """The branch specs of the registry job `job` when a push to `repo` starts it on another
+    branch than `branch` only, the one an update is pushed to; none otherwise.
+
+    Such a job builds a promotion branch, a deploy repo's `prd` that is
+    fast-forwarded along the default branch by hand: the update reaches the
+    artifact when that branch is promoted to it, and not before.
+    """
+    specs = jenkins.jobs_by_repo().get(repo.lower(), {}).get(job, ())
+    return () if builds_branch(specs, branch) else specs
 
 
 def untracked_job(job: str, repo: str, jobs: list[str]) -> list[str]:
@@ -1349,12 +1392,14 @@ def deliver(outcome: Outcome, update: UpdateResult, repo: str, jenkins: Jenkins)
     A build red where its own job was green before resumes the session to fix
     it, FIX_ROUNDS times at most. Any other red build, a tracker that could not
     finish, a fix round that stopped short of a push and a registry job the
-    push does not start are unresolved.
+    push does not start are unresolved, unless the push starts that job on a
+    promotion branch: then the producer awaits promotion.
     """
     producer, clone = outcome.producer, update.clone
     before: dict[str, str | None] = {}
     try:
-        jobs = tracked_jobs(producer.job, repo, jenkins)
+        jobs = tracked_jobs(producer.job, repo, clone.branch, jenkins)
+        promoted = promotion(producer.job, repo, clone.branch, jenkins)
         first = push_and_track(producer, clone, jobs, before, jenkins)
     except ProducerError as e:
         detail = f"{e}; the commits stay unpushed in {clone.path}"
@@ -1369,12 +1414,20 @@ def deliver(outcome: Outcome, update: UpdateResult, repo: str, jenkins: Jenkins)
         push, session_id = fix.push, fix.session_id
     issues = [f"fix round {n}: {fix.failure}" for n, fix in enumerate(fixes, 1) if fix.failure]
     issues += [issue for t in push.tracked for issue in build_issues(t, len(fixes))]
-    issues += untracked_job(producer.job, repo, jobs)
+    awaiting = None
+    if promoted:
+        awaiting = (
+            f"{producer.job} builds {', '.join(promoted)}, not {clone.branch}: "
+            f"{push.commit[:12]} is published once that is promoted to it"
+        )
+    else:
+        issues += untracked_job(producer.job, repo, jobs)
     return replace(
         outcome,
-        detail="; ".join([outcome.detail, *issues]),
+        detail="; ".join([outcome.detail, *issues, *([awaiting] if awaiting else [])]),
         reviewed=push.commit,
         issues=tuple(issues),
+        awaiting=awaiting,
         push=first,
         fixes=tuple(fixes),
     )
@@ -1499,8 +1552,9 @@ def _red_line(red: RedJob) -> str:
 
 
 def render_report(outcomes: list[Outcome], now: datetime, red: list[RedJob]) -> str:
-    """The run's report: what was red before a forced run, a section per producer, then the
-    sessions' judgment calls, closing with what failed and needs the operator."""
+    """The run's report: what was red before a forced run, a section per producer, then what
+    awaits a promotion when there is any, the sessions' judgment calls, closing with what failed
+    and needs the operator."""
     issues = [(o.producer.id, issue) for o in outcomes for issue in o.issues]
     calls = [(o.producer.id, call) for o in outcomes for call in judgment_calls(o)]
     tally = ", ".join(
@@ -1520,6 +1574,11 @@ def render_report(outcomes: list[Outcome], now: datetime, red: list[RedJob]) -> 
         lines += [f"Red before the run, run with `--force`: {listed}.", ""]
     for outcome in outcomes:
         lines += _producer_lines(outcome)
+    awaiting = [(o.producer.id, o.awaiting) for o in outcomes if o.awaiting]
+    if awaiting:
+        lines += ["## Awaiting promotion", ""]
+        lines += [f"- `{producer}`: {line}" for producer, line in awaiting]
+        lines.append("")
     lines += ["## Judgment calls", ""]
     lines += [f"- `{producer}`: {call}" for producer, call in calls] or ["None."]
     lines += ["", "## Unresolved", ""]
