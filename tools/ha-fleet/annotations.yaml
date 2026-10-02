@@ -13,8 +13,8 @@
 # the view (every leaf reaches cap:home-automation either way); swap the two
 # targets if a leaf should hang off the other coordinator.
 zigbee_bridges:
-  "0x187a3efffefa873f": ss:zigbee2mqtt-zigbee2mqtt1-zigbee2mqtt,30978e51-1594-5c38-9f85-13dc43f9d328
-  "0x449fdafffe205e11": ss:zigbee2mqtt-zigbee2mqtt2-zigbee2mqtt,43ac1818-deb9-548a-afc6-8b2da5c96a4e
+  "0x187a3efffefa873f": ss:zigbee2mqtt-prd-zigbee2mqtt1-zigbee2mqtt,3b3dcf7a-9bbc-5a29-9120-5e7d552e2d39
+  "0x449fdafffe205e11": ss:zigbee2mqtt-prd-zigbee2mqtt2-zigbee2mqtt,a2c8ea0b-84f7-5a8d-adc9-3c1f169df12e
 
 # Operator exclusion set — seed_keys the live data shouldn't surface (noise,
 # decommissioned-but-still-registered, devices modeled elsewhere). Empty today.
