@@ -73,17 +73,17 @@ state; the gap report goes to stderr.
 ## Scheduled Jenkins job
 
 The pipeline is `Jenkinsfile.ha-fleet` (at the repo root): a standalone job,
-separate from the main AaC pipeline, that runs the generator, validates the
-output against the validation service (`.claude/architecture/arch-validate.py` —
-fails without publishing on a non-zero exit), and archives
+separate from the main AaC pipeline, that runs the generator, archives
 `out/architecture/home-automation-fleet.yaml` (under an `architecture/` path so
 the main pipeline's `copyArtifacts` filter `**/architecture/**/*.yaml` picks it
-up — same contract as every other producer; no commit-back).
+up — same contract as every other producer; no commit-back), and validates it
+against the validation service (`.claude/architecture/arch-validate.py`). A
+non-zero exit fails the build, and the main pipeline copies only the job's last
+successful build, so an invalid snapshot is never published.
 
 The job is `AaC/Home Assistant Fleet`: *Pipeline script from SCM*, repo = this
-one, **Script Path = `Jenkinsfile.ha-fleet`**, with the daily schedule in the
-job config (Build Triggers → Build periodically) — the pipeline itself declares
-**no trigger**.
+one, **Script Path = `Jenkinsfile.ha-fleet`**. The pipeline declares its daily
+schedule itself: `triggers { cron('H 4 * * *') }`.
 
 Secrets:
 - **`HA_TOKEN`** comes from OpenBao via `withVault` (same pattern as the other
@@ -92,8 +92,7 @@ Secrets:
   are ACL-scoped, do **not** reuse one; the HA token is the only source that sees
   DSMR/Ecowitt/SLZB/WiFi, not just Zigbee. The controller-level Vault config
   supplies the address + auth.
-- **`HA_URL`** is read from the ambient global Jenkins environment (already set),
-  forwarded into the build container by the Jenkinsfile.
+- **`HA_URL`** is read from the ambient global Jenkins environment (already set).
 
 The producer is registered in `pipeline-producers.yaml` as
 `home-automation-fleet` with that job and **no `repo:`** — its artifact comes

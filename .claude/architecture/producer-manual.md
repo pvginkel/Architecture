@@ -656,8 +656,9 @@ Validate with `arch-validate` from the **aac-tools toolchain**, the
 `arch-validate.py` beside this manual byte for byte, so this repo keeps
 no copy of the script:
 
-- **Jenkins:** run it in the container `containerTemplates.aac_tools`
-  declares (see Jenkins integration).
+- **Jenkins:** the producer's pipeline runs it through the
+  JenkinsPipelineUtils `architectureProducer` steps (see Jenkins
+  integration).
 - **KubeCoder:** declare the toolchain in `.kubecoder/config.yaml`
   (`- use: aac-tools` under `tools:`) and run it through
   `cexec aac-tools`.
@@ -688,61 +689,65 @@ merge time in the Architecture pipeline.
 
 ## Jenkins integration
 
-The validator runs in the aac-tools container, which the pod template
-declares through the JenkinsPipelineUtils shared library:
+A producer's pipeline is a file of its own, `Jenkinsfile.architecture`,
+run by a job of its own, `AaC/<Repo>`. It is written to
+the estate's Jenkins pipeline style guide, which JenkinsPipelineUtils
+publishes from its `docs/`: the file is the guide's reference file for
+the producer's architecture type, with this repo's own values.
+
+- **App architecture producer**, for a hand-authored model; the
+  reference file is `AaC/Ginbov`'s. One `Validate architecture` stage
+  after the checkout validates the files and archives them.
+- **Deploy-repo architecture producer**, for a model generated from a
+  deploy repo's chart; the reference file is `AaC/ChartsDeploy`'s.
+  `Generate architecture` generates the file and archives it, then
+  `Validate architecture` validates it.
+
+The pod declares the aac-tools container with the library's `podYaml`
+template `aac-tools`, and the stages call the library's
+`architectureProducer` steps, which carry what every producer shares:
+the container the tools run in, their command lines, and an archive
+the Architecture pipeline collects:
 
 ```groovy
-library identifier: 'JenkinsPipelineUtils', changelog: false
-
-podTemplate(inheritFrom: 'jenkins-agent', containers: [
-    containerTemplates.aac_tools('aac-tools')
-]) {
-    node(POD_LABEL) {
-        // clone this repo, then the steps below
+stage('Validate architecture') {
+    steps {
+        script {
+            architectureProducer.validate(files: ['docs/architecture/*.yaml'])
+            architectureProducer.archive(files: ['docs/architecture/*.yaml'])
+        }
     }
 }
 ```
 
-Two steps in this repo's `Jenkinsfile`. Both use a directory glob so
-they work whether this repo emits one YAML or several:
+- `validate(files: [...])` runs `arch-validate` on the files; a model
+  the service rejects fails the build.
+- `archive(files: [...])` archives them, fingerprinted. Each pattern
+  ends in `.yaml` under a path segment named `architecture`, which the
+  Architecture pipeline's filter matches.
+- `generate(stage: '<stage>', producer: '<id>')` runs the toolchain's
+  `gen-architecture` for a deploy repo's stage.
 
-1. **Validate** as a build step. Fail the build on non-zero exit:
-
-   ```groovy
-   stage('Validate architecture artifacts') {
-       container('aac-tools') {
-           sh 'arch-validate docs/architecture/*.yaml'
-       }
-   }
-   ```
-
-2. **Archive** so the Architecture pipeline can pull every YAML via
-   `copyArtifacts`:
-
-   ```groovy
-   stage('Archive architecture artifacts') {
-       archiveArtifacts artifacts: 'docs/architecture/*.yaml', fingerprint: true
-   }
-   ```
+A directory glob keeps the file working whether this repo emits one
+YAML or several.
 
 The Architecture pipeline calls `copyArtifacts` with
 `filter: '**/architecture/**/*.yaml'` and no `flatten`, so the YAMLs
 land under `producer-artifacts/<producer-id>/` with their original
 repo-relative paths preserved. The collector walks the producer
 directory recursively, so subdirectory layout (and any same-basename
-files in different subdirs) is fine.
+files in different subdirs) is fine. It copies a producer's last
+successful build, so a model that fails validation never reaches it,
+archived or not.
 
 The Jenkins agent must have outbound HTTPS to
 `architecture.webathome.org` so the validator can reach the service.
 
-**Generated producers** add a **generate** step first and do **not**
-commit the YAML — regenerate, validate, archive:
-
-```groovy
-stage('Generate') { sh 'python tools/gen-architecture.py' }   // may need helm/etc. on the agent
-stage('Validate') { container('aac-tools') { sh 'arch-validate docs/architecture/*.yaml' } }
-stage('Archive')  { archiveArtifacts artifacts: 'docs/architecture/*.yaml', fingerprint: true }
-```
+**Generated producers** do **not** commit the YAML: a
+`Generate architecture` stage regenerates it and archives what it
+writes, then `Validate architecture` validates it. A deploy repo
+generates with `architectureProducer.generate`; any other generator
+runs as the repo's own command in that stage.
 
 No first-build bootstrap deadlock: `arch-validate` doesn't resolve
 cross-producer refs (that's merge-time), so build order only affects
@@ -928,8 +933,8 @@ up.
 3. **Author** the architecture YAML(s) under `docs/architecture/`.
    Iterate against `cexec aac-tools arch-validate docs/architecture/*.yaml`
    until clean.
-4. **Wire CI**: add the validate + archive steps to this repo's
-   Jenkinsfile.
+4. **Wire CI**: write this repo's `Jenkinsfile.architecture` (see
+   Jenkins integration).
 5. **Verify**: trigger one build. Confirm every file archives and
    the validation step passes.
 6. **Register**: commit to `pipeline-producers.yaml` on

@@ -19,7 +19,7 @@ tools:
   - use: aac-tools
 
 # The deliverable is a container image that is not built locally otherwise —
-# Jenkins builds it with helmCharts.kaniko. This is here so a Dockerfile change
+# Jenkins builds it with helmCharts.kaniko2. This is here so a Dockerfile change
 # can be smoke-tested in-env:
 #   kaniko --destination registry:5000/architecture:dev
 # Deliberately not wired into `kc project build`, because it cannot pass: the

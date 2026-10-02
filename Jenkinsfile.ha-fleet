@@ -1,88 +1,68 @@
-// home-automation-fleet — scheduled producer pipeline.
+// Generates the home-automation-fleet architecture snapshot from the live Home Assistant every day,
+// validates it against the architecture service, and archives it as the producer's artifact, which
+// AaC/Architecture collects. It only reads Home Assistant.
 //
-// A STANDALONE, daily-scheduled job (separate from the main Architecture-rebuild
-// pipeline). It is the only job that touches Home Assistant. It:
+// The producer is registered in pipeline-producers.yaml as home-automation-fleet, with this job and
+// no repo, so AaC/Architecture copies this job's last successful artifact. HA_URL is a global
+// environment variable of the controller. HA_TOKEN, a Home Assistant long-lived access token, is in
+// OpenBao.
 //
-//   1. Checks out this repo (the generator lives in tools/ha-fleet/).
-//   2. Runs gen-ha-fleet.py against the live HA WebSocket API, using HA_URL (an
-//      ambient global Jenkins env var) + HA_TOKEN (from OpenBao), to emit
-//      tools/ha-fleet/out/architecture/home-automation-fleet.yaml.
-//   3. Validates that artifact against the validation service (arch-validate.py);
-//      a non-zero exit fails the build BEFORE the archive stage, so a bad
-//      snapshot is never published.
-//   4. Archives the artifact. The main pipeline's `copyArtifacts` (filter
-//      **/architecture/**/*.yaml) pulls it into producer-artifacts/
-//      home-automation-fleet/ on its next run — same contract as every other
-//      producer; no commit-back.
-//
-// The Jenkins job is AaC/Home Assistant Fleet:
-//   - "Pipeline script from SCM", repo = this one, Script Path = Jenkinsfile.ha-fleet.
-//   - HA_TOKEN comes from OpenBao via the withVault block below, stored at
-//     KV-v2 path `kv/jenkins/home-automation-fleet`, key `ha_token` (a HA
-//     long-lived access token; not a firmware MQTT user — those are ACL-scoped
-//     and don't see DSMR/Ecowitt/SLZB/WiFi). The controller-level Vault config
-//     supplies the address + auth (same as every other pipeline).
-//   - HA_URL is read from the ambient global Jenkins environment, forwarded
-//     into the build container below.
-//   - The schedule lives in the job config (Build Triggers → Build
-//     periodically), not here: this pipeline declares no trigger.
-//   - The producer is registered in pipeline-producers.yaml as
-//     home-automation-fleet with this job and no `repo`, so the main pipeline
-//     copies this job's last successful artifact and the central architecture
-//     update leaves the producer alone (see tools/ha-fleet/README.md).
+// Controller config:
+//   - Job: AaC/Home Assistant Fleet
+//   - SCM: pvginkel/Architecture, branch main
+//   - Script Path: Jenkinsfile.ha-fleet
 
-library('JenkinsPipelineUtils') _
+library identifier: 'JenkinsPipelineUtils', changelog: false
 
-withVault([vaultSecrets: [
-    [path: 'kv/jenkins/home-automation-fleet', engineVersion: 2, secretValues: [
-        [envVar: 'HA_TOKEN', vaultKey: 'ha_token'],
-    ]],
-]]) {
-    // The python sidecar doesn't inherit the build env, so forward HA_TOKEN
-    // (from Vault) and HA_URL (ambient global env) into it explicitly — same
-    // containerEnvVar pattern the other Vault-backed pipelines use.
-    podTemplate(inheritFrom: 'jenkins-agent', containers: [
-        containerTemplate(name: 'python', image: 'python:slim', command: 'sleep', args: 'infinity',
-            alwaysPullImage: true, envVars: [
-                containerEnvVar(key: 'HA_TOKEN', value: '$HA_TOKEN'),
-                containerEnvVar(key: 'HA_URL', value: '$HA_URL'),
-            ])
-    ]) {
-        node(POD_LABEL) {
-            // No trigger declared here — the schedule is owned by the Jenkins
-            // job config (Build Triggers → Build periodically).
+pipeline {
+    agent {
+        kubernetes {
+            inheritFrom 'jenkins-agent'
+            yaml podYaml(images: [[image: 'python:slim', name: 'python']])
+        }
+    }
 
-            stage('Checkout') {
+    options {
+        disableConcurrentBuilds(abortPrevious: true)
+        skipDefaultCheckout()
+        timeout(time: 60, unit: 'MINUTES')
+        timestamps()
+    }
+
+    triggers {
+        cron('H 4 * * *')
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
                 checkout scm
             }
+        }
 
-            stage('Generate HA fleet snapshot') {
+        stage('Generate architecture') {
+            steps {
                 container('python') {
-                    sh '''
-                        set -eu
-                        pip install --quiet --no-cache-dir websocket-client pyyaml
-                        python3 tools/ha-fleet/gen-ha-fleet.py
-                    '''
+                    sh 'pip install --quiet --no-cache-dir websocket-client pyyaml'
+                    withVault([vaultSecrets: [
+                        [path: 'kv/jenkins/home-automation-fleet', engineVersion: 2, secretValues: [
+                            [envVar: 'HA_TOKEN', vaultKey: 'ha_token'],
+                        ]],
+                    ]]) {
+                        sh 'python3 tools/ha-fleet/gen-ha-fleet.py'
+                    }
                 }
+                archiveArtifacts artifacts: 'tools/ha-fleet/out/architecture/home-automation-fleet.yaml', fingerprint: true
             }
+        }
 
-            stage('Validate') {
+        // AaC/Architecture copies a producer's last successful build, so a snapshot that fails here
+        // never reaches it, archived or not.
+        stage('Validate architecture') {
+            steps {
                 container('python') {
-                    // arch-validate.py is stdlib-only and submits to the
-                    // validation service. Exit 1 = invalid model, 2 =
-                    // transport/server error; either fails the build here,
-                    // before the archive stage, so an invalid snapshot is never
-                    // published.
                     sh 'python3 .claude/architecture/arch-validate.py tools/ha-fleet/out/architecture/home-automation-fleet.yaml'
                 }
-            }
-
-            stage('Archive artifact') {
-                archiveArtifacts(
-                    artifacts: 'tools/ha-fleet/out/architecture/home-automation-fleet.yaml',
-                    fingerprint: true,
-                    allowEmptyArchive: false
-                )
             }
         }
     }

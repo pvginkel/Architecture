@@ -142,12 +142,14 @@ diff** — a clean producer is byte-identical (catches non-deterministic ids).
 
 ## Step 6 — Wire CI and register (point, don't do blindly)
 
-Per the manual's **Jenkins integration** and **Registration** sections: add
-validate + archive steps (generated producers add a generate step first and
-don't commit the YAML, ideally in a dedicated `Jenkinsfile.architecture`
-isolated from the deploy pipeline), with the validate step running
-`arch-validate` in the aac-tools toolchain's container
-(`containerTemplates.aac_tools`); the repo keeps no copy of the validator.
+Per the manual's **Jenkins integration** and **Registration** sections: write
+the repo's `Jenkinsfile.architecture`, which a job of its own runs apart from
+the deploy pipeline, from the pipeline style guide's reference file for the
+producer's architecture type. Its stages call the JenkinsPipelineUtils
+`architectureProducer` steps: `validate` and `archive`, and for a generated
+producer a generate stage first, which does not commit the YAML. The steps
+run `arch-validate` in the aac-tools toolchain's container; the repo keeps no
+copy of the validator.
 Push the seeded commits once the operator approves: the central update
 refuses a clone with unpushed commits.
 Confirm one build archives + validates, then PR `pipeline-producers.yaml` in

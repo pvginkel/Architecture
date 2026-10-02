@@ -135,10 +135,11 @@ curl -sS \
 ## `arch-validate` CLI
 
 The dev-facing artifact. Producers run it from the aac-tools toolchain, the
-`registry:5000/aac-tools` image ArgoCDTools publishes: in Jenkins in the
-container `containerTemplates.aac_tools` declares, in a KubeCoder environment
-that declares the toolchain through `cexec aac-tools`. A producer repo keeps no
-copy of the script.
+`registry:5000/aac-tools` image ArgoCDTools publishes: in Jenkins through the
+JenkinsPipelineUtils `architectureProducer` steps, which run it in the
+toolchain's container (see the producer manual's *Jenkins integration*), in a
+KubeCoder environment that declares the toolchain through `cexec aac-tools`. A
+producer repo keeps no copy of the script.
 
 ```bash
 # from a producer repo's KubeCoder environment

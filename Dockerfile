@@ -87,7 +87,7 @@ RUN npm run build && npm test
 #
 # --relaxed tolerates dangling cross-producer refs while the federation is
 # still onboarding (apps whose owning producer isn't emitting yet). This must
-# match the Jenkinsfile's preview "Run collector" stage — the two runs are
+# match the Jenkinsfile's "Validate architecture" stage — the two runs are
 # byte-identical only when given the same flags. Drop --relaxed from both once
 # every referenced producer is online so dangling refs fail the build again.
 FROM check-schemas AS run-collector

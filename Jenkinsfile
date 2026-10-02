@@ -1,157 +1,141 @@
-// Architecture-rebuild pipeline.
+// Collects the architecture model of every producer registered in pipeline-producers.yaml,
+// validates the federation with the collector, builds the architecture_viewer image that serves it,
+// and pins that image into WebathomeOrgDeploy, which Argo CD syncs to prd. It also sets the job's
+// own triggers.
 //
-// 1. Checkout the Architecture repo.
-// 2. Read pipeline-producers.yaml — the registered producer list. Every
-//    producer names the `jenkinsJob` that archives its artifact; the one
-//    marked `self: true` is this repo, whose job is this very pipeline.
-// 3. For each registered producer:
-//    - copyArtifacts from <jenkinsJob> lastSuccessful into
-//      producer-artifacts/<producer-id>/;
-//    - for the self-producer, copy docs/architecture/ of this checkout
-//      into producer-artifacts/<producer-id>/ instead: its last
-//      successful build is the previous run of this pipeline, not the
-//      commit being built.
-// 4. Bundle producer-artifacts/ into producer-artifacts.tgz and
-//    archive it as a build artifact, before the collector runs, so
-//    the raw inputs are available for debugging even on failure.
-// 5. Run the collector (`tooling/collect.py`) in a Python sidecar to
-//    archive validation-report.json as a Jenkins build artifact.
-// 6. Clear the `producer-artifacts/` line in .dockerignore so kaniko
-//    sees the populated directory.
-// 7. Kaniko-build the multi-stage Dockerfile. The Dockerfile's
-//    `run-collector` stage reruns collect.py against the same inputs
-//    inside the image; output is byte-identical to step 5 by the
-//    collector's determinism guarantee.
-// 8. Pin the image into WebathomeOrgDeploy, which Argo CD syncs.
+// The job builds on a push to this repo, and when any registered producer's job succeeds, except
+// its own (the self-producer) and those marked `trigger: false`: WebathomeOrgDeploy's, which the
+// pin write starts. triggers {} cannot hold a list read at run time, so the Set triggers stage sets
+// them, and the build of the commit that registers a producer wires its trigger.
 //
-// Triggers wired below:
-//   - SCM push to this repo (the default poll-or-webhook).
-//   - Upstream success of every registered producer's Jenkins job
-//     except the self-producer's, which is this pipeline, and those
-//     marked `trigger: false`: WebathomeOrgDeploy, which the image pin
-//     below writes into. Registering a producer wires its trigger on the
-//     next run of this Jenkinsfile.
-//   - Manual "Build Now" in the Jenkins UI is always available.
+// Controller config:
+//   - Job: AaC/Architecture
+//   - SCM: pvginkel/Architecture, branch main
+//   - Script Path: Jenkinsfile
 
 library identifier: 'JenkinsPipelineUtils', changelog: false
 
-podTemplate(inheritFrom: 'jenkins-agent kaniko', containers: [
-    containerTemplates.k8s('k8s'),
-    containerTemplates.python('python')
-]) {
-    node(POD_LABEL) {
+pipeline {
+    agent {
+        kubernetes {
+            inheritFrom 'jenkins-agent kaniko'
+            yamlMergeStrategy merge()
+            yaml podYaml(templates: ['k8s', 'python'])
+        }
+    }
+
+    options {
+        disableConcurrentBuilds(abortPrevious: true)
+        skipDefaultCheckout()
+        timeout(time: 60, unit: 'MINUTES')
+        timestamps()
+    }
+
+    stages {
         stage('Checkout') {
-            checkout scm
+            steps {
+                checkout scm
+            }
         }
 
-        // Triggers wiring derived from pipeline-producers.yaml.
-        def producersDoc = readYaml(file: 'pipeline-producers.yaml')
-        def producers = producersDoc.producers ?: []
-        def upstreamJobs = producers.findAll { !it.self && it.trigger != false }.collect { it.jenkinsJob }.join(', ')
-
-        def triggers = [githubPush()]
-        if (upstreamJobs) {
-            triggers << upstream(threshold: hudson.model.Result.SUCCESS,
-                                 upstreamProjects: upstreamJobs)
-        }
-        properties([pipelineTriggers(triggers)])
-
-        stage('Copy producer artifacts') {
-            sh 'mkdir -p producer-artifacts'
-            producers.each { p ->
-                if (p.self) {
-                    // Self-producer: its artifact is this checkout's
-                    // docs/architecture/, not its jenkinsJob's archive
-                    // (that is this pipeline's previous run). Mirror the
-                    // directory into producer-artifacts/<id>/ so the
-                    // collector's rglob walk picks the files up the same
-                    // way it does for upstream producers.
-                    sh """
-                        set -eu
-                        mkdir -p producer-artifacts/${p.id}/docs/architecture
-                        cp docs/architecture/*.yaml producer-artifacts/${p.id}/docs/architecture/
-                    """
-                } else {
-                    copyArtifacts(
-                        projectName: p.jenkinsJob,
-                        selector: lastSuccessful(),
-                        filter: '**/architecture/**/*.yaml',
-                        target: "producer-artifacts/${p.id}",
-                        fingerprintArtifacts: true
-                    )
+        // The estate's one properties step. Declarative leaves alone the triggers its
+        // triggers {} did not declare, so the next build keeps these.
+        stage('Set triggers') {
+            steps {
+                script {
+                    List producers = readYaml(file: 'pipeline-producers.yaml').producers ?: []
+                    String upstreamJobs = producers.findAll { !it.self && it.trigger != false }.collect { it.jenkinsJob }.join(', ')
+                    List jobTriggers = [githubPush()]
+                    if (upstreamJobs) {
+                        jobTriggers << upstream(threshold: hudson.model.Result.SUCCESS, upstreamProjects: upstreamJobs)
+                    }
+                    properties([pipelineTriggers(jobTriggers)])
                 }
             }
         }
 
-        stage('Archive collected artifacts') {
-            // Debugging aid: bundle the raw producer-artifacts/ tree
-            // and expose it as a build artifact before the collector
-            // runs, so the inputs are available even if collection
-            // fails downstream.
-            sh '''
-                set -eu
-                tar -czf producer-artifacts.tgz producer-artifacts
-            '''
-            archiveArtifacts(
-                artifacts: 'producer-artifacts.tgz',
-                fingerprint: true,
-                allowEmptyArchive: false
-            )
+        stage('Collect producer artifacts') {
+            steps {
+                script {
+                    List producers = readYaml(file: 'pipeline-producers.yaml').producers ?: []
+                    for (producer in producers) {
+                        if (producer.self) {
+                            // The self-producer's artifact is this checkout's docs/architecture/:
+                            // its job's last successful build is this job's previous build.
+                            sh """
+                                set -eu
+                                mkdir -p 'producer-artifacts/${producer.id}/docs/architecture'
+                                cp docs/architecture/*.yaml 'producer-artifacts/${producer.id}/docs/architecture/'
+                            """
+                        } else {
+                            copyArtifacts(
+                                projectName: producer.jenkinsJob,
+                                selector: lastSuccessful(),
+                                filter: '**/architecture/**/*.yaml',
+                                target: "producer-artifacts/${producer.id}",
+                                fingerprintArtifacts: true
+                            )
+                        }
+                    }
+                }
+                // The collector's inputs, archived before it runs, so that a failed collection can be
+                // replayed from them.
+                sh 'tar -czf producer-artifacts.tgz producer-artifacts'
+                archiveArtifacts artifacts: 'producer-artifacts.tgz', fingerprint: true
+            }
         }
 
-        stage('Run collector') {
-            container('python') {
+        stage('Validate architecture') {
+            steps {
+                container('python') {
+                    // --relaxed tolerates dangling references between producers while the
+                    // federation is onboarding. The Dockerfile's run-collector stage passes the same
+                    // flag, and the two runs must match.
+                    sh '''
+                        set -eu
+                        pip install --quiet --no-cache-dir poetry
+                        cd tooling
+                        poetry install --no-root --without dev
+                        poetry run python collect.py \
+                            --producers "$WORKSPACE/pipeline-producers.yaml" \
+                            --in "$WORKSPACE/producer-artifacts" \
+                            --out "$WORKSPACE/dist" \
+                            --relaxed
+                    '''
+                }
+                archiveArtifacts artifacts: 'dist/data/v0.1/validation-report.json', fingerprint: true
+            }
+        }
+
+        stage('Build architecture_viewer image') {
+            steps {
+                // The image bundles producer-artifacts/, which .dockerignore keeps out of every other
+                // build of the Dockerfile.
                 sh '''
                     set -eu
-                    pip install --quiet --no-cache-dir poetry
-                    cd tooling
-                    poetry install --no-root --without dev
-                    poetry run python collect.py \
-                        --producers "${WORKSPACE}/pipeline-producers.yaml" \
-                        --in "${WORKSPACE}/producer-artifacts" \
-                        --out "${WORKSPACE}/dist" \
-                        --relaxed
-                    # --relaxed tolerates dangling cross-producer refs while the
-                    # federation is still onboarding (apps whose owning producer
-                    # isn't emitting yet). The Dockerfile's run-collector stage
-                    # carries the same flag (the two runs must match); drop it
-                    # from BOTH once every referenced producer is online so
-                    # dangling refs fail the build again.
-                '''
-            }
-            archiveArtifacts(
-                artifacts: 'dist/data/v0.1/validation-report.json',
-                fingerprint: true,
-                allowEmptyArchive: false
-            )
-        }
-
-        stage('Build container image') {
-            // The pipeline opts in to bundling producer-artifacts/ by
-            // dropping its exclusion from .dockerignore. The collector
-            // step above already validated everything.
-            sh '''
-                set -eu
-                if [ -f .dockerignore ]; then
                     grep -v '^producer-artifacts/$' .dockerignore > .dockerignore.tmp || true
                     mv .dockerignore.tmp .dockerignore
-                fi
-            '''
-            container('kaniko') {
-                helmCharts.kaniko([
-                    "registry:5000/architecture_viewer:${currentBuild.number}",
-                    'registry:5000/architecture_viewer:latest'
-                ])
+                '''
+                container('kaniko') {
+                    script {
+                        helmCharts.kaniko2(destinations: [
+                            "registry:5000/architecture_viewer:${currentBuild.number}",
+                            'registry:5000/architecture_viewer:latest',
+                        ])
+                    }
+                }
             }
         }
 
-        // The build hands its image to Argo CD by pinning it in the deploy repo (argo-cd D53);
-        // Argo syncs the commit. HelmCharts no longer deploys this app.
         stage('Write image pins') {
-            container('k8s') {
-                cicd.writeVersionPins(repo: 'pvginkel/WebathomeOrgDeploy', pins: [
-                    'config/prd/values.yaml': ['images.architecture_viewer': ":${currentBuild.number}"]
-                ])
+            steps {
+                container('k8s') {
+                    script {
+                        cicd.writeVersionPins(repo: 'pvginkel/WebathomeOrgDeploy', pins: [
+                            'config/prd/values.yaml': ['images.architecture_viewer': ":${currentBuild.number}"],
+                        ])
+                    }
+                }
             }
         }
     }
