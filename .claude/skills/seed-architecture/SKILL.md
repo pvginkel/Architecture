@@ -152,8 +152,8 @@ run `arch-validate` in the aac-tools toolchain's container; the repo keeps no
 copy of the validator.
 Push the seeded commits once the operator approves: the central update
 refuses a clone with unpushed commits.
-Confirm one build archives + validates, then PR `pipeline-producers.yaml` in
-pvginkel/Architecture with the producer's `id`, `jenkinsJob` and `repo`
+Confirm one build archives + validates, then commit to `pipeline-producers.yaml`
+on pvginkel/Architecture's `main` with the producer's `id`, `jenkinsJob` and `repo`
 (GitHub `owner/name`; without it the central update does not manage the
 producer).
 
