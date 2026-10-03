@@ -180,12 +180,14 @@ being shared with the dev pipeline, and pushes.
 ## Running it
 
 The operator's entry point is the `architecture-update` skill: it starts `fleet.py update` in the
-background under `timeout --signal=INT --kill-after=2m 12h` and, when the run exits, sends one
+background under `timeout --signal=INT --kill-after=2m 110m` and, when the run exits, sends one
 `notification` message by exit code: 0 or 1, the report path and the unresolved and judgment-call
 counts; 3, that the run did not start because Jenkins was red before it (or could not be read) and
 which jobs; 4, that the report is on disk but could not be committed and pushed to the specs repo;
 124, that the run was killed rather than finished. SIGINT rather than SIGTERM is what lets the tool
-end the headless session it is driving.
+end the headless session it is driving. The skill starts the run with the Bash tool's `timeout:
+7200000`, the most that tool allows a background command; 110 minutes plus the 2-minute kill-after
+keeps the run under that cap, past which the harness would kill it without the SIGINT.
 
 The tool itself is plain `python3`: the standard library and PyYAML only, so it runs in the dev
 container without the Poetry environment. (Its tests run under Poetry, with the rest of tooling's

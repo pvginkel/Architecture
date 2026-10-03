@@ -16,24 +16,27 @@ it the tool cannot read Jenkins and stops before the first producer (exit 3):
 ```bash
 mkdir -p /tmp/architecture-update
 LOG=/tmp/architecture-update/$(date +%Y-%m-%dT%H%M).log
-timeout --signal=INT --kill-after=2m 12h \
+timeout --signal=INT --kill-after=2m 110m \
   python3 tooling/fleet.py update > "$LOG" 2>&1
 ```
 
-Start it **in the background** and end your turn: it re-invokes you when it
-exits. Don't tail the log, don't poll it, don't re-run it to see how far it got.
-A whole-fleet run takes from half an hour, when nearly every producer skips at
-triage, to hours when many of them update.
+Start it **in the background**, passing the Bash tool `timeout: 7200000`, and
+end your turn: it re-invokes you when it exits. Without that parameter the
+harness kills a background command after 30 minutes. Don't tail the log, don't
+poll it, don't re-run it to see how far it got. A whole-fleet run takes from
+half an hour, when nearly every producer skips at triage, to over an hour when
+many of them update.
 
 - `--signal=INT` is what makes a killed run safe. On SIGINT the tool ends the
   headless session it is driving from a `finally`; SIGTERM would skip that and
   leave a session running.
-- `12h` is the cap for the whole fleet, and it is a backstop, not a budget. The
-  tool's own timeouts (600 s per triage session, 3600 s per update session)
-  would allow some 35 h over 30 producers; what a sweep actually costs, measured,
-  is about 50 s per producer that skips and about 10 min per producer that
-  updates, push and build tracking included, so a run reaches 12 h only when it
-  is stuck.
+- `110m` is the cap for the whole fleet, and it is a backstop, not a budget.
+  With the 2 min kill-after it stays under the Bash tool's own 2 h kill of a
+  background command, which would end the run without the SIGINT. The tool's
+  own timeouts (600 s per triage session, 3600 s per update session) would
+  allow far more; what a sweep actually costs, measured, is about 50 s per
+  producer that skips and about 10 min per producer that updates, push and
+  build tracking included, so a run reaches the cap only when it is stuck.
 - Name producer ids to take only those: `python3 tooling/fleet.py update newsfilter`.
 - Before the first producer the tool checks that every job it would track,
   and every job those jobs' last builds started, is green; any red stops it
