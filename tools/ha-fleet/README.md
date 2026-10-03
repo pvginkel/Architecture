@@ -67,8 +67,10 @@ python3 gen-ha-fleet.py                 # writes out/architecture/home-automatio
 python3 gen-ha-fleet.py --raw ha_raw.json
 ```
 Runtime deps: `pyyaml`, `websocket-client` (the latter only for the live path).
-Output is gitignored (a build output). The run is deterministic given a fixed HA
-state; the gap report goes to stderr.
+Output is gitignored (a build output). A string the validation service would read
+as a number (a firmware version like `9e10234`, by YAML 1.2 and js-yaml's rules)
+is written quoted; plain PyYAML dumps by YAML 1.1 rules and would leave it bare.
+The run is deterministic given a fixed HA state; the gap report goes to stderr.
 
 ## Scheduled Jenkins job
 

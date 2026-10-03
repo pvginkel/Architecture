@@ -56,7 +56,7 @@ tooling/       # Python (Poetry)
   fleet.py             the central architecture update: scan · stage · update the producer repos
   tests/               fixture-driven end-to-end collector tests (run_fixtures.py)
 service/       # Node + Express (TypeScript), vitest
-  src/                 routes: validate, static, usage, metrics, csp; schema loader; error-translate
+  src/                 routes: validate, static, usage, metrics, csp; schema loader; error-translate · source-locate
 viewer/        # React + ReactFlow + ELK SPA (Vite, TypeScript)
   src/                 model (manifest → graph), theme, filter rail, views, parent-bridge
   src/generated/       vocab.ts + LOGO_FILES — emitted by generate.py, typecheck-enforced

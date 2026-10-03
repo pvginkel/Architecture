@@ -43,9 +43,11 @@ outcome — both pass and fail return `200`.
 ### Failure
 
 Each error is normalised to a single LLM-friendly shape. The `path` is a JSON
-Pointer into the submitted artifact, the `value` is extracted at that path so
-the reader doesn't have to re-fetch it, and `schemaUrl` points at the most
-specific schema or enum file relevant to the error.
+Pointer into the submitted artifact, `line` is the 1-based line it sits on in
+the submitted text (the key's line for a mapping value; absent when the pointer
+does not map to a node, e.g. through a `<<` merge), the `value` is extracted at
+that path so the reader doesn't have to re-fetch it, and `schemaUrl` points at
+the most specific schema or enum file relevant to the error.
 
 ```json
 {
@@ -54,6 +56,7 @@ specific schema or enum file relevant to the error.
   "errors": [
     {
       "path": "/nodes/0/id",
+      "line": 5,
       "keyword": "pattern",
       "message": "value 'Node_BadId' does not match the required pattern /^node:[a-z][a-z0-9-]*,[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/",
       "value": "Node_BadId",
@@ -63,6 +66,12 @@ specific schema or enum file relevant to the error.
   ]
 }
 ```
+
+A type error on a scalar quotes the scalar as written next to what the YAML
+1.2 reader made of it, so a string that parsed as a number is visible as such:
+`firmware: 9e10234 (parsed as float Infinity) is not of expected type string`.
+A long or multi-line scalar is cut to its first line, at most 60 characters,
+ending in `…`.
 
 The service also enforces the ArchiMate 3.2 (source-kind, type, target-kind)
 matrix on every relation whose endpoints are present in the submitted
@@ -149,6 +158,9 @@ cat architecture.yaml | cexec aac-tools arch-validate -      # stdin
 cexec aac-tools arch-validate --json architecture.yaml       # raw endpoint JSON
 cexec aac-tools arch-validate --quiet architecture.yaml      # suppress OK lines
 ```
+
+Each error prints as its `path`, then its message — prefixed `line N:` when
+the error carries a `line` — then its `schemaUrl` and any `hint`.
 
 Exit codes: `0` valid, `1` invalid, `2` transport/server error.
 
