@@ -369,6 +369,36 @@ def load_annotations(path: Path) -> dict:
     return data
 
 
+class Yaml12SafeDumper(yaml.SafeDumper):
+    """SafeDumper that also quotes strings the validate service reads as numbers.
+
+    PyYAML resolves scalars by YAML 1.1 rules, so it writes e.g. a firmware
+    version "9e10234" plain; the service reads it with js-yaml 4 (YAML 1.2 core
+    schema), where that is a float overflowing to Infinity. The resolvers below
+    cover the YAML 1.2 core int and float grammar plus js-yaml's extensions:
+    `_` digit separators (no trailing `_`), `0b` binary, a sign on any base, and
+    a leading-zero decimal (`089`). A resolved non-str tag makes the emitter
+    quote the string; strings matching neither are written as plain
+    `yaml.safe_dump` writes them.
+    """
+
+
+Yaml12SafeDumper.add_implicit_resolver(
+    "tag:yaml.org,2002:int",
+    re.compile(r"^[-+]?(?:0b[01_]+|0o[0-7_]+|0x[0-9a-fA-F_]+|[0-9][0-9_]*)(?<!_)$"),
+    list("-+0123456789"),
+)
+Yaml12SafeDumper.add_implicit_resolver(
+    "tag:yaml.org,2002:float",
+    re.compile(r"^[-+]?(?:[0-9][0-9_]*(?:\.[0-9_]*)?|\.[0-9_]+)(?:[eE][-+]?[0-9]+)?(?<!_)$"),
+    list("-+.0123456789"),
+)
+
+
+def dump_yaml(doc: dict) -> str:
+    return yaml.dump(doc, Dumper=Yaml12SafeDumper, sort_keys=False, width=120, allow_unicode=True)
+
+
 def main() -> None:
     here = Path(__file__).resolve().parent
     ap = argparse.ArgumentParser(description="Generate the home-automation-fleet artifact from HA.")
@@ -391,7 +421,7 @@ def main() -> None:
     out_dir = Path(args.out) / "architecture"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "home-automation-fleet.yaml"
-    out_path.write_text(yaml.safe_dump(doc, sort_keys=False, width=120, allow_unicode=True))
+    out_path.write_text(dump_yaml(doc))
 
     print(f"wrote {out_path}: {len(doc['devices'])} devices, {len(doc['relations'])} relations", file=sys.stderr)
     if gaps:

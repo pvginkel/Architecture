@@ -12,6 +12,7 @@ from types import ModuleType
 from typing import Any
 
 import pytest
+import yaml
 
 GENERATOR = Path(__file__).resolve().parents[2] / "tools" / "ha-fleet" / "gen-ha-fleet.py"
 
@@ -120,3 +121,37 @@ def test_the_tahoma_gateway_and_the_devices_behind_it_surface_through_overkiz(
         key=lambda r: r["source"],
     )
     assert gaps == ["dropped 1 device(s): drop:sonos"]
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["1e5", "1.5e3", "0o17", "089", "9e10234", "1_0e5", "0o1_7", "0b1_0", "+0x_F", "-.5", "1."],
+)
+def test_strings_a_yaml_1_2_reader_takes_for_numbers_are_written_quoted(
+    gen: ModuleType, value: str
+) -> None:
+    text = gen.dump_yaml({"firmware": value})
+
+    assert text == f"firmware: '{value}'\n"
+    assert yaml.safe_load(text) == {"firmware": value}
+
+
+def test_other_strings_and_non_string_values_are_written_as_plain_safe_dump_writes_them(
+    gen: ModuleType,
+) -> None:
+    doc = {
+        "firmware": "1.2.3",
+        "build": "9e1x",
+        "trailing": "1_",
+        "underscored": "_1",
+        "hex": "0xG",
+        "label": "Hall blind — Ø",
+        "count": 42,
+        "ratio": 1.5e3,
+        "huge": float("inf"),
+        "on": True,
+        "none": None,
+        "versions": ["v1", "2024.10.1"],
+    }
+
+    assert gen.dump_yaml(doc) == yaml.safe_dump(doc, sort_keys=False, width=120, allow_unicode=True)
