@@ -29,6 +29,9 @@ pipeline {
         skipDefaultCheckout()
         timeout(time: 60, unit: 'MINUTES')
         timestamps()
+        // A push that reaches many producer repos finishes their jobs in a burst, and a build for
+        // each would only be aborted by the next.
+        quietPeriod(90)
     }
 
     stages {
