@@ -7,7 +7,8 @@
 # Telegram Bot API — jenkins-telegram-bot, telegram-mcp-server, newsfilter;
 # GitHub — KubeCoder controller/worker + git-sync). Foundational
 # third-party SaaS are kept here even with a single current consumer so the
-# catalogue stays in one place (Anthropic, VS Code Dev Tunnels — KubeCoder).
+# catalogue stays in one place (Anthropic, VS Code Dev Tunnels — KubeCoder;
+# healthchecks.io — Prometheus's Alertmanager).
 # The provider->consumer Serving edge itself is authored in each consuming
 # producer's own artifact, not here.
 
@@ -71,3 +72,15 @@ applicationServices:
     lifecycle: active
     stats:
       homepage: https://code.visualstudio.com/docs/remote/tunnels
+
+  - id: svc:healthchecks-io,4d31c387-4492-4a39-8201-f5a9ff13ad22
+    label: healthchecks.io
+    summary: >-
+      healthchecks.io dead-man's-switch monitoring: a client pings a check's
+      HTTPS URL (hc-ping.com) on a schedule, and when pings stop for longer
+      than the check's grace period healthchecks.io notifies through its own
+      integrations. Hardcoded host; consumers carry no boundBy.
+    introduced: 2026-10-03
+    lifecycle: active
+    stats:
+      homepage: https://healthchecks.io/
