@@ -2,6 +2,7 @@ import express, { type Router } from "express";
 import yaml from "js-yaml";
 import type { SchemaBundle } from "./schema-loader.js";
 import { translateErrors, type TranslatedError } from "./error-translate.js";
+import { sourceLocator, type Locator } from "./source-locate.js";
 import type { Metrics, ValidateOutcome } from "./metrics.js";
 
 export interface ValidateOptions {
@@ -85,11 +86,12 @@ export function mountValidate(opts: ValidateOptions): Router {
         return;
       }
 
+      const locate = sourceLocator(raw.toString("utf8"));
       const ok = opts.bundle.artifactValidator(artifact);
       const schemaErrors = ok
         ? []
-        : translateErrors(opts.bundle.artifactValidator.errors ?? [], artifact);
-      const tripleErrors = checkRelationsTriples(artifact, opts.bundle);
+        : translateErrors(opts.bundle.artifactValidator.errors ?? [], artifact, locate);
+      const tripleErrors = checkRelationsTriples(artifact, opts.bundle, locate);
       const all = [...schemaErrors, ...tripleErrors];
 
       outcome = all.length === 0 ? "valid" : "invalid";
@@ -161,7 +163,11 @@ function parseBody(raw: Buffer, ctype: string): unknown {
   );
 }
 
-function checkRelationsTriples(artifact: unknown, bundle: SchemaBundle): TranslatedError[] {
+function checkRelationsTriples(
+  artifact: unknown,
+  bundle: SchemaBundle,
+  locate: Locator,
+): TranslatedError[] {
   if (!artifact || typeof artifact !== "object") return [];
   const env = artifact as Record<string, unknown>;
   const relations = env.relations;
@@ -191,8 +197,11 @@ function checkRelationsTriples(artifact: unknown, bundle: SchemaBundle): Transla
     const targetKind = kindById.get(r.target);
     if (!sourceKind || !targetKind) return; // cross-producer; defer to collector
     if (!bundle.allowedTriples.has(sourceKind, r.type, targetKind)) {
+      const path = `/relations/${i}`;
+      const line = locate(path)?.line;
       errors.push({
-        path: `/relations/${i}`,
+        path,
+        ...(line !== undefined ? { line } : {}),
         keyword: "x-allowedTriples",
         message: `relation type '${r.type}' is not allowed between ${sourceKind} (source) and ${targetKind} (target)`,
         value: { source: r.source, type: r.type, target: r.target },

@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import yaml from "js-yaml";
 import { loadSchemas } from "../src/schema-loader.js";
 import { translateErrors, extractByPointer } from "../src/error-translate.js";
+import { sourceLocator } from "../src/source-locate.js";
 
 const REPO_SCHEMA_ROOT = path.resolve(__dirname, "../../schema/v0.1");
 const EXAMPLES = path.resolve(__dirname, "../../schema/v0.1/examples");
@@ -79,6 +80,46 @@ describe("per-keyword translators", () => {
   it("type", () => {
     const out = translateErrors([makeErr("type", { type: "string" }, { instancePath: "/x" })], { x: 42 });
     expect(out[0]!.message).toMatch(/not of expected type string/);
+  });
+
+  it("type, located: quotes the scalar as written beside the parsed value", () => {
+    const text = "x: 9e10234\ny: 0o1_7\nz:\n  - 1_0e5\nw: true\n";
+    const doc = { x: Infinity, y: 15, z: [1000000], w: true };
+    const out = translateErrors(
+      [
+        makeErr("type", { type: "string" }, { instancePath: "/x" }),
+        makeErr("type", { type: "string" }, { instancePath: "/y" }),
+        makeErr("type", { type: "string" }, { instancePath: "/z/0" }),
+        makeErr("type", { type: "string" }, { instancePath: "/w" }),
+      ],
+      doc,
+      sourceLocator(text),
+    );
+    expect(out.map((e) => [e.line, e.message])).toEqual([
+      // sorted by path
+      [5, "w: true (parsed as bool true) is not of expected type string"],
+      [1, "x: 9e10234 (parsed as float Infinity) is not of expected type string"],
+      [2, "y: 0o1_7 (parsed as int 15) is not of expected type string"],
+      [4, "1_0e5 (parsed as float 1000000) is not of expected type string"],
+    ]);
+  });
+
+  it("type, located on a non-scalar: keeps the value-only message and adds the line", () => {
+    const out = translateErrors(
+      [makeErr("type", { type: "string" }, { instancePath: "/x" })],
+      { x: { a: 1 } },
+      sourceLocator("x:\n  a: 1\n"),
+    );
+    expect(out[0]).toMatchObject({ line: 1, message: "value object is not of expected type string" });
+  });
+
+  it("an error whose path does not map carries no line", () => {
+    const out = translateErrors(
+      [makeErr("required", { missingProperty: "id" }, { instancePath: "/nope" })],
+      {},
+      sourceLocator("a: 1\n"),
+    );
+    expect(out[0]).not.toHaveProperty("line");
   });
 
   it("const", () => {

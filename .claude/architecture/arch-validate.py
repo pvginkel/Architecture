@@ -99,7 +99,8 @@ def print_human(name, response, quiet, c):
 
     for err in errors:
         sys.stderr.write(f"  {err.get('path', '')}\n")
-        sys.stderr.write(f"    {err.get('message', '')}\n")
+        line = f"line {err['line']}: " if "line" in err else ""
+        sys.stderr.write(f"    {line}{err.get('message', '')}\n")
         sys.stderr.write(f"    schema: {err.get('schemaUrl', '')}\n")
         if err.get("hint"):
             sys.stderr.write(f"    hint: {err['hint']}\n")

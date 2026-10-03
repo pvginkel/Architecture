@@ -5,6 +5,7 @@ import yaml from "js-yaml";
 import request from "supertest";
 import { createApp } from "../src/app.js";
 import { loadSchemas } from "../src/schema-loader.js";
+import { firmwareArtifact } from "./firmware-artifact.js";
 
 const REPO_SCHEMA_ROOT = path.resolve(__dirname, "../../schema/v0.1");
 const EXAMPLES = path.resolve(__dirname, "../../schema/v0.1/examples");
@@ -234,5 +235,87 @@ describe("POST /api/validate — relations triple matrix", () => {
     // required fields elsewhere), so we only assert no triple error is raised.
     const errs = (res.body.errors as Array<{ keyword: string }> | undefined) ?? [];
     expect(errs.some((e) => e.keyword === "x-allowedTriples")).toBe(false);
+  });
+});
+
+describe("POST /api/validate — source lines", () => {
+  it("locates a type error and shows the scalar as written beside its parsed value", async () => {
+    const { text, line } = firmwareArtifact();
+    const res = await request(makeApp())
+      .post("/api/validate")
+      .set("Content-Type", "application/yaml")
+      .send(text);
+    expect(res.status).toBe(200);
+    expect(res.body.valid).toBe(false);
+    expect(res.body.errors).toEqual([
+      {
+        path: "/devices/3/stats/firmware",
+        line,
+        keyword: "type",
+        message: "firmware: 9e10234 (parsed as float Infinity) is not of expected type string",
+        schemaUrl: "https://architecture.webathome.org/schema/v0.1/generated/device.schema.json",
+        value: null,
+      },
+    ]);
+  });
+
+  it("gives every golden-fixture error the line of its node", async () => {
+    for (const name of [
+      "invalid-additional-property.yaml",
+      "invalid-malformed-id.yaml",
+      "invalid-unknown-relationship-type.yaml",
+    ]) {
+      const res = await request(makeApp())
+        .post("/api/validate")
+        .set("Content-Type", "application/yaml")
+        .send(exampleText(name));
+      const errors = res.body.errors as Array<{ path: string; line?: number }>;
+      expect(errors.length).toBeGreaterThan(0);
+      for (const e of errors) expect(e.line, `${name} ${e.path}`).toBeTypeOf("number");
+    }
+  });
+
+  it("locates a relation-triple error on its relation's line", async () => {
+    const text = [
+      `schemaVersion: "0.1"`,
+      `producer: helmcharts`,
+      `capabilities:`,
+      `  - id: cap:test-only`,
+      `    label: Test only`,
+      `    summary: Only used in this unit test.`,
+      `    introduced: 2026-05-27`,
+      `    lifecycle: active`,
+      `nodes:`,
+      `  - id: node:test,11111111-1111-4111-8111-111111111111`,
+      `    label: Test node`,
+      `    summary: Only used in this unit test.`,
+      `    introduced: 2026-05-27`,
+      `    lifecycle: active`,
+      `relations:`,
+      `  - id: rel:bad-triple`,
+      `    source: cap:test-only`,
+      `    target: node:test,11111111-1111-4111-8111-111111111111`,
+      `    type: Composition`,
+      ``,
+    ].join("\n");
+    const res = await request(makeApp())
+      .post("/api/validate")
+      .set("Content-Type", "application/yaml")
+      .send(text);
+    const errs = res.body.errors as Array<{ keyword: string; line?: number }>;
+    expect(errs.find((e) => e.keyword === "x-allowedTriples")?.line).toBe(16);
+  });
+
+  it("locates errors in a JSON body too", async () => {
+    const doc = yaml.load(exampleText("invalid-malformed-id.yaml"));
+    const body = JSON.stringify(doc, null, 2);
+    const res = await request(makeApp())
+      .post("/api/validate")
+      .set("Content-Type", "application/json")
+      .send(body);
+    const e = (res.body.errors as Array<{ path: string; line?: number }>).find(
+      (x) => x.path === "/nodes/0/id",
+    );
+    expect(body.split("\n")[e!.line! - 1]).toMatch(/^\s*"id":/);
   });
 });

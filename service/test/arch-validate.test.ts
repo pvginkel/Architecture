@@ -5,6 +5,7 @@ import path from "node:path";
 import { createServer, type Server } from "node:http";
 import { createApp } from "../src/app.js";
 import { loadSchemas } from "../src/schema-loader.js";
+import { firmwareArtifact } from "./firmware-artifact.js";
 
 const exec = promisify(execFile);
 
@@ -110,6 +111,41 @@ describe(".claude/architecture/arch-validate.py", () => {
     expect(r.code).toBe(1);
     expect(r.stderr).not.toMatch(/✓/);
     expect(r.stderr).toMatch(/✗/);
+  });
+
+  it("prints the line, the scalar as written and its parsed value for a type error", async () => {
+    const { text, line } = firmwareArtifact();
+    const r = await run(["-"], { input: text });
+    expect(r.code).toBe(1);
+    expect(r.stderr).toContain(
+      [
+        "  /devices/3/stats/firmware",
+        `    line ${line}: firmware: 9e10234 (parsed as float Infinity) is not of expected type string`,
+        "    schema: https://architecture.webathome.org/schema/v0.1/generated/device.schema.json",
+      ].join("\n"),
+    );
+  });
+
+  it("prints an error without a line exactly as before", async () => {
+    const response = JSON.stringify({
+      valid: false,
+      schemaVersion: "0.1",
+      errors: [{ path: "/nodes/0/id", keyword: "pattern", message: "bad id", schemaUrl: "s", hint: "h" }],
+    });
+    const stub = createServer((_req, res) => {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(response);
+    });
+    await new Promise<void>((resolve) => stub.listen(0, "127.0.0.1", () => resolve()));
+    const addr = stub.address();
+    if (!addr || typeof addr === "string") throw new Error("listen() returned unexpected address");
+    try {
+      const r = await runWithStdin(["-"], "x: 1\n", `http://127.0.0.1:${addr.port}/`);
+      expect(r.code).toBe(1);
+      expect(r.stderr).toBe("✗ <stdin>\n  /nodes/0/id\n    bad id\n    schema: s\n    hint: h\n");
+    } finally {
+      await new Promise<void>((resolve) => stub.close(() => resolve()));
+    }
   });
 
   it("exits 2 on transport error (endpoint unreachable)", async () => {

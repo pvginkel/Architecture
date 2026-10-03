@@ -1,8 +1,11 @@
 import type { ErrorObject } from "ajv";
+import type { Locator, SourceNode } from "./source-locate.js";
 
 export interface TranslatedError {
   /** JSON Pointer into the submitted artifact. */
   path: string;
+  /** 1-based line of the node at `path` in the submitted text; absent when it does not map to one. */
+  line?: number;
   /** Full-sentence English explanation, quoting the offending value when short. */
   message: string;
   /** The value at `path` (extracted from the artifact), so the reader doesn't have to re-fetch it. */
@@ -59,11 +62,12 @@ const STRUCTURAL_KEYWORDS = new Set([
 export function translateErrors(
   rawErrors: readonly ErrorObject[],
   artifact: unknown,
+  locate?: Locator,
 ): TranslatedError[] {
   if (rawErrors.length === 0) return [];
 
   const deduped = dedupCascades(rawErrors);
-  return deduped.map((e) => translateOne(e, artifact));
+  return deduped.map((e) => translateOne(e, artifact, locate));
 }
 
 // Preferred informativeness order for structural cascade summaries.
@@ -140,14 +144,16 @@ function pushDedupedLeafs(out: ErrorObject[], leafs: readonly ErrorObject[]): vo
   }
 }
 
-function translateOne(e: ErrorObject, artifact: unknown): TranslatedError {
+function translateOne(e: ErrorObject, artifact: unknown, locate?: Locator): TranslatedError {
   const path = e.instancePath ?? "";
   const value = extractByPointer(artifact, path);
+  const node = locate?.(path);
   const fn = translators[e.keyword] ?? translateGeneric;
-  const partial = fn(e, value);
+  const partial = fn(e, value, node);
   const schemaUrl = partial.schemaUrl ?? deriveSchemaUrl(path, e, value);
   return {
     path,
+    ...(node ? { line: node.line } : {}),
     keyword: e.keyword,
     message: partial.message,
     schemaUrl,
@@ -162,7 +168,7 @@ interface PartialTranslation {
   schemaUrl?: string;
 }
 
-type Translator = (e: ErrorObject, value: unknown) => PartialTranslation;
+type Translator = (e: ErrorObject, value: unknown, node?: SourceNode) => PartialTranslation;
 
 const translators: Record<string, Translator> = {
   additionalProperties(e, _value): PartialTranslation {
@@ -185,13 +191,16 @@ const translators: Record<string, Translator> = {
       hint: prop ? `add the '${prop}' field` : undefined,
     };
   },
-  type(e, value): PartialTranslation {
-    const expected = (e.params as { type?: string | string[] }).type;
-    return {
-      message: `value ${quoteShort(value)} is not of expected type ${
-        Array.isArray(expected) ? expected.join("|") : (expected ?? "?")
-      }`,
-    };
+  type(e, value, node): PartialTranslation {
+    const param = (e.params as { type?: string | string[] }).type;
+    const expected = Array.isArray(param) ? param.join("|") : (param ?? "?");
+    if (node?.scalar) {
+      const { source, key } = node.scalar;
+      return {
+        message: `${key !== undefined ? `${key}: ` : ""}${source} (parsed as ${describeParsed(value, source)}) is not of expected type ${expected}`,
+      };
+    }
+    return { message: `value ${quoteShort(value)} is not of expected type ${expected}` };
   },
   enum(e, value): PartialTranslation {
     const allowed = (e.params as { allowedValues?: unknown[] }).allowedValues ?? [];
@@ -309,6 +318,17 @@ function quoteShort(value: unknown): string {
     return value.length <= 60 ? `'${value}'` : `'${value.slice(0, 57)}…'`;
   }
   if (typeof value === "number" || typeof value === "boolean") return String(value);
+  return typeof value;
+}
+
+/** js-yaml's integer forms (decimal, 0b, 0o, 0x, `_` separators); every other number it reads is a float. */
+const INT_SOURCE = /^[-+]?(0b[01_]+|0o[0-7_]+|0x[0-9a-f_]+|[0-9][0-9_]*)$/i;
+
+function describeParsed(value: unknown, source: string): string {
+  if (value === null) return "null";
+  if (typeof value === "number") return `${INT_SOURCE.test(source) ? "int" : "float"} ${value}`;
+  if (typeof value === "boolean") return `bool ${value}`;
+  if (typeof value === "string") return `string ${quoteShort(value)}`;
   return typeof value;
 }
 
