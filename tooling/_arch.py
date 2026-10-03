@@ -8,6 +8,7 @@ CLI concerns. Callers shape user-facing output.
 from __future__ import annotations
 
 import datetime as dt
+import functools
 import re
 from pathlib import Path
 from typing import Any
@@ -106,14 +107,20 @@ def build_registry() -> Registry:
     return registry
 
 
+@functools.cache
+def artifact_validator() -> Draft202012Validator:
+    """The validator for the master schema, built once per process: loading the
+    schema tree costs ~100x the validation of one artifact, and the collector
+    validates every producer file."""
+    return Draft202012Validator(schema=load_master_schema(), registry=build_registry())
+
+
 def validate_doc(doc: Any) -> list[jsonschema.ValidationError]:
     """Validate one already-parsed-and-normalized artifact against the master
-    schema. Returns errors sorted by absolute_path. No I/O, no printing.
+    schema. Returns errors sorted by absolute_path. No printing.
     """
-    schema_doc = load_master_schema()
-    registry = build_registry()
-    validator = Draft202012Validator(schema=schema_doc, registry=registry)
-    return sorted(validator.iter_errors(doc), key=lambda e: list(e.absolute_path))
+    errors = artifact_validator().iter_errors(doc)
+    return sorted(errors, key=lambda e: list(e.absolute_path))
 
 
 def load_capability_enum() -> set[str]:
