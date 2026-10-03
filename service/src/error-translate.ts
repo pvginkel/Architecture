@@ -194,7 +194,7 @@ const translators: Record<string, Translator> = {
   type(e, value, node): PartialTranslation {
     const param = (e.params as { type?: string | string[] }).type;
     const expected = Array.isArray(param) ? param.join("|") : (param ?? "?");
-    if (node?.scalar) {
+    if (node?.scalar && node.scalar.source !== "") {
       const { source, key } = node.scalar;
       return {
         message: `${key !== undefined ? `${key}: ` : ""}${source} (parsed as ${describeParsed(value, source)}) is not of expected type ${expected}`,

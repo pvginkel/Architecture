@@ -104,6 +104,22 @@ describe("per-keyword translators", () => {
     ]);
   });
 
+  it("type, located on an empty scalar: keeps the value-only message and adds the line", () => {
+    const out = translateErrors(
+      [
+        makeErr("type", { type: "string" }, { instancePath: "/a" }),
+        makeErr("type", { type: "string" }, { instancePath: "/b/0" }),
+      ],
+      { a: null, b: [null] },
+      sourceLocator("a:\nb:\n  -\n"),
+    );
+    expect(out.map((e) => e.message)).toEqual([
+      "value null is not of expected type string",
+      "value null is not of expected type string",
+    ]);
+    expect(out[0]).toHaveProperty("line", 1);
+  });
+
   it("type, located on a non-scalar: keeps the value-only message and adds the line", () => {
     const out = translateErrors(
       [makeErr("type", { type: "string" }, { instancePath: "/x" })],
