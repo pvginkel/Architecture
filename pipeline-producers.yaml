@@ -281,3 +281,6 @@ producers:
     repo: pvginkel/PipelinesDeploy
     jenkinsJob: AaC/PipelinesDeploy
     defaultLogo: pipelines
+  - id: kyverno-deploy
+    repo: pvginkel/KyvernoDeploy
+    jenkinsJob: AaC/KyvernoDeploy
