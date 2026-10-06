@@ -79,6 +79,7 @@ properties:
     - headlamp
     - helm
     - home-assistant
+    - homelab-qrh
     - html5
     - intercom-server
     - iot-support

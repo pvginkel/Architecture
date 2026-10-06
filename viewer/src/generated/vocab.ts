@@ -271,6 +271,7 @@ export const LOGO_FILES = {
   "headlamp": "headlamp.png",
   "helm": "helm.svg",
   "home-assistant": "home-assistant.svg",
+  "homelab-qrh": "homelab-qrh.svg",
   "html5": "html5.svg",
   "intercom-server": "intercom-server.png",
   "iot-support": "iot-support.png",
