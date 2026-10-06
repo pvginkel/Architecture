@@ -123,6 +123,10 @@ producers:
     repo: pvginkel/FieldnotesApp
     jenkinsJob: AaC/FieldnotesApp
     defaultLogo: fieldnotes-app
+  - id: homelab-qrh
+    repo: pvginkel/SOPs
+    jenkinsJob: AaC/SOPs
+    defaultLogo: homelab-qrh
   - id: argocd-deploy
     repo: pvginkel/ArgoCDDeploy
     jenkinsJob: AaC/ArgoCDDeploy
