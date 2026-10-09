@@ -325,7 +325,7 @@ export const LOGO_FILES = {
   "typescript": "typescript.svg",
   "ubiquiti": "ubiquiti.svg",
   "ubuntu": "ubuntu.svg",
-  "webathome": "webathome.png",
+  "webathome": "webathome.svg",
   "xaml": "xaml.png",
   "xml": "xml.svg",
   "yaml": "yaml.svg",

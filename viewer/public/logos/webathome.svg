@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 32 32" shape-rendering="crispEdges" role="img" aria-labelledby="title desc">
+  <title id="title">webathome.org — Pixel W</title>
+  <desc id="desc">A W built from five rectangular pixel blocks on a transparent background.</desc>
+  <defs>
+    <linearGradient id="accent" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#52EAD7"/>
+      <stop offset="1" stop-color="#22BFAE"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#accent)" d="M1 4h6v12H1z M7 16h6v12H7z M13 10h6v6h-6z M19 16h6v12h-6z M25 4h6v12h-6z"/>
+</svg>
