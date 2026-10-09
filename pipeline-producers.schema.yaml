@@ -45,9 +45,8 @@ properties:
             upstream trigger; the central architecture update tracks it after
             a push and reports the producer unresolved when a push does not
             start it. For the self-producer it is this repo's own pipeline.
-            Several producers may name one job, each with its own `path`: the
-            Jenkinsfile then copies only each one's `architecture/<id>.yaml`,
-            at any depth, and wires the job once.
+            Several producers may name one job, each with its own `path`; the
+            Jenkinsfile wires the job once.
           minLength: 1
         path:
           type: string
@@ -58,7 +57,8 @@ properties:
             gap lines its job's console prints below the producer's own
             `wrote docs/architecture/<id>.yaml` line, and the repo's root
             `.architecturerc` with `{path}` and `{producer}` filled with its
-            own. Required of every producer whose `jenkinsJob` another
+            own; the Jenkinsfile copies only its `architecture/<id>.yaml`, at
+            any depth. Required of every producer whose `jenkinsJob` another
             producer names too; omit for a producer whose repo is its own.
           pattern: ^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)*$
         self:

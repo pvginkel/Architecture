@@ -67,10 +67,6 @@ pipeline {
             steps {
                 script {
                     List producers = readYaml(file: 'pipeline-producers.yaml').producers ?: []
-                    Map producersOfJob = [:]
-                    for (producer in producers) {
-                        producersOfJob[producer.jenkinsJob] = (producersOfJob[producer.jenkinsJob] ?: 0) + 1
-                    }
                     for (producer in producers) {
                         if (producer.self) {
                             // The self-producer's artifact is this checkout's docs/architecture/:
@@ -81,10 +77,10 @@ pipeline {
                                 cp docs/architecture/*.yaml 'producer-artifacts/${producer.id}/docs/architecture/'
                             """
                         } else {
-                            // A job that publishes for several producers archives each one's
-                            // <id>.yaml, and the collector refuses a file that names another
-                            // producer than its directory's.
-                            String filter = producersOfJob[producer.jenkinsJob] > 1 ? "**/architecture/${producer.id}.yaml" : '**/architecture/**/*.yaml'
+                            // A monorepo's job archives one <id>.yaml per app directory, registered
+                            // or not, and the collector refuses a file that names another producer
+                            // than its directory's.
+                            String filter = producer.path ? "**/architecture/${producer.id}.yaml" : '**/architecture/**/*.yaml'
                             copyArtifacts(
                                 projectName: producer.jenkinsJob,
                                 selector: lastSuccessful(),
