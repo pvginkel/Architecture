@@ -2440,6 +2440,32 @@ def test_a_gap_line_above_every_wrote_line_fails_the_producer(jenkins: FakeJenki
     )
 
 
+def test_a_timestamped_consoles_gap_and_wrote_lines_are_read_past_their_stamp(
+    jenkins: FakeJenkins,
+) -> None:
+    """A `timestamps()` pipeline's consoleText starts a step's output line with `[<ISO time>] `."""
+    stamp = "[2026-10-09T22:04:39.130Z] "
+    console = (
+        f"{stamp}gap: {GAP_A}",
+        f"{stamp}  gap: indented, not a gap line",
+        f"{stamp}gap: {GAP_B}",
+    )
+    jenkins.job(JOB, console=console)
+    shared = (
+        f"{stamp}+ gen-architecture --stage prd --producer headlamp-deploy",
+        f"{stamp}{_wrote('headlamp-deploy')}",
+        f"{stamp}gap: {GAP_A}",
+        f"{stamp}+ gen-architecture --stage prd --producer recipes-deploy",
+        f"{stamp}{_wrote('recipes-deploy')}",
+        f"{stamp}gap: {GAP_B}",
+    )
+    jenkins.job(MONO_JOB, MONO_SCM, console=shared)
+    client = fleet.Jenkins.from_env()
+    assert client.gaps(PRODUCER) == (GAP_A, GAP_B)
+    assert client.gaps(HEADLAMP_PRODUCER) == (GAP_A,)
+    assert client.gaps(RECIPES_PRODUCER) == (GAP_B,)
+
+
 def _sessions_brief(sources_at: str) -> str:
     return (
         "- Producer id: headlamp-deploy\n"

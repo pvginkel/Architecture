@@ -146,12 +146,14 @@ SUMMARY_LOG = re.compile(r"\s*↳ full log: (.+)")
 SCHEDULED = re.compile(
     r"^(?:Scheduling project: |Starting building: )(.+?)(?: #\d+)?$", re.MULTILINE
 )
+# The `[<ISO time>] ` a `timestamps()` pipeline's consoleText puts before a step's output line.
+STAMP = r"(?:\[\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z\] )?"
 # A generated producer's console line naming what its generator could not map.
-GAP = re.compile(r"^gap: (.+)$", re.MULTILINE)
+GAP = re.compile(rf"^{STAMP}gap: (.+)$", re.MULTILINE)
 # A gap line, or the line gen-architecture prints for the artifact it wrote, before that run's gap
 # lines: a job that generates for several producers prints one per producer.
 WROTE_OR_GAP = re.compile(
-    r"^(?:wrote docs/architecture/([^/\s]+)\.yaml(?= |$)|gap: (.+)$)", re.MULTILINE
+    rf"^{STAMP}(?:wrote docs/architecture/([^/\s]+)\.yaml(?= |$)|gap: (.+)$)", re.MULTILINE
 )
 # In a monorepo's `.architecturerc`, the placeholders for the reading producer's own.
 PATH_FIELD = "{path}"
