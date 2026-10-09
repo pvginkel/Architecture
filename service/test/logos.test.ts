@@ -53,8 +53,19 @@ describe("GET /api/logo", () => {
       });
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toContain("image/svg+xml");
-    expect(res.headers["cache-control"]).toBe("public, max-age=86400");
+    expect(res.headers["cache-control"]).toBe("no-cache");
     expect(Buffer.from(res.body).equals(SVG_BYTES)).toBe(true);
+  });
+
+  it("answers a revalidation with the logo's ETag with a 304", async () => {
+    const app = makeApp();
+    const first = await request(app).get("/api/logo").query({ name: "keycloak" });
+    expect(first.headers["etag"]).toBeTruthy();
+    const again = await request(app)
+      .get("/api/logo")
+      .query({ name: "keycloak" })
+      .set("If-None-Match", first.headers["etag"]!);
+    expect(again.status).toBe(304);
   });
 
   it("serves a known PNG with the right content-type and round-trips its bytes", async () => {

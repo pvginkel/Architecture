@@ -7,7 +7,10 @@ export interface LogosOptions {
   viewerRoot: string;
 }
 
-const CACHE_LOGOS = "public, max-age=86400";
+// Revalidate on every use (the ETag makes that a cheap 304): a logo URL is
+// keyed on its name alone, so a replaced logo would otherwise stay stale in
+// consumers' browser caches for the whole max-age.
+const CACHE_LOGOS = "no-cache";
 const LOGO_EXTENSIONS = [".svg", ".png"];
 
 const CONTENT_TYPES: Record<string, string> = {
