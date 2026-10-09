@@ -115,6 +115,62 @@ def test_committed_registry_names_a_repo_for_every_fleet_producer(tmp_path: Path
     assert f"Loaded {len(producers)} registered producer(s)" in proc.stdout
 
 
+# Producers in app directories of one monorepo, sharing its AaC job.
+MONO = "pvginkel/HomelabAppsDeploy"
+MONO_JOB = "AaC/HomelabAppsDeploy"
+HEADLAMP = {"id": "headlamp-deploy", "repo": MONO, "jenkinsJob": MONO_JOB, "path": "headlamp"}
+RECIPES = {"id": "recipes-deploy", "repo": MONO, "jenkinsJob": MONO_JOB, "path": "recipes"}
+
+
+def _registry(tmp_path: Path, *producers: dict[str, Any]) -> subprocess.CompletedProcess[str]:
+    registry = tmp_path / "producers.yaml"
+    registry.write_text(yaml.safe_dump({"producers": list(producers)}))
+    return _collect(registry, tmp_path)
+
+
+@pytest.mark.parametrize("path", ["headlamp", "apps/head-lamp_2.x"])
+def test_registry_takes_a_path(tmp_path: Path, path: str) -> None:
+    proc = _registry(tmp_path, {**HEADLAMP, "path": path})
+    assert "FAIL [registry]" not in proc.stderr, proc.stderr
+    assert "Loaded 1 registered producer(s)" in proc.stdout
+
+
+@pytest.mark.parametrize(
+    "path", ["", "/headlamp", "headlamp/", "apps//headlamp", "../headlamp", ".headlamp", "a b"]
+)
+def test_registry_rejects_a_path_that_is_not_relative_plain_segments(
+    tmp_path: Path, path: str
+) -> None:
+    proc = _registry(tmp_path, {**HEADLAMP, "path": path})
+    assert proc.returncode == 1
+    assert "FAIL [registry]" in proc.stderr
+    assert "at /producers/0/path:" in proc.stderr
+
+
+def test_registry_rejects_a_path_without_a_repo(tmp_path: Path) -> None:
+    proc = _registry(tmp_path, {"id": "headlamp-deploy", "jenkinsJob": MONO_JOB, "path": "x"})
+    assert proc.returncode == 1
+    assert "at /producers/0: 'repo' is a dependency of 'path'" in proc.stderr
+
+
+def test_registry_rejects_a_job_two_producers_name_unless_each_has_a_path(
+    tmp_path: Path,
+) -> None:
+    recipes = {k: v for k, v in RECIPES.items() if k != "path"}
+    proc = _registry(tmp_path, HEADLAMP, recipes, NEWSFILTER)
+    assert proc.returncode == 1
+    assert (
+        f"producers.yaml: jenkinsJob '{MONO_JOB}' is named by 2 producers, so "
+        "each needs a `path`: recipes-deploy has none"
+    ) in proc.stderr
+
+
+def test_registry_takes_a_job_two_producers_name_each_with_its_path(tmp_path: Path) -> None:
+    proc = _registry(tmp_path, HEADLAMP, RECIPES, NEWSFILTER)
+    assert "FAIL [registry]" not in proc.stderr, proc.stderr
+    assert "Loaded 3 registered producer(s)" in proc.stdout
+
+
 # ---- fleet.py ----
 
 
@@ -2146,9 +2202,9 @@ def test_the_gaps_are_the_gap_lines_of_the_last_successful_build_each_once(
     jenkins.job(JOB, builds=[(43, "FAILURE"), (42, "SUCCESS")], console=console)
     jenkins.job(APP, builds=[(1, "FAILURE")], console=(f"gap: {GAP_A}",))
     client = fleet.Jenkins.from_env()
-    assert client.gaps(JOB) == (GAP_A, GAP_B)
+    assert client.gaps(PRODUCER) == (GAP_A, GAP_B)
     assert "/job/AaC/job/NewsFilter/42/consoleText" in jenkins.paths
-    assert client.gaps(APP) == ()
+    assert client.gaps(fleet.Producer("app", REPO, APP)) == ()
 
 
 def test_a_gap_no_run_has_judged_runs_the_update_session_without_triage(
@@ -2255,6 +2311,194 @@ def test_a_generated_producer_whose_gaps_jenkins_cannot_serve_fails(
         PRODUCER, fleet.FAILED, reason, issues=(reason,)
     )
     assert kc.calls() == []
+
+
+# ---- fleet.py: producers in the app directories of a monorepo ----
+
+MONO_SCM = f"https://github.com/{MONO}.git"
+MONO_RC = {
+    "generated": True,
+    "sources": ["{path}/architecture.yaml", "{path}/chart/"],
+    "instructions": "Generated producer (id {producer}); edit only {path}/architecture.yaml.\n",
+}
+HEADLAMP_PRODUCER = fleet.Producer("headlamp-deploy", MONO, MONO_JOB, "headlamp")
+RECIPES_PRODUCER = fleet.Producer("recipes-deploy", MONO, MONO_JOB, "recipes")
+
+
+def _monorepo(tmp_path: Path) -> tuple[Remote, str]:
+    """HomelabAppsDeploy with two app directories and its root `.architecturerc`: the remote and
+    the commit both apps' sources last changed at."""
+    remote = Remote(tmp_path, MONO)
+    base = remote.commit(
+        {
+            ".architecturerc": yaml.safe_dump(MONO_RC),
+            "headlamp/architecture.yaml": "images: {}\n",
+            "headlamp/chart/Chart.yaml": "name: headlamp\n",
+            "recipes/architecture.yaml": "images: {}\n",
+            "recipes/chart/Chart.yaml": "name: recipes\n",
+        }
+    )
+    return remote, base
+
+
+def _wrote(producer: str) -> str:
+    """gen-architecture's line for the artifact it wrote, as the job's console carries it."""
+    return f"wrote docs/architecture/{producer}.yaml — 4 elements, 2 relations"
+
+
+def test_the_registry_entrys_path_reaches_the_producer(tmp_path: Path) -> None:
+    f = _fleet(tmp_path, HEADLAMP, NEWSFILTER)
+    assert fleet.load_registry(f.registry) == [HEADLAMP_PRODUCER, PRODUCER]
+
+
+def test_a_producer_in_an_app_directory_reads_the_rc_filled_with_its_own(
+    tmp_path: Path, jenkins: FakeJenkins
+) -> None:
+    _monorepo(tmp_path)
+    jenkins.job(MONO_JOB, MONO_SCM)
+    f = _fleet(tmp_path)
+    scan = fleet.scan_producer(f, HEADLAMP_PRODUCER, MONO, fleet.Review(), fleet.Jenkins.from_env())
+    assert scan.config == fleet.RepoConfig(
+        generated=True,
+        sources=("headlamp/architecture.yaml", "headlamp/chart/"),
+        instructions="Generated producer (id headlamp-deploy); edit only "
+        "headlamp/architecture.yaml.\n",
+    )
+    alone = fleet.Producer("headlamp-deploy", MONO, MONO_JOB)
+    with pytest.raises(fleet.ProducerError) as failure:
+        fleet.scan_producer(f, alone, MONO, fleet.Review(), fleet.Jenkins.from_env())
+    assert str(failure.value) == (
+        "no sources at origin/HEAD: {path}/architecture.yaml, {path}/chart/"
+    )
+
+
+def test_scan_counts_each_producer_in_a_monorepo_only_its_own_directorys_commits(
+    tmp_path: Path, jenkins: FakeJenkins, capsys: pytest.CaptureFixture[str]
+) -> None:
+    remote, base = _monorepo(tmp_path)
+    remote.commit({"recipes/config/prd/values.yaml": "replicas: 1\n"})
+    remote.commit({"recipes/config/prd/values.yaml": "replicas: 2\n", "README.md": "apps\n"})
+    jenkins.job(MONO_JOB, MONO_SCM)
+    f = _fleet(tmp_path, HEADLAMP, RECIPES)
+    assert fleet.run(["scan"], f, NOW) == 0
+    assert capsys.readouterr().out.splitlines() == [
+        "headlamp-deploy  pvginkel/HomelabAppsDeploy  current",
+        "recipes-deploy   pvginkel/HomelabAppsDeploy  stale              "
+        f"2 commits since {base[:12]}: 1 file changed, 1 insertion(+)",
+    ]
+
+
+def test_a_producer_whose_neighbours_alone_changed_is_current_at_the_head(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins
+) -> None:
+    remote, _ = _monorepo(tmp_path)
+    remote.commit({"headlamp/config/prd/values.yaml": "replicas: 1\n"})
+    reviewed = remote.commit({"headlamp/config/prd/values.yaml": "replicas: 2\n"})
+    head = remote.commit({"recipes/config/prd/values.yaml": "replicas: 1\n"})
+    jenkins.job(MONO_JOB, MONO_SCM)
+    f = _fleet(tmp_path, HEADLAMP)
+    state = f.spec_repo / fleet.STATE_FILE
+    state.parent.mkdir(parents=True)
+    entry = {"reviewed": reviewed, "date": "2026-09-01", "outcome": "skipped: x"}
+    state.write_text(yaml.safe_dump({"headlamp-deploy": entry}))
+    review = fleet.Review(reviewed)
+    scan = fleet.scan_producer(f, HEADLAMP_PRODUCER, MONO, review, fleet.Jenkins.from_env())
+    assert (scan.base, scan.commits, scan.shortstat, scan.current) == (head, 0, "", True)
+    [outcome] = fleet.update(f, [HEADLAMP_PRODUCER], NOW, fleet.Jenkins.from_env())
+    assert outcome == fleet.Outcome(HEADLAMP_PRODUCER, fleet.CURRENT, reviewed=head)
+    assert kc.calls() == []
+
+
+def test_a_shared_jobs_gap_lines_are_each_producers_below_its_wrote_line(
+    jenkins: FakeJenkins,
+) -> None:
+    console = (
+        "+ gen-architecture --stage prd --producer headlamp-deploy",
+        _wrote("headlamp-deploy"),
+        f"gap: {GAP_A}",
+        f"gap: {GAP_A}",
+        "+ gen-architecture --stage prd --producer recipes-deploy",
+        _wrote("recipes-deploy"),
+        f"gap: {GAP_B}",
+        "+ arch-validate headlamp/docs/architecture/headlamp-deploy.yaml",
+    )
+    jenkins.job(MONO_JOB, MONO_SCM, console=console)
+    client = fleet.Jenkins.from_env()
+    assert client.gaps(HEADLAMP_PRODUCER) == (GAP_A,)
+    assert client.gaps(RECIPES_PRODUCER) == (GAP_B,)
+    assert client.gaps(fleet.Producer("paper-clock-deploy", MONO, MONO_JOB, "paper-clock")) == ()
+    assert client.gaps(fleet.Producer("homelab-apps", MONO, MONO_JOB)) == (GAP_A, GAP_B)
+
+
+def test_a_gap_line_above_every_wrote_line_fails_the_producer(jenkins: FakeJenkins) -> None:
+    jenkins.job(MONO_JOB, MONO_SCM, console=(f"gap: {GAP_A}", _wrote("headlamp-deploy")))
+    with pytest.raises(fleet.ProducerError) as failure:
+        fleet.Jenkins.from_env().gaps(HEADLAMP_PRODUCER)
+    assert str(failure.value) == (
+        f"{MONO_JOB} #1 prints `gap: {GAP_A}` above every "
+        "`wrote docs/architecture/<producer>.yaml` line: no producer owns it"
+    )
+
+
+def _sessions_brief(sources_at: str) -> str:
+    return (
+        "- Producer id: headlamp-deploy\n"
+        "- App directory: `headlamp/`\n"
+        "- Mode: generated\n"
+        "- Sources: `headlamp/architecture.yaml` `headlamp/chart/`\n"
+        f"- Base commit: {sources_at}\n"
+    )
+
+
+INSTRUCTIONS = (
+    "\nThe repo's instructions, verbatim from its `.architecturerc`:\n\n"
+    "Generated producer (id headlamp-deploy); edit only headlamp/architecture.yaml.\n\n"
+)
+
+
+def test_the_triage_of_a_producer_in_an_app_directory_judges_its_directorys_commits(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins
+) -> None:
+    remote, base = _monorepo(tmp_path)
+    remote.commit({"headlamp/config/prd/values.yaml": "replicas: 1\n"})
+    remote.commit({"recipes/config/prd/values.yaml": "replicas: 1\n"})
+    jenkins.job(MONO_JOB, MONO_SCM)
+    kc.play(SKIP)
+    f = _fleet(tmp_path, HEADLAMP)
+    list(fleet.update(f, [HEADLAMP_PRODUCER], NOW, fleet.Jenkins.from_env()))
+    assert kc.prompts() == [
+        f"Does anything under `headlamp/` in {base}..HEAD (1 commit) change what producer "
+        "`headlamp-deploy`'s architecture must say? End with your two-line verdict.\n\n"
+        + _sessions_brief(base)
+        + INSTRUCTIONS
+    ]
+
+
+def test_the_update_of_a_producer_in_an_app_directory_is_handed_its_directory_and_gaps(
+    tmp_path: Path, kc: FakeKc, jenkins: FakeJenkins
+) -> None:
+    remote, base = _monorepo(tmp_path)
+    remote.commit({"headlamp/config/prd/values.yaml": "replicas: 1\n"})
+    head = remote.commit({"recipes/config/prd/values.yaml": "replicas: 1\n"})
+    console = (
+        _wrote("headlamp-deploy"), f"gap: {GAP_A}", _wrote("recipes-deploy"), f"gap: {GAP_B}"
+    )
+    jenkins.job(MONO_JOB, MONO_SCM, console=console)
+    kc.play(NOTHING)
+    f = _fleet(tmp_path, HEADLAMP)
+    [outcome] = fleet.update(f, [HEADLAMP_PRODUCER], NOW, fleet.Jenkins.from_env())
+    assert (outcome.status, outcome.reviewed, outcome.gaps) == (fleet.NOTHING, head, (GAP_A,))
+    assert kc.prompts() == [
+        "Bring producer `headlamp-deploy`'s architecture sources up to date with the commits "
+        f"under `headlamp/` in {base}..HEAD. Commit per the repo's cadence, do not push. End "
+        "with your two-line handoff.\n\n"
+        + _sessions_brief(base)
+        + "- Default branch: main\n"
+        f"- Gaps the last successful `{MONO_JOB}` build reports, in scope whatever the range:\n"
+        f"  - {GAP_A}\n"
+        + INSTRUCTIONS
+    ]
+    assert _state(f)["headlamp-deploy"]["gaps"] == [GAP_A]
 
 
 # ---- fleet.py update: the report, the state and the specs repo ----

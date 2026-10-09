@@ -28,6 +28,15 @@ session is handed every gap the build reports, in scope whatever the range.
 The gaps are recorded with the reviewed commit, so a gap no session can close
 costs one session rather than one a run.
 
+A producer whose registry entry carries `path:` is one app directory of a
+monorepo whose other directories, and whose AaC job, belong to other producers.
+Its commits are the ones under `<path>/`; its gaps are the gap lines its job's
+console prints below its own `wrote docs/architecture/<id>.yaml` line, up to
+the next `wrote` line; and in the repo's root `.architecturerc`, `{path}` and
+`{producer}` in `sources` and `instructions` stand for its own. A producer
+without `path:` reads its repo whole, every gap line of its job and the file as
+written.
+
 The sessions are headless `kc` sessions driven as the dev plugin's
 `run_kc_session` drives them: `create-headless` in the clone with the staged
 agent, `send` under a timeout this tool enforces, `status` for the session
@@ -139,6 +148,14 @@ SCHEDULED = re.compile(
 )
 # A generated producer's console line naming what its generator could not map.
 GAP = re.compile(r"^gap: (.+)$", re.MULTILINE)
+# A gap line, or the line gen-architecture prints for the artifact it wrote, before that run's gap
+# lines: a job that generates for several producers prints one per producer.
+WROTE_OR_GAP = re.compile(
+    r"^(?:wrote docs/architecture/([^/\s]+)\.yaml(?= |$)|gap: (.+)$)", re.MULTILINE
+)
+# In a monorepo's `.architecturerc`, the placeholders for the reading producer's own.
+PATH_FIELD = "{path}"
+PRODUCER_FIELD = "{producer}"
 # Builds read back per job to find the one completed before a tracked build.
 SCAN_RANGE = 50
 
@@ -184,11 +201,13 @@ class Fleet:
 @dataclass(frozen=True)
 class Producer:
     """A registry entry: `repo` is None for a producer no repo's sources maintain, `job` the
-    Jenkins job that builds and archives its artifact."""
+    Jenkins job that builds and archives its artifact, `path` the app directory of a producer in
+    a monorepo, None for one its repo is whole."""
 
     id: str
     repo: str | None
     job: str
+    path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -428,7 +447,7 @@ def spec_repo_from(aiworkflowrc: Path) -> Path:
 
 def load_registry(path: Path) -> list[Producer]:
     return [
-        Producer(p["id"], p.get("repo"), p["jenkinsJob"])
+        Producer(p["id"], p.get("repo"), p["jenkinsJob"], p.get("path"))
         for p in yaml.safe_load(path.read_text())["producers"]
     ]
 
@@ -543,6 +562,29 @@ def read_repo_config(clone: Path, head: str) -> RepoConfig:
     if not git(clone, "ls-tree", "--name-only", head, "--", RC_FILE).strip():
         return RepoConfig()
     return parse_repo_config(git(clone, "show", f"{head}:{RC_FILE}"))
+
+
+def scope_config(config: RepoConfig, producer: Producer) -> RepoConfig:
+    """The repo's config as `producer` reads it: for a producer in an app directory, `{path}` and
+    `{producer}` in its sources and instructions filled with its own."""
+    if producer.path is None:
+        return config
+    path = producer.path
+
+    def fill(text: str) -> str:
+        return text.replace(PATH_FIELD, path).replace(PRODUCER_FIELD, producer.id)
+
+    return replace(
+        config,
+        sources=tuple(fill(source) for source in config.sources),
+        instructions=fill(config.instructions),
+    )
+
+
+def scope(producer: Producer) -> tuple[str, ...]:
+    """The pathspec arguments that limit a range to the producer's own commits: its app
+    directory's, or none to read the repo whole."""
+    return () if producer.path is None else ("--", f"{producer.path}/")
 
 
 def kit_files(kit: Path) -> list[Path]:
@@ -701,8 +743,11 @@ def pick_base(clone: Clone, watermark: str, reviewed: str | None) -> str:
 def scan_producer(
     fleet: Fleet, producer: Producer, repo: str, review: Review, jenkins: Jenkins
 ) -> Scan:
+    """What a run judges in the producer's clone. For a producer in an app directory, a base
+    past which only other directories changed is moved to the head: no commit past it is its
+    own."""
     clone = prepare(fleet, repo)
-    config = read_repo_config(clone.path, clone.head)
+    config = scope_config(read_repo_config(clone.path, clone.head), producer)
     files = source_files(clone, config.sources)
     if not files:
         raise ProducerError(f"no sources at origin/HEAD: {', '.join(config.sources)}")
@@ -710,12 +755,19 @@ def scan_producer(
         check_envelope(clone, files, producer.id)
     watermark = git(clone.path, "log", "-1", "--format=%H", clone.head, "--", *config.sources)
     base = pick_base(clone, watermark.strip(), review.reviewed)
-    gaps = jenkins.gaps(producer.job) if config.generated else ()
+    gaps = jenkins.gaps(producer) if config.generated else ()
     new_gaps = tuple(gap for gap in gaps if gap not in review.gaps)
+    own = scope(producer)
+    if own and base != clone.head:
+        newest = git(clone.path, "rev-list", "-1", "--no-merges", f"{base}..{clone.head}", *own)
+        if not newest.strip():
+            base = clone.head
     if base == clone.head:
         return Scan(producer, clone, config, watermark.strip(), base, 0, "", gaps, new_gaps)
-    commits = git(clone.path, "rev-list", "--count", "--no-merges", f"{base}..{clone.head}")
-    shortstat = git(clone.path, "diff", "--shortstat", base, clone.head)
+    commits = git(
+        clone.path, "rev-list", "--count", "--no-merges", f"{base}..{clone.head}", *own
+    )
+    shortstat = git(clone.path, "diff", "--shortstat", base, clone.head, *own)
     return Scan(
         producer,
         clone,
@@ -879,9 +931,11 @@ def parse_handoff(response: str) -> Handoff | None:
 
 
 def _brief(scan: Scan) -> str:
+    directory = scan.producer.path
     return (
         f"- Producer id: {scan.producer.id}\n"
-        f"- Mode: {'generated' if scan.config.generated else 'hand-authored'}\n"
+        + (f"- App directory: `{directory}/`\n" if directory is not None else "")
+        + f"- Mode: {'generated' if scan.config.generated else 'hand-authored'}\n"
         f"- Sources: {' '.join(f'`{s}`' for s in scan.config.sources)}\n"
         f"- Base commit: {scan.base}\n"
     )
@@ -894,10 +948,16 @@ def _instructions(scan: Scan) -> str:
     )
 
 
+def _range(scan: Scan) -> str:
+    """The commits past the base the sessions judge: its app directory's, or the repo's."""
+    where = "" if scan.producer.path is None else f"under `{scan.producer.path}/` "
+    return f"{where}in {scan.base}..HEAD"
+
+
 def triage_prompt(scan: Scan) -> str:
     noun = "commit" if scan.commits == 1 else "commits"
     return (
-        f"Does anything in {scan.base}..HEAD ({scan.commits} {noun}) change what producer "
+        f"Does anything {_range(scan)} ({scan.commits} {noun}) change what producer "
         f"`{scan.producer.id}`'s architecture must say? End with your two-line verdict.\n\n"
         + _brief(scan)
         + _instructions(scan)
@@ -915,7 +975,7 @@ def _gaps(scan: Scan) -> str:
 
 def update_prompt(scan: Scan) -> str:
     work = (
-        f"with the commits in {scan.base}..HEAD"
+        f"with the commits {_range(scan)}"
         if scan.base != scan.clone.head
         else "with the gaps its AaC build reports; no commit is past the base"
     )
@@ -1097,16 +1157,20 @@ class Jenkins:
         build = self._api(f"{job_path(job)}/", tree)["lastCompletedBuild"]
         return None if build is None else (int(build["number"]), str(build["result"]))
 
-    def gaps(self, job: str) -> tuple[str, ...]:
-        """What the job's last successful build reported its generator could not map: the `gap: `
-        lines of its console, each once, in order; none when the job has no successful build."""
+    def gaps(self, producer: Producer) -> tuple[str, ...]:
+        """What the producer's job's last successful build reported its generator could not map:
+        the `gap: ` lines of its console, each once, in order, for a producer in an app directory
+        only those `attributed_gaps` gives it; none when the job has no successful build."""
+        job = producer.job
         tree = "lastSuccessfulBuild[number]"
         build = self._api(f"{job_path(job)}/", tree)["lastSuccessfulBuild"]
         if build is None:
             return ()
-        console = self.get(f"{job_path(job)}/{int(build['number'])}/consoleText")
-        text = console.decode("utf-8", "replace")
-        return tuple(dict.fromkeys(match[1] for match in GAP.finditer(text)))
+        number = int(build["number"])
+        text = self.get(f"{job_path(job)}/{number}/consoleText").decode("utf-8", "replace")
+        if producer.path is None:
+            return tuple(dict.fromkeys(match[1] for match in GAP.finditer(text)))
+        return attributed_gaps(text, producer.id, f"{job} #{number}")
 
     def started_by(self, job: str, number: int) -> list[str]:
         """The jobs build `number` of `job` started, read off its console log."""
@@ -1119,6 +1183,25 @@ class Jenkins:
         builds = self._api(f"{job_path(job)}/", tree)["builds"]
         completed = [b for b in builds if b["number"] < number and b["result"] is not None]
         return str(max(completed, key=lambda b: b["number"])["result"]) if completed else None
+
+
+def attributed_gaps(console: str, producer: str, build: str) -> tuple[str, ...]:
+    """The gap lines of a console that generates for several producers that are `producer`'s,
+    each once, in order: those below its `wrote docs/architecture/<producer>.yaml` line and above
+    the next `wrote` line. A gap line above every `wrote` line is no producer's, and fails it."""
+    owner: str | None = None
+    gaps: list[str] = []
+    for match in WROTE_OR_GAP.finditer(console):
+        if match[1] is not None:
+            owner = match[1]
+        elif owner is None:
+            raise ProducerError(
+                f"{build} prints `gap: {match[2]}` above every "
+                "`wrote docs/architecture/<producer>.yaml` line: no producer owns it"
+            )
+        elif owner == producer:
+            gaps.append(match[2])
+    return tuple(dict.fromkeys(gaps))
 
 
 def scheduled_jobs(console: str) -> list[str]:

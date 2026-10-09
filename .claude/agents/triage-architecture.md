@@ -17,6 +17,10 @@ pathspecs naming what the artifact is made of), the repo's instructions (verbati
 `.architecturerc`; on anything specific to this repo they win) and the base commit. The sources
 have not changed since the base, so what they say now is what the architecture says.
 
+A producer in a monorepo also has an **app directory**: the repo holds other producers'
+directories beside it, and only commits under it are this producer's. Add `-- <app directory>`
+to every range command below; the commit count the caller gives counts only those.
+
 ## Read
 
 1. `.claude/architecture/producer-manual.md`: the "Inclusion rule", "Element kinds" and

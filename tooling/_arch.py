@@ -214,10 +214,12 @@ def load_pipeline_producers(
     schema_path: Path = PIPELINE_PRODUCERS_SCHEMA,
 ) -> list[dict[str, Any]]:
     """Load and validate the producer registry. Returns the list of entries
-    (each a dict with `id` and `jenkinsJob`, and optional `repo`, `self`, `trigger`,
-    `defaultLogo`). Raises ValueError on schema violation or duplicate id — fail fast at
-    collector startup, no partial recovery.
+    (each a dict with `id` and `jenkinsJob`, and optional `repo`, `path`, `self`, `trigger`,
+    `defaultLogo`). Raises ValueError on schema violation, duplicate id, or a job several
+    producers name without each naming its `path` — fail fast at collector startup, no partial
+    recovery.
     """
+    rel = yaml_path.relative_to(REPO_ROOT) if yaml_path.is_relative_to(REPO_ROOT) else yaml_path
     schema = load_yaml(schema_path)
     doc = load_yaml(yaml_path)
     Draft202012Validator.check_schema(schema)
@@ -226,7 +228,6 @@ def load_pipeline_producers(
         key=lambda e: list(e.absolute_path),
     )
     if errors:
-        rel = yaml_path.relative_to(REPO_ROOT) if yaml_path.is_relative_to(REPO_ROOT) else yaml_path
         lines = [f"{rel}: {len(errors)} schema error(s):"]
         for e in errors:
             pointer = "/" + "/".join(str(p) for p in e.absolute_path)
@@ -237,16 +238,22 @@ def load_pipeline_producers(
     seen: dict[str, int] = {}
     for i, p in enumerate(producers):
         if p["id"] in seen:
-            rel = (
-                yaml_path.relative_to(REPO_ROOT)
-                if yaml_path.is_relative_to(REPO_ROOT)
-                else yaml_path
-            )
             raise ValueError(
                 f"{rel}: duplicate producer id "
                 f"{p['id']!r} at indexes {seen[p['id']]} and {i}"
             )
         seen[p["id"]] = i
+
+    by_job: dict[str, list[dict[str, Any]]] = {}
+    for p in producers:
+        by_job.setdefault(p["jenkinsJob"], []).append(p)
+    for job, sharing in by_job.items():
+        unplaced = [p["id"] for p in sharing if "path" not in p]
+        if len(sharing) > 1 and unplaced:
+            raise ValueError(
+                f"{rel}: jenkinsJob {job!r} is named by {len(sharing)} producers, so each "
+                f"needs a `path`: {', '.join(unplaced)} has none"
+            )
     return producers
 
 

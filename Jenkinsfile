@@ -47,10 +47,16 @@ pipeline {
             steps {
                 script {
                     List producers = readYaml(file: 'pipeline-producers.yaml').producers ?: []
-                    String upstreamJobs = producers.findAll { !it.self && it.trigger != false }.collect { it.jenkinsJob }.join(', ')
+                    // A job that publishes for several producers is named once.
+                    List upstreamJobs = []
+                    for (producer in producers) {
+                        if (!producer.self && producer.trigger != false && !upstreamJobs.contains(producer.jenkinsJob)) {
+                            upstreamJobs << producer.jenkinsJob
+                        }
+                    }
                     List jobTriggers = [githubPush()]
                     if (upstreamJobs) {
-                        jobTriggers << upstream(threshold: hudson.model.Result.SUCCESS, upstreamProjects: upstreamJobs)
+                        jobTriggers << upstream(threshold: hudson.model.Result.SUCCESS, upstreamProjects: upstreamJobs.join(', '))
                     }
                     properties([pipelineTriggers(jobTriggers)])
                 }
@@ -61,6 +67,10 @@ pipeline {
             steps {
                 script {
                     List producers = readYaml(file: 'pipeline-producers.yaml').producers ?: []
+                    Map producersOfJob = [:]
+                    for (producer in producers) {
+                        producersOfJob[producer.jenkinsJob] = (producersOfJob[producer.jenkinsJob] ?: 0) + 1
+                    }
                     for (producer in producers) {
                         if (producer.self) {
                             // The self-producer's artifact is this checkout's docs/architecture/:
@@ -71,10 +81,14 @@ pipeline {
                                 cp docs/architecture/*.yaml 'producer-artifacts/${producer.id}/docs/architecture/'
                             """
                         } else {
+                            // A job that publishes for several producers archives each one's
+                            // <id>.yaml, and the collector refuses a file that names another
+                            // producer than its directory's.
+                            String filter = producersOfJob[producer.jenkinsJob] > 1 ? "**/architecture/${producer.id}.yaml" : '**/architecture/**/*.yaml'
                             copyArtifacts(
                                 projectName: producer.jenkinsJob,
                                 selector: lastSuccessful(),
-                                filter: '**/architecture/**/*.yaml',
+                                filter: filter,
                                 target: "producer-artifacts/${producer.id}",
                                 fingerprintArtifacts: true
                             )

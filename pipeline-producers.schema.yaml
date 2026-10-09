@@ -17,6 +17,8 @@ properties:
       type: object
       additionalProperties: false
       required: [id, jenkinsJob]
+      dependentRequired:
+        path: [repo]
       properties:
         id:
           type: string
@@ -43,7 +45,22 @@ properties:
             upstream trigger; the central architecture update tracks it after
             a push and reports the producer unresolved when a push does not
             start it. For the self-producer it is this repo's own pipeline.
+            Several producers may name one job, each with its own `path`: the
+            Jenkinsfile then copies only each one's `architecture/<id>.yaml`,
+            at any depth, and wires the job once.
           minLength: 1
+        path:
+          type: string
+          description: |
+            The app directory, relative to `repo`'s root, of a producer in a
+            monorepo (e.g., `headlamp` in pvginkel/HomelabAppsDeploy). The
+            central architecture update reads only the commits under it, the
+            gap lines its job's console prints below the producer's own
+            `wrote docs/architecture/<id>.yaml` line, and the repo's root
+            `.architecturerc` with `{path}` and `{producer}` filled with its
+            own. Required of every producer whose `jenkinsJob` another
+            producer names too; omit for a producer whose repo is its own.
+          pattern: ^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)*$
         self:
           type: boolean
           const: true

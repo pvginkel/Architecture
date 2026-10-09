@@ -20,6 +20,9 @@ The prompt names:
 
 - **Producer id**: the `producer:` envelope key, matching this repo's entry in the Architecture
   repo's `pipeline-producers.yaml`.
+- **App directory**, for a producer in a monorepo only: the directory its artifact is made from.
+  The repo holds other producers' directories beside it, and only commits under it are this
+  producer's: add `-- <app directory>` to every range command below, and edit nothing outside it.
 - **Mode**: `hand-authored` or `generated`. It decides what you edit and how you validate;
   everything else in this file applies to both.
 - **Sources**: git pathspecs naming what the artifact is made of. `git ls-files -- <sources>`
