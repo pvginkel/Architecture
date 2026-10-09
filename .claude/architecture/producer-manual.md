@@ -578,7 +578,12 @@ annotation, say), it prints on a console line of its own,
 update reads those lines from the producer's last successful AaC build
 and hands each gap to an update session whatever commits are new, so a
 gap older than the last review is not left behind. Print every gap
-this way: a gap reported in any other form is never seen.
+this way: a gap reported in any other form is never seen. A job that
+generates for several producers (a monorepo, one app directory each)
+generates them one after another, never in parallel: a gap line belongs
+to the producer whose `wrote docs/architecture/<id>.yaml` line, which
+`gen-architecture` prints, is nearest above it, and a gap line above
+every `wrote` line fails each of the job's producers.
 
 ## Capability enum (read-only reference)
 
@@ -734,7 +739,10 @@ YAML or several.
 The Architecture pipeline calls `copyArtifacts` with
 `filter: '**/architecture/**/*.yaml'` and no `flatten`, so the YAMLs
 land under `producer-artifacts/<producer-id>/` with their original
-repo-relative paths preserved. The collector walks the producer
+repo-relative paths preserved. For a producer whose registry entry
+carries `path:`, one of several a monorepo's job publishes, the filter
+is `**/architecture/<producer-id>.yaml` alone, so each producer
+receives its own file. The collector walks the producer
 directory recursively, so subdirectory layout (and any same-basename
 files in different subdirs) is fine. It copies a producer's last
 successful build, so a model that fails validation never reaches it,
@@ -766,7 +774,15 @@ producers:
   - id: <kebab-id>                  # matches the bare kebab in this repo's architecture YAML producer: key
     jenkinsJob: <Jenkins job path>  # e.g. AaC/Ansible, AaC/KubeCoderDeploy
     repo: <owner>/<name>            # GitHub repo the central architecture update clones
+    path: <app directory>           # only for one app directory of a monorepo; see below
 ```
+
+`path:` is for a producer that is one app directory of a monorepo whose
+one job publishes a producer per directory. It requires `repo:`, and
+once several producers name one `jenkinsJob`, each of them must carry
+it, or the collector refuses the registry. Register such a producer
+only after its job has archived its `<id>.yaml`: the narrowed copy
+fails on a build without it.
 
 The next Architecture pipeline run picks the new entry up and wires
 the upstream-success trigger automatically. From then on, every
@@ -800,6 +816,12 @@ producer, as does a `sources` that matches nothing at the remote head.
 **generated** producer does need the file: `generated: true` is what
 keeps the update session in the annotation layer instead of the
 generated YAML.
+
+A monorepo has one `.architecturerc`, at its root, for every producer
+in it. For a producer whose registry entry carries `path:`, `{path}`
+and `{producer}` in `sources` and `instructions` are filled with its
+own (quote such a source, `"{path}/chart/"`), and only the commits
+under its directory are judged.
 
 ## Ownership conventions
 

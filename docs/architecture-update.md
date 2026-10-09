@@ -45,12 +45,25 @@ deliberately not part of it.
   to both sessions, and authoritative over the agents' own files on anything specific to that repo).
   The file is read from the remote head without a checkout; an unknown key, a wrong type or
   unparseable YAML fails that producer instead of being worked around.
+- **`path:`, for a producer in a monorepo** — the app directory, relative to the repo's root, of a
+  producer whose repo holds other producers' directories beside its own and whose `jenkinsJob`
+  builds them all. It requires `repo:`, and when several producers name one `jenkinsJob`, each of
+  them must carry it; `collect.py` checks both at startup. The tool then reads that producer's
+  commits under `<path>/` only, and the repo's one root `.architecturerc` with `{path}` and
+  `{producer}` in `sources` and `instructions` filled with its own; quote such a source
+  (`"{path}/chart/"`). The id stays `<app>-deploy`, so `path:` is explicit rather than derived.
+  A producer without `path:` reads its repo whole and the file as written.
 
 - **`gap:` lines, for a generated producer.** Its generator prints each thing it could not map on a
   console line of its own, `gap: <what>`, in the `jenkinsJob` build, and the build stays green.
   The `aac-tools` image's `gen-architecture`, which the deploy repos' producer pipelines run, does
   this, for an image no annotation maps, for instance. The
-  tool reads the lines from that job's last successful build.
+  tool reads the lines from that job's last successful build. A job that generates for several
+  producers runs them one after another, and a gap line belongs to the producer whose
+  `wrote docs/architecture/<id>.yaml` line, which `gen-architecture` prints itself, is nearest
+  above it. A gap line above every `wrote` line is no producer's, and fails each `path:` producer
+  of the job rather than being dropped. A producer without `path:` takes every gap line of its
+  job.
 
 A hand-authored producer is cross-checked before any session: the first YAML among its sources that
 carries a top-level `producer:` must name the registry id. A wrong `repo:` therefore surfaces as a
@@ -76,9 +89,10 @@ a time:
    uncommitted or unpushed kit edit refuses producer `architecture` until it is pushed.)
 3. **Pick the base, read the gaps.** The watermark is the last commit that touched the sources at
    `origin/HEAD`; the base is the later of that and the producer's `reviewed` commit in the state
-   file. A generated producer's gaps are the `gap:` lines of its `jenkinsJob`'s last successful
-   build. A gap is new when the state file does not list it. A base equal to the head with no new
-   gap means *current*: nothing to judge, no session.
+   file. For a `path:` producer only the commits under `<path>/` count, so a base past which only
+   other directories changed is the head. A generated producer's gaps are the `gap:` lines of its
+   `jenkinsJob`'s last successful build. A gap is new when the state file does not list it. A base
+   equal to the head with no new gap means *current*: nothing to judge, no session.
 4. **Triage.** A `triage-architecture` session answers `VERDICT: update` or `VERDICT: skip` with one
    line of reason. `skip` ends the producer and advances `reviewed` to the head; an answer that
    cannot be parsed counts as `update`, so a confused judge costs a session rather than a miss. A

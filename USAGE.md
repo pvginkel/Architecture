@@ -229,6 +229,14 @@ producer does need the file: `generated: true` is what keeps the session in the
 sources the artifact is generated from, instead of the artifact it would
 otherwise edit.
 
+A monorepo whose one AaC job publishes a producer per app directory has one
+`.architecturerc` at its root for all of them. Each such producer's entry in
+`pipeline-producers.yaml` carries `path:`, its app directory, and the run fills
+`{path}` and `{producer}` in that producer's `sources` and `instructions` with
+its own (quote such a source, `"{path}/chart/"`). It judges only the commits
+under the directory, and of the job's `gap:` lines only those printed below
+the producer's own `wrote docs/architecture/<id>.yaml` line.
+
 ## Schema-change requests
 
 To add a capability id, a relation kind, a stereotype, or any other vocabulary
