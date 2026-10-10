@@ -181,8 +181,9 @@ producers:
     repo: pvginkel/HomeassistantMcpDeploy
     jenkinsJob: AaC/HomeassistantMcpDeploy
   - id: calendar-support-deploy
-    repo: pvginkel/CalendarSupportDeploy
-    jenkinsJob: AaC/CalendarSupportDeploy
+    repo: pvginkel/HomelabAppsDeploy
+    jenkinsJob: AaC/HomelabAppsDeploy
+    path: calendar-support
   - id: git-sync-deploy
     repo: pvginkel/GitSyncDeploy
     jenkinsJob: AaC/GitSyncDeploy
