@@ -142,8 +142,9 @@ producers:
     jenkinsJob: AaC/HomelabAppsDeploy
     path: filebeat
   - id: models-deploy
-    repo: pvginkel/ModelsDeploy
-    jenkinsJob: AaC/ModelsDeploy
+    repo: pvginkel/HomelabAppsDeploy
+    jenkinsJob: AaC/HomelabAppsDeploy
+    path: models
   - id: pgadmin-deploy
     repo: pvginkel/HomelabAppsDeploy
     jenkinsJob: AaC/HomelabAppsDeploy
