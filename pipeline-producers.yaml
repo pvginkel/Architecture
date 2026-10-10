@@ -155,8 +155,9 @@ producers:
     repo: pvginkel/HomeappsDeploy
     jenkinsJob: AaC/HomeappsDeploy
   - id: iac-provisioner-deploy
-    repo: pvginkel/IacProvisionerDeploy
-    jenkinsJob: AaC/IacProvisionerDeploy
+    repo: pvginkel/HomelabAppsDeploy
+    jenkinsJob: AaC/HomelabAppsDeploy
+    path: iac-provisioner
   - id: newsfilter-deploy
     repo: pvginkel/NewsfilterDeploy
     jenkinsJob: AaC/NewsfilterDeploy
