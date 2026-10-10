@@ -162,8 +162,9 @@ producers:
     repo: pvginkel/NewsfilterDeploy
     jenkinsJob: AaC/NewsfilterDeploy
   - id: source-deploy
-    repo: pvginkel/SourceDeploy
-    jenkinsJob: AaC/SourceDeploy
+    repo: pvginkel/HomelabAppsDeploy
+    jenkinsJob: AaC/HomelabAppsDeploy
+    path: source
   - id: scantopdf-deploy
     repo: pvginkel/ScantopdfDeploy
     jenkinsJob: AaC/ScantopdfDeploy
