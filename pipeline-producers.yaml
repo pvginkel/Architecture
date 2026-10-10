@@ -219,8 +219,9 @@ producers:
     repo: pvginkel/VersionPollerDeploy
     jenkinsJob: AaC/VersionPollerDeploy
   - id: headlamp-deploy
-    repo: pvginkel/HeadlampDeploy
-    jenkinsJob: AaC/HeadlampDeploy
+    repo: pvginkel/PlatformAddOnsDeploy
+    jenkinsJob: AaC/PlatformAddOnsDeploy
+    path: headlamp
   - id: iot-deploy
     repo: pvginkel/IotDeploy
     jenkinsJob: AaC/IotDeploy
