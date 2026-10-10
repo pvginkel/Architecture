@@ -138,8 +138,9 @@ producers:
     repo: pvginkel/KubeCoderDeploy
     jenkinsJob: AaC/KubeCoderDeploy
   - id: filebeat-deploy
-    repo: pvginkel/FilebeatDeploy
-    jenkinsJob: AaC/FilebeatDeploy
+    repo: pvginkel/HomelabAppsDeploy
+    jenkinsJob: AaC/HomelabAppsDeploy
+    path: filebeat
   - id: models-deploy
     repo: pvginkel/ModelsDeploy
     jenkinsJob: AaC/ModelsDeploy
