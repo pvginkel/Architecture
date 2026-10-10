@@ -280,8 +280,9 @@ producers:
     repo: pvginkel/ExternalSecretsDeploy
     jenkinsJob: AaC/ExternalSecretsDeploy
   - id: mosquitto-deploy
-    repo: pvginkel/MosquittoDeploy
-    jenkinsJob: AaC/MosquittoDeploy
+    repo: pvginkel/HomelabAppsDeploy
+    jenkinsJob: AaC/HomelabAppsDeploy
+    path: mosquitto
   - id: nginx-deploy
     repo: pvginkel/NginxDeploy
     jenkinsJob: AaC/NginxDeploy
