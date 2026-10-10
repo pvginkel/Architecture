@@ -193,8 +193,9 @@ producers:
     repo: pvginkel/GitSyncDeploy
     jenkinsJob: AaC/GitSyncDeploy
   - id: infra-statistics-deploy
-    repo: pvginkel/InfraStatisticsDeploy
-    jenkinsJob: AaC/InfraStatisticsDeploy
+    repo: pvginkel/HomelabAppsDeploy
+    jenkinsJob: AaC/HomelabAppsDeploy
+    path: infra-statistics
   - id: intercom-deploy
     repo: pvginkel/IntercomDeploy
     jenkinsJob: AaC/IntercomDeploy
