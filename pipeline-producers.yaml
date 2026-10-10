@@ -144,8 +144,9 @@ producers:
     repo: pvginkel/ModelsDeploy
     jenkinsJob: AaC/ModelsDeploy
   - id: pgadmin-deploy
-    repo: pvginkel/PgadminDeploy
-    jenkinsJob: AaC/PgadminDeploy
+    repo: pvginkel/HomelabAppsDeploy
+    jenkinsJob: AaC/HomelabAppsDeploy
+    path: pgadmin
   - id: fieldnotes-deploy
     repo: pvginkel/FieldnotesDeploy
     jenkinsJob: AaC/FieldnotesDeploy
