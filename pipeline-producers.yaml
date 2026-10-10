@@ -197,8 +197,9 @@ producers:
     repo: pvginkel/IntercomDeploy
     jenkinsJob: AaC/IntercomDeploy
   - id: telegram-mcp-deploy
-    repo: pvginkel/TelegramMcpDeploy
-    jenkinsJob: AaC/TelegramMcpDeploy
+    repo: pvginkel/HomelabAppsDeploy
+    jenkinsJob: AaC/HomelabAppsDeploy
+    path: telegram-mcp
   - id: trello-mcp-deploy
     repo: pvginkel/TrelloMcpDeploy
     jenkinsJob: AaC/TrelloMcpDeploy
