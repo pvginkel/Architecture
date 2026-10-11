@@ -293,8 +293,9 @@ producers:
     jenkinsJob: AaC/HomelabAppsDeploy
     path: mosquitto
   - id: nginx-deploy
-    repo: pvginkel/NginxDeploy
-    jenkinsJob: AaC/NginxDeploy
+    repo: pvginkel/HomelabAppsDeploy
+    jenkinsJob: AaC/HomelabAppsDeploy
+    path: nginx
   - id: grafana-deploy
     repo: pvginkel/GrafanaDeploy
     jenkinsJob: AaC/GrafanaDeploy
