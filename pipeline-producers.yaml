@@ -292,8 +292,9 @@ producers:
     jenkinsJob: AaC/PlatformAddOnsDeploy
     path: csi-driver-smb
   - id: external-secrets-deploy
-    repo: pvginkel/ExternalSecretsDeploy
-    jenkinsJob: AaC/ExternalSecretsDeploy
+    repo: pvginkel/PlatformAddOnsDeploy
+    jenkinsJob: AaC/PlatformAddOnsDeploy
+    path: external-secrets
   - id: mosquitto-deploy
     repo: pvginkel/HomelabAppsDeploy
     jenkinsJob: AaC/HomelabAppsDeploy
