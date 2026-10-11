@@ -284,8 +284,9 @@ producers:
     jenkinsJob: AaC/PlatformAddOnsDeploy
     path: ceph-csi-rbd
   - id: ceph-csi-cephfs-deploy
-    repo: pvginkel/CephCsiCephfsDeploy
-    jenkinsJob: AaC/CephCsiCephfsDeploy
+    repo: pvginkel/PlatformAddOnsDeploy
+    jenkinsJob: AaC/PlatformAddOnsDeploy
+    path: ceph-csi-cephfs
   - id: csi-driver-smb-deploy
     repo: pvginkel/PlatformAddOnsDeploy
     jenkinsJob: AaC/PlatformAddOnsDeploy
