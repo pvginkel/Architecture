@@ -298,8 +298,9 @@ producers:
     jenkinsJob: AaC/HomelabAppsDeploy
     path: nginx
   - id: grafana-deploy
-    repo: pvginkel/GrafanaDeploy
-    jenkinsJob: AaC/GrafanaDeploy
+    repo: pvginkel/PlatformAddOnsDeploy
+    jenkinsJob: AaC/PlatformAddOnsDeploy
+    path: grafana
   - id: prometheus-deploy
     repo: pvginkel/PrometheusDeploy
     jenkinsJob: AaC/PrometheusDeploy
