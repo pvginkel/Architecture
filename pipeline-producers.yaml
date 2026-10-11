@@ -264,8 +264,9 @@ producers:
     jenkinsJob: AaC/HomelabAppsDeploy
     path: keycloak
   - id: jenkins-deploy
-    repo: pvginkel/JenkinsDeploy
-    jenkinsJob: AaC/JenkinsDeploy
+    repo: pvginkel/HomelabAppsDeploy
+    jenkinsJob: AaC/HomelabAppsDeploy
+    path: jenkins
   - id: elasticsearch-deploy
     repo: pvginkel/HomelabAppsDeploy
     jenkinsJob: AaC/HomelabAppsDeploy
