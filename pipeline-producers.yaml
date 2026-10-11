@@ -245,8 +245,9 @@ producers:
     repo: pvginkel/ChartsDeploy
     jenkinsJob: AaC/ChartsDeploy
   - id: registry-deploy
-    repo: pvginkel/RegistryDeploy
-    jenkinsJob: AaC/RegistryDeploy
+    repo: pvginkel/HomelabAppsDeploy
+    jenkinsJob: AaC/HomelabAppsDeploy
+    path: registry
   - id: storage-deploy
     repo: pvginkel/HomelabAppsDeploy
     jenkinsJob: AaC/HomelabAppsDeploy
