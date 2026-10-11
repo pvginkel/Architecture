@@ -213,8 +213,9 @@ producers:
     repo: pvginkel/Zigbee2mqttDeploy
     jenkinsJob: AaC/Zigbee2mqttDeploy
   - id: guacamole-deploy
-    repo: pvginkel/GuacamoleDeploy
-    jenkinsJob: AaC/GuacamoleDeploy
+    repo: pvginkel/HomelabAppsDeploy
+    jenkinsJob: AaC/HomelabAppsDeploy
+    path: guacamole
   - id: youtrack-deploy
     repo: pvginkel/HomelabAppsDeploy
     jenkinsJob: AaC/HomelabAppsDeploy
