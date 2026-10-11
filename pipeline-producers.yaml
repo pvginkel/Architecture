@@ -216,8 +216,9 @@ producers:
     repo: pvginkel/GuacamoleDeploy
     jenkinsJob: AaC/GuacamoleDeploy
   - id: youtrack-deploy
-    repo: pvginkel/YoutrackDeploy
-    jenkinsJob: AaC/YoutrackDeploy
+    repo: pvginkel/HomelabAppsDeploy
+    jenkinsJob: AaC/HomelabAppsDeploy
+    path: youtrack
   - id: postgres-pas-deploy
     repo: pvginkel/PostgresPasDeploy
     jenkinsJob: AaC/PostgresPasDeploy
