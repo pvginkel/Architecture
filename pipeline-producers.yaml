@@ -255,8 +255,9 @@ producers:
     repo: pvginkel/DnsmasqDeploy
     jenkinsJob: AaC/DnsmasqDeploy
   - id: keycloak-deploy
-    repo: pvginkel/KeycloakDeploy
-    jenkinsJob: AaC/KeycloakDeploy
+    repo: pvginkel/HomelabAppsDeploy
+    jenkinsJob: AaC/HomelabAppsDeploy
+    path: keycloak
   - id: keycloak-dev-deploy
     repo: pvginkel/KeycloakDeploy
     jenkinsJob: AaC/KeycloakDeploy-dev
