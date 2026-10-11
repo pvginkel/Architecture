@@ -264,8 +264,9 @@ producers:
     repo: pvginkel/JenkinsDeploy
     jenkinsJob: AaC/JenkinsDeploy
   - id: elasticsearch-deploy
-    repo: pvginkel/ElasticsearchDeploy
-    jenkinsJob: AaC/ElasticsearchDeploy
+    repo: pvginkel/HomelabAppsDeploy
+    jenkinsJob: AaC/HomelabAppsDeploy
+    path: elasticsearch
   - id: cloudnative-pg-deploy
     repo: pvginkel/CloudnativePgDeploy
     jenkinsJob: AaC/CloudnativePgDeploy
