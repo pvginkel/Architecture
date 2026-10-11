@@ -220,8 +220,9 @@ producers:
     jenkinsJob: AaC/HomelabAppsDeploy
     path: youtrack
   - id: postgres-pas-deploy
-    repo: pvginkel/PostgresPasDeploy
-    jenkinsJob: AaC/PostgresPasDeploy
+    repo: pvginkel/HomelabAppsDeploy
+    jenkinsJob: AaC/HomelabAppsDeploy
+    path: postgres-pas
   - id: electronics-inventory-deploy
     repo: pvginkel/ElectronicsInventoryDeploy
     jenkinsJob: AaC/ElectronicsInventoryDeploy
