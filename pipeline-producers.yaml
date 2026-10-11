@@ -302,8 +302,9 @@ producers:
     jenkinsJob: AaC/PlatformAddOnsDeploy
     path: grafana
   - id: prometheus-deploy
-    repo: pvginkel/PrometheusDeploy
-    jenkinsJob: AaC/PrometheusDeploy
+    repo: pvginkel/PlatformAddOnsDeploy
+    jenkinsJob: AaC/PlatformAddOnsDeploy
+    path: prometheus
   - id: pipelines-deploy
     repo: pvginkel/PipelinesDeploy
     jenkinsJob: AaC/PipelinesDeploy
