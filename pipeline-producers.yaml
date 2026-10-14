@@ -322,3 +322,6 @@ producers:
     repo: pvginkel/PlatformAddOnsDeploy
     jenkinsJob: AaC/PlatformAddOnsDeploy
     path: kyverno
+  - id: notifications-deploy
+    repo: pvginkel/NotificationsDeploy
+    jenkinsJob: AaC/NotificationsDeploy
