@@ -134,6 +134,9 @@ producers:
   - id: notifications
     repo: pvginkel/Notifications
     jenkinsJob: AaC/Notifications
+  - id: pilot-app
+    repo: pvginkel/PilotApp
+    jenkinsJob: AaC/PilotApp
   - id: argocd-deploy
     repo: pvginkel/ArgoCDDeploy
     jenkinsJob: AaC/ArgoCDDeploy
