@@ -328,3 +328,6 @@ producers:
   - id: notifications-deploy
     repo: pvginkel/NotificationsDeploy
     jenkinsJob: AaC/NotificationsDeploy
+  - id: pilot-deploy
+    repo: pvginkel/PilotDeploy
+    jenkinsJob: AaC/PilotDeploy
