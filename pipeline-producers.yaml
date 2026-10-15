@@ -331,3 +331,6 @@ producers:
   - id: pilot-deploy
     repo: pvginkel/PilotDeploy
     jenkinsJob: AaC/PilotDeploy
+  - id: aiworkflow-deploy
+    repo: pvginkel/AIWorkflowDeploy
+    jenkinsJob: AaC/AIWorkflowDeploy
