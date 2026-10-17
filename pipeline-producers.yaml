@@ -334,3 +334,6 @@ producers:
   - id: aiworkflow-deploy
     repo: pvginkel/AIWorkflowDeploy
     jenkinsJob: AaC/AIWorkflowDeploy
+  - id: dev-guides-deploy
+    repo: pvginkel/DevGuidesDeploy
+    jenkinsJob: AaC/DevGuidesDeploy
