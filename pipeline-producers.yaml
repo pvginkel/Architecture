@@ -26,10 +26,6 @@ producers:
   - id: docker-images
     repo: pvginkel/DockerImages
     jenkinsJob: AaC/DockerImages
-  - id: ssegateway
-    repo: pvginkel/SSEGateway
-    jenkinsJob: AaC/SSEGateway
-    defaultLogo: sse-gateway
   - id: electronics-inventory
     repo: pvginkel/ElectronicsInventory
     jenkinsJob: AaC/ElectronicsInventory
