@@ -323,6 +323,9 @@ producers:
   - id: pilot-deploy
     repo: pvginkel/PilotDeploy
     jenkinsJob: AaC/PilotDeploy
+  - id: pilot-dev-deploy
+    repo: pvginkel/PilotDeploy
+    jenkinsJob: AaC/PilotDeployDev
   - id: dev-guides-deploy
     repo: pvginkel/DevGuidesDeploy
     jenkinsJob: AaC/DevGuidesDeploy
