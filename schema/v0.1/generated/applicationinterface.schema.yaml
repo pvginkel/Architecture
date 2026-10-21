@@ -102,10 +102,12 @@ properties:
     - newsfilter
     - nginx
     - nodejs
+    - ntfy
     - openai
     - openbao
     - opensearch
     - pgadmin
+    - pilot
     - pipelines
     - playwright
     - plex
