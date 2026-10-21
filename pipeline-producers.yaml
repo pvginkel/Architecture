@@ -130,6 +130,7 @@ producers:
   - id: notifications
     repo: pvginkel/Notifications
     jenkinsJob: AaC/Notifications
+    defaultLogo: ntfy
   - id: pilot-app
     repo: pvginkel/PilotApp
     jenkinsJob: AaC/PilotApp
