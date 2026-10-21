@@ -19,7 +19,7 @@
         </filter>
     </defs>
     <g style="display:inline">
-        <path d="M0 0h50v50H0z" style="fill:url(#c);fill-opacity:1;stroke:none;stroke-width:.286502;stroke-linejoin:bevel"/>
+        <rect width="50" height="50" rx="6.78" style="fill:url(#c);fill-opacity:1;stroke:none;stroke-width:.286502;stroke-linejoin:bevel"/>
     </g>
     <g style="display:inline">
         <path d="M50.4 46.883c-9.168 0-17.023 7.214-17.023 16.387v.007l.09 71.37-2.303 16.992 31.313-8.319h77.841c9.17 0 17.024-7.224 17.024-16.396V63.27c0-9.17-7.85-16.383-17.016-16.387h-.008zm0 11.566h89.926c3.222.004 5.45 2.347 5.45 4.82v63.655c0 2.475-2.232 4.82-5.457 4.82h-79.54l-15.908 4.807.162-.938-.088-72.343c0-2.476 2.23-4.82 5.455-4.82z" style="color:#fff;display:inline;fill:#fff;stroke:none;stroke-width:1.93113;-inkscape-stroke:none;filter:url(#d)" transform="scale(.26458)"/>
