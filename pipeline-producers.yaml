@@ -318,6 +318,10 @@ producers:
     repo: pvginkel/PlatformAddOnsDeploy
     jenkinsJob: AaC/PlatformAddOnsDeploy
     path: kyverno
+  - id: descheduler-deploy
+    repo: pvginkel/PlatformAddOnsDeploy
+    jenkinsJob: AaC/PlatformAddOnsDeploy
+    path: descheduler
   - id: notifications-deploy
     repo: pvginkel/NotificationsDeploy
     jenkinsJob: AaC/NotificationsDeploy
